@@ -39,7 +39,7 @@ except ImportError:
     validate_segments = None
 
 # Constants
-MAX_COMPLETION_TOKENS = 32000  # Maximum tokens for ChatGPT response
+MAX_COMPLETION_TOKENS = 125000  # Maximum tokens for ChatGPT response
 MAX_ERROR_OUTPUT_LENGTH = 500  # Maximum length of error output to display
 
 
