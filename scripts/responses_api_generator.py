@@ -773,7 +773,7 @@ def generate_pass_b_content(
     max_tokens = calculate_max_output_tokens(
         total_target_words,
         buffer_ratio=1.30,
-        cap_tokens=min(int(os.getenv("PASS_B_MAX_OUTPUT_TOKENS", "60000")), 60000),
+        cap_tokens=min(int(os.getenv("PASS_B_MAX_OUTPUT_TOKENS", "125000")), 125000),
     )
 
     # Pass B is intended to be a low-cost summarization step. Default to gpt-5-nano.
