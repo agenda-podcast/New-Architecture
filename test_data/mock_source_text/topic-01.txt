@@ -1,12 +1,208 @@
-This is a placeholder SOURCE_TEXT for topic-01.
-
-Replace this file if you enable Pass B (medium/short/reels) while disabling Pass A (long).
-
-Example structure you may paste here:
-
+Reasoning
+Empty reasoning item
+Web Search
+Searched the web
+Reasoning
+Empty reasoning item
+Web Search
+Searched the web
+Reasoning
+Empty reasoning item
+Web Search
+Searched the web
+Reasoning
+Empty reasoning item
+Web Search
+Searched the web
+Reasoning
+Empty reasoning item
+Web Search
+Searched the web
+Reasoning
+Empty reasoning item
+Web Search
+Searched the web
+Reasoning
+Empty reasoning item
+Web Search
+Searched the web
+Reasoning
+Empty reasoning item
+Web Search
+Searched the web
+Reasoning
+Empty reasoning item
+Web Search
+Searched the web
+Reasoning
+Empty reasoning item
+Web Search
+Searched the web
+Reasoning
+Empty reasoning item
+Web Search
+Searched the web
+Reasoning
+Empty reasoning item
+Web Search
+Searched the web
+Reasoning
+Empty reasoning item
+assistant
 SOURCES:
-- https://example.com
 
+https://www.reuters.com/world/asia-pacific/core-inflation-japans-capital-slows-december-stays-above-boj-target-2025-12-25/
+https://www.reuters.com/business/energy/oil-edges-up-strong-us-economic-growth-supply-risks-2025-12-24/
+https://www.reuters.com/world/europe/major-central-banks-deliver-biggest-easing-push-over-decade-2025-2025-12-23/
+https://www.reuters.com/sustainability/sustainable-finance-reporting/ecb-wage-tracker-signals-gradual-normalisation-negotiated-wage-pressures-2025-12-19/
+https://ec.europa.eu/eurostat/web/products-euro-indicators/w/2-17122025-ap
+https://www.eia.gov/petroleum/gasdiesel/
+https://www.fao.org/statistics/events/events-detail/fao-food-price-index-and-commodity-price-indices.-december-2025-update/en
 SCRIPT:
-HOST_A: ...
-HOST_B: ...
+HOST_A: This is Gary Thompson. It’s Friday, December 26, 2025. And today we’re talking about the global cost of living—why it still feels like everything is getting more expensive, even when some inflation headlines sound calmer.
+
+HOST_B: I’m Margaret Butcher. And if you’re listening and thinking, “Calmer? Not where I live,” yeah—same. Rent, groceries, utilities, childcare, a basic night out… it’s like every category found a new way to surprise you.
+
+HOST_A: Exactly. And I want to set a standard for this conversation: no doom, no magic thinking, no blaming some cartoon villain. We stick to what’s measurable, what’s actually driving prices, and what working families can realistically do—this week, this month—while policymakers do what they do.
+
+HOST_B: Okay, Gary, give us the quick global snapshot. What are you watching right now?
+
+HOST_A: Three buckets: inflation data, wages, and energy—because energy still leaks into everything.
+
+HOST_A: On inflation, Japan’s Tokyo numbers just came in. Reuters reports Tokyo’s core inflation in December was 2.3% year over year—still above the Bank of Japan’s 2% target, but slower than November, helped by lower utility bills. And the index that strips out fresh food and fuel—so more “demand-driven”—was 2.6%. That matters because Tokyo is often a leading indicator ahead of Japan’s national data. (reuters.com)
+
+HOST_B: So even when energy cools, underlying prices can still run hot.
+
+HOST_A: Right. Meanwhile in Europe, Eurostat says euro area annual inflation was 2.1% in November, and it points out that services were the biggest contributor to that inflation rate. Translation: even when goods inflation cools, the everyday stuff you can’t opt out of—services—stays sticky. (ec.europa.eu)
+
+HOST_B: Sticky is the word. Haircuts, repairs, insurance, childcare, health care—people notice those.
+
+HOST_A: And then there’s wages. Reuters reports the European Central Bank’s wage tracker is pointing to negotiated wage growth of 3.2% in 2025 and 2.3% in 2026, when smoothed for one-off payments. That’s a sign wage pressure is easing—but it also means a lot of households won’t get giant pay jumps to “catch up” fast. (reuters.com)
+
+HOST_B: So we’ve got “inflation lower than the worst years,” but not “life is cheap again.”
+
+HOST_A: Exactly. And that’s the psychological whiplash people are living with: inflation is the rate of increase, but the price level is already higher than it used to be.
+
+HOST_B: Let’s make that plain. People hear “inflation is down,” and think, “So prices go down?”
+
+HOST_A: Most of the time, no. “Inflation down” usually means prices are rising more slowly—not reversing. Prices falling across the board is deflation, and that’s rare and messy.
+
+HOST_B: Okay. Now let’s hit the kitchen-table stuff. Why are working families squeezed specifically on housing, food, energy, and services?
+
+HOST_A: Start with housing. Housing is not like buying a TV—supply can’t react quickly. If your city underbuilt for years, or zoning’s tight, or rates rose and people can’t move, you get a choke point. Rents stay high even if other prices cool.
+
+HOST_B: And there’s a political temptation to say, “Just build more,” like it’s a weekend project.
+
+HOST_A: Right. It’s multi-year. And in the meantime, renters are living in the now. I’m in South Brooklyn—renter—with three kids. My commute’s to Jersey City. The rent check doesn’t care about my opinions on macroeconomics.
+
+HOST_B: Nor do your guinea pigs.
+
+HOST_A: They definitely don’t.
+
+HOST_B: Food next. Because it’s not just “groceries.” It’s food plus time. People are working more, commuting more, and then you’re supposed to meal-prep like you’re running a small catering business.
+
+HOST_A: That’s real. On the global food picture, I’m watching the UN Food and Agriculture Organization’s monitoring tools. FAO’s Food Price Monitoring and Analysis (FPMA) updates monthly and tracks domestic basic-food prices in many developing countries—so it’s not just rich-world supermarket data. Their calendar shows the latest FPMA data release was December 5, with the next planned for January 9. (fao.org)
+
+HOST_B: Which is important because “global cost of living” is not just New York and London. It’s also families in places where a staple food price jump is existential.
+
+HOST_A: Exactly. And the drivers are layered: weather shocks, fertilizer and fuel costs, currency moves, shipping disruptions, and local policy choices like export restrictions or stockpiling.
+
+HOST_B: Now energy—because this is the part people feel in their bills and in the price of everything delivered by truck.
+
+HOST_A: On oil specifically, Reuters reports Brent closed around $62 a barrel on December 24, with prices having rebounded about 6% since December 16, amid geopolitics and thin holiday trading. (reuters.com)
+
+HOST_B: Translation: energy prices can move fast, and even if your personal gasoline cost looks stable, businesses are repricing based on expectations.
+
+HOST_A: And for a concrete consumer number in the U.S., the Energy Information Administration’s latest gasoline and diesel update—released December 16—put average U.S. regular gasoline at $2.895 per gallon for the week of December 15, with big regional differences. (eia.gov)
+
+HOST_B: That’s the thing: averages can hide pain. If you’re in a high-cost area, or you need a car for work, you’re exposed.
+
+HOST_A: Totally. And if you’re lower-income, energy takes a bigger share of the budget, so volatility hits harder.
+
+HOST_B: Now services. Why do services keep pushing up even when goods calm down?
+
+HOST_A: Labor and housing. Services are labor-intensive, and many service providers face their own rent increases, insurance increases, regulatory costs, and wage demands—because their workers are also paying higher rents.
+
+HOST_B: So it becomes this loop: high rent pushes wage demands, wage demands push service prices, service prices push the cost of living, and we’re all chasing our tail.
+
+HOST_A: That’s a clean way to put it.
+
+HOST_B: So what are central banks doing about this? Because people always ask: “Why don’t they just fix it?”
+
+HOST_A: They’re trying, but with blunt tools. And there’s been a global pivot toward rate cuts in 2025. Reuters reported on December 23 that major central banks delivered the biggest easing push in over a decade—850 basis points of cuts across 32 reductions among major developed-market central banks, while emerging markets also cut aggressively. (reuters.com)
+
+HOST_B: That sounds like relief—lower rates, lower payments, right?
+
+HOST_A: Sometimes. But it’s not instant. Rate cuts can help new borrowers and variable-rate debt, and can eventually ease housing construction financing. But if housing supply is structurally constrained, lower rates can also prop up demand. It’s a balance.
+
+HOST_B: Here’s a slightly spicy take: maybe the “solution” is just accepting we’re poorer than we thought—like, reset expectations, stop trying to live a 2019 lifestyle in a 2025 price world.
+
+HOST_A: That’s controversial but not crazy. The problem is: you can’t ask working families to “reset expectations” when the basics—rent, food, transportation—are the bulk of the budget. There’s not much luxury to cut.
+
+HOST_B: Fair. And people didn’t “choose” a higher rent for the same apartment. It’s not lifestyle creep, it’s survival creep.
+
+HOST_A: Exactly. So let’s get practical: what can families realistically expect next—and what can they do now?
+
+HOST_B: Start with “what to expect.”
+
+HOST_A: Expect inflation to be uneven. Some goods may stabilize. Some energy components can drop, then spike. Services may stay stubborn. And housing—especially rent—can remain a pressure point in many cities even when headline inflation looks okay.
+
+HOST_B: So: no miracle “everything gets cheaper” year.
+
+HOST_A: Right. But also: don’t ignore incremental improvement. If negotiated wage growth is cooling in parts of Europe, as the ECB tracker suggests, that’s one sign we may be moving away from the wage-price feedback loop—slowly. (reuters.com)
+
+HOST_B: And in Japan, Tokyo inflation easing partly because utilities dropped is a reminder that policy and energy costs matter—sometimes a lot. (reuters.com)
+
+HOST_A: Now the coping part. I’ll give a framework I actually use as a renter with kids.
+
+HOST_B: Let’s hear it.
+
+HOST_A: Three moves: protect cash flow, reduce exposure, and buy time.
+
+HOST_B: Translate.
+
+HOST_A: Protect cash flow: you list your non-negotiables—rent, utilities, transit, minimum debt payments, basic groceries—and you make that number real. Not aspirational. Then you automate what you can, and you cut the silent leaks: subscriptions, bank fees, high-interest balances.
+
+HOST_B: And if you’re thinking “I don’t have leaks,” you still check. Everybody has at least one.
+
+HOST_A: Reduce exposure: this is about the categories that can jump. Energy is one. If you drive, you can’t control oil markets, but you can control driving less, combining trips, tire pressure, and avoiding premium fuel if your car doesn’t require it. And you track local prices because the EIA data shows regional variation is real. (eia.gov)
+
+HOST_B: Also: if you’re on variable-rate debt, every rate move matters more. Refinancing or consolidating isn’t always available, but it’s worth checking—carefully.
+
+HOST_A: Third: buy time. That means building even a small buffer. I’m not talking about a “six-month emergency fund” fantasy for everyone. I’m talking about getting to one extra rent payment, then one month of groceries, then expanding from there.
+
+HOST_B: Let’s talk rent specifically. Because for a lot of listeners, rent is the entire story.
+
+HOST_A: If your lease is up: negotiate like it’s a business transaction—because it is. Bring comparables, ask for a smaller increase, ask for a longer lease with a predictable schedule, ask for repairs in writing, ask for concessions. The worst they can say is no.
+
+HOST_B: And if moving is on the table, you price it honestly. Moving costs, deposits, time off work, commuting changes—sometimes “cheaper rent” isn’t cheaper.
+
+HOST_A: Food: the goal is not gourmet. The goal is predictable cost. You rotate a short list of low-waste meals, you plan around sales, you use store brands, and you reduce food waste because throwing out food is like throwing out cash. And if you’re in a place where staple prices are volatile, follow monitoring from credible institutions—FAO tracks domestic price stress in many countries for a reason. (fao.org)
+
+HOST_B: Services: people can’t always cut them, but you can time them. If inflation is running hottest in services—as Eurostat’s breakdown suggests in the euro area—you become strategic: postpone non-urgent work, bundle errands, comparison shop, and don’t auto-renew expensive policies without shopping around. (ec.europa.eu)
+
+HOST_A: Now—what about the bigger “why” for all this? We should name it cleanly: we’re living through the after-effects of years of shocks—pandemic disruptions, energy disruptions, and then a normalization period where central banks are trying to cool inflation without breaking labor markets.
+
+HOST_B: And in 2025, a lot of central banks pivoted toward cuts, which Reuters characterized as the biggest easing push in over a decade. That’s a big signal that policymakers think the peak inflation era has passed—but it doesn’t mean the cost-of-living pinch is gone. (reuters.com)
+
+HOST_A: Exactly. And families are not crazy for feeling it. Even if inflation slows, prices are still high. Paychecks don’t instantly catch up. And the essentials—housing and services—don’t behave like discount electronics.
+
+HOST_B: Before we close, one more thing. People want someone to blame. It’s emotionally satisfying.
+
+HOST_A: Sure. But blame doesn’t pay ConEd, or your equivalent abroad. Accountability matters—policies matter—but for your household, the winning move is controlling what you can control while voting, organizing, and advocating through legitimate channels.
+
+HOST_B: Practical, unsexy, but real.
+
+HOST_A: Let’s wrap with a quick checklist for this weekend.
+
+HOST_B: Hit us.
+
+HOST_A: One: write down your “must-pay” total for January. Two: pick one cost category you can actually move—fuel, groceries, subscriptions—and make one change you’ll keep. Three: if your rent or debt resets soon, gather your documents now—don’t wait for panic week. Four: treat price spikes as temporary but recurring—meaning you plan for them, not pray they won’t happen.
+
+HOST_B: And five: talk about it at home without shame. A cost-of-living squeeze is not a personal moral failure. It’s an environment. You adapt, together.
+
+HOST_A: That’s the show. I’m Gary Thompson.
+
+HOST_B: I’m Margaret Butcher.
+
+HOST_A: Stay steady, stay practical—and we’ll see you next time.
