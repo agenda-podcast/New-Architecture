@@ -12,7 +12,7 @@ from pathlib import Path
 # ============================================================================
 
 # Testing Configuration
-TESTING_MODE = True  # When True, use saved mock responses instead of calling OpenAI API
+TESTING_MODE = False  # When True, use saved mock responses instead of calling OpenAI API
 
 # Resolve repo-rooted paths robustly (GitHub Actions may run scripts from ./scripts, so relative paths break)
 REPO_ROOT = Path(os.environ.get('GITHUB_WORKSPACE', Path(__file__).resolve().parents[1])).resolve()
@@ -21,7 +21,7 @@ MOCK_SOURCE_TEXT_DIR = str(REPO_ROOT / 'test_data' / 'mock_source_text')  # Dire
 
 # OpenAI Model Configuration
 GPT_MODEL = "gpt-5.2-pro"  # Model for Pass A in two-pass architecture (with web search)
-MAX_COMPLETION_TOKENS = 100000  # Maximum tokens per API response
+MAX_COMPLETION_TOKENS = 1000000  # Maximum tokens per API response
 
 # DEPRECATED: The following constants are kept for backwards compatibility but are no longer used
 # in the two-pass architecture. They will be removed in a future version.
@@ -279,8 +279,8 @@ VIDEO_TIMER_COLOR = "white"
 # ============================================================================
 
 # File Naming Patterns
-SCRIPT_TXT_PATTERN = "{topic}-{date}-{code}.script.txt"
-SCRIPT_JSON_PATTERN = "{topic}-{date}-{code}.script.json"
+SCRIPT_TXT_PATTERN = "{topic}-{date}-{code}.txt"
+SCRIPT_JSON_PATTERN = "{topic}-{date}-{code}.json"
 CHAPTERS_JSON_PATTERN = "{topic}-{date}-{code}.chapters.json"
 FFMETA_PATTERN = "{topic}-{date}-{code}.ffmeta"
 AUDIO_PATTERN = "{topic}-{date}-{code}.m4a"
