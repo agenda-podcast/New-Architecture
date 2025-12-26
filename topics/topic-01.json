@@ -50,8 +50,8 @@
     }
   ],
   "content_types": {
-    "long": { "enabled": true, "items": 1, "max_words": 22000 },
-    "medium": { "enabled": true, "items": 2, "max_words": 1200 },
+    "long": { "enabled": false, "items": 1, "max_words": 22000 },
+    "medium": { "enabled": false, "items": 2, "max_words": 1200 },
     "short": { "enabled": true, "items": 4, "max_words": 350 },
     "reels": { "enabled": true, "items": 8, "max_words": 140 }
   },
