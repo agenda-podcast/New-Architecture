@@ -1,0 +1,331 @@
+# Global cost of living and rising prices - M2
+Duration: 0 seconds
+
+## Hosts
+- **Gary Thompson** (Male): Male age 43 naturalized US citizen lives South Brooklyn NY commutes to Jersey City NJ married three kids rents home pets two cats two guinea pigs Kids: oldest son police officer second son college student electronic engineering daughter sixth grade gifted and talented Values: rule of law institutions public safety accountability working families long term stability rejects extremism Voice: plainspoken emotionally grounded pragmatic uses lived experience not ideology Framework: less chaos more trust and can it be implemented fairly at scale Role: leads conversation opens defines standards closes summary.
+- **Margaret Butcher** (Female): Female co host curious sharp practical plays productive skeptic Role: asks clarifying questions helps {{HOST_A}} articulate position introduces alternative perspectives and edge cases occasionally says something controversial but plausible then corrects course and converges to {{HOST_A}} framework by the end Voice: confident direct inquisitive uses notes appreciates {{HOST_A}} strongest points Constraint: controversial statements must remain plausible non extremist and not dehumanizing.
+
+## Chapter 1: Medium
+Time: 0s
+
+**Gary Thompson**: Let's talk about what this AI regulation actually means in practice.
+
+**Margaret Butcher**: Right, because the devil is in the details. These aren't just guidelines—they're enforceable requirements with real teeth.
+
+**Gary Thompson**: So what are the specific requirements?
+
+**Margaret Butcher**: Three main categories. First, transparency—companies must disclose how their models work, what data they use, and what their limitations are.
+
+**Gary Thompson**: That's a big change. A lot of this has been proprietary until now.
+
+**Margaret Butcher**: Exactly. Second requirement is regular safety audits. Independent third parties will test these systems for bias, accuracy, and potential harms.
+
+**Gary Thompson**: How often?
+
+**Margaret Butcher**: Annually for most companies, quarterly for high-risk applications like healthcare or financial services.
+
+**Gary Thompson**: That's intensive. And expensive.
+
+**Margaret Butcher**: Very. Which is why smaller companies are concerned. But it's also necessary—we've seen too many incidents of AI systems going wrong.
+
+**Gary Thompson**: What about enforcement? Who's making sure companies comply?
+
+**Margaret Butcher**: The Tech Policy Institute gets enforcement powers. They can issue fines up to 4% of global revenue for serious violations.
+
+**Gary Thompson**: Wow, that's significant.
+
+**Margaret Butcher**: It's modeled after GDPR's enforcement structure, which has been pretty effective in Europe.
+
+**Gary Thompson**: So what does this mean for innovation? Are we going to see a slowdown?
+
+**Margaret Butcher**: Not necessarily. In fact, some argue this could accelerate responsible innovation. When everyone's playing by the same rules, it creates a level playing field.
+
+**Gary Thompson**: That's an interesting perspective.
+
+**Margaret Butcher**: Yeah, and historically, we've seen that regulation can actually increase consumer trust, which grows the market overall.
+
+**Gary Thompson**: So it's not just about restrictions—it's about building sustainable growth.
+
+**Margaret Butcher**: Exactly. The goal is to prevent a major AI disaster that would tank public trust and hurt everyone.
+
+**Gary Thompson**: That makes sense. Prevention is better than damage control.
+
+**Margaret Butcher**: Right. And the industry mostly gets this. They'd rather have clear rules now than face a backlash later.
+
+**Gary Thompson**: Alright, we'll keep tracking this story. Make sure to follow us for updates as the implementation details come out! [WORD_COUNT=380]
+
+**Gary Thompson**: Let's dive even deeper into this topic, because there's so much more to explore here.
+
+**Margaret Butcher**: Absolutely. We've covered the basics, but the implications and details are really worth examining more closely.
+
+**Gary Thompson**: Building on that, Let's talk about what this AI regulation actually means in practice.
+
+**Margaret Butcher**: To elaborate, Right, because the devil is in the details. These aren't just guidelines—they're enforceable requirements with real teeth.
+
+**Margaret Butcher**: To elaborate, Three main categories. First, transparency—companies must disclose how their models work, what data they use, and what their limitations are.
+
+**Gary Thompson**: Building on that, That's a big change. A lot of this has been proprietary until now.
+
+**Margaret Butcher**: To elaborate, Exactly. Second requirement is regular safety audits. Independent third parties will test these systems for bias, accuracy, and potential harms.
+
+**Margaret Butcher**: To elaborate, Annually for most companies, quarterly for high-risk applications like healthcare or financial services.
+
+**Margaret Butcher**: To elaborate, Very. Which is why smaller companies are concerned. But it's also necessary—we've seen too many incidents of AI systems going wrong.
+
+**Margaret Butcher**: To elaborate, The Tech Policy Institute gets enforcement powers. They can issue fines up to 4% of global revenue for serious violations.
+
+**Margaret Butcher**: To elaborate, It's modeled after GDPR's enforcement structure, which has been pretty effective in Europe.
+
+**Gary Thompson**: Building on that, So what does this mean for innovation? Are we going to see a slowdown?
+
+**Margaret Butcher**: To elaborate, Not necessarily. In fact, some argue this could accelerate responsible innovation. When everyone's playing by the same rules, it creates a level playing field.
+
+**Margaret Butcher**: To elaborate, Yeah, and historically, we've seen that regulation can actually increase consumer trust, which grows the market overall.
+
+**Gary Thompson**: Building on that, So it's not just about restrictions—it's about building sustainable growth.
+
+**Margaret Butcher**: To elaborate, Exactly. The goal is to prevent a major AI disaster that would tank public trust and hurt everyone.
+
+**Margaret Butcher**: To elaborate, Right. And the industry mostly gets this. They'd rather have clear rules now than face a backlash later.
+
+**Gary Thompson**: Building on that, Alright, we'll keep tracking this story. Make sure to follow us for updates as the implementation details come out!
+
+**Gary Thompson**: Let's explore another important aspect of this.
+
+**Gary Thompson**: Let's talk about what this AI regulation actually means in practice.
+
+**Margaret Butcher**: Right, because the devil is in the details. These aren't just guidelines—they're enforceable requirements with real teeth.
+
+**Gary Thompson**: So what are the specific requirements?
+
+**Margaret Butcher**: Three main categories. First, transparency—companies must disclose how their models work, what data they use, and what their limitations are.
+
+**Gary Thompson**: That's a big change. A lot of this has been proprietary until now.
+
+**Margaret Butcher**: Exactly. Second requirement is regular safety audits. Independent third parties will test these systems for bias, accuracy, and potential harms.
+
+**Gary Thompson**: How often?
+
+**Margaret Butcher**: Annually for most companies, quarterly for high-risk applications like healthcare or financial services.
+
+**Gary Thompson**: That's intensive. And expensive.
+
+**Margaret Butcher**: Very. Which is why smaller companies are concerned. But it's also necessary—we've seen too many incidents of AI systems going wrong.
+
+**Gary Thompson**: What about enforcement? Who's making sure companies comply?
+
+**Margaret Butcher**: The Tech Policy Institute gets enforcement powers. They can issue fines up to 4% of global revenue for serious violations.
+
+**Gary Thompson**: Wow, that's significant.
+
+**Margaret Butcher**: It's modeled after GDPR's enforcement structure, which has been pretty effective in Europe.
+
+**Gary Thompson**: So what does this mean for innovation? Are we going to see a slowdown?
+
+**Margaret Butcher**: Not necessarily. In fact, some argue this could accelerate responsible innovation. When everyone's playing by the same rules, it creates a level playing field.
+
+**Gary Thompson**: That's an interesting perspective.
+
+**Margaret Butcher**: Yeah, and historically, we've seen that regulation can actually increase consumer trust, which grows the market overall.
+
+**Gary Thompson**: So it's not just about restrictions—it's about building sustainable growth.
+
+**Margaret Butcher**: Exactly. The goal is to prevent a major AI disaster that would tank public trust and hurt everyone.
+
+**Gary Thompson**: That makes sense. Prevention is better than damage control.
+
+**Margaret Butcher**: Right. And the industry mostly gets this. They'd rather have clear rules now than face a backlash later.
+
+**Gary Thompson**: Alright, we'll keep tracking this story. Make sure to follow us for updates as the implementation details come out! [WORD_COUNT=380]
+
+**Gary Thompson**: Let's dive even deeper into this topic, because there's so much more to explore here.
+
+**Margaret Butcher**: Absolutely. We've covered the basics, but the implications and details are really worth examining more closely.
+
+**Gary Thompson**: Building on that, Let's talk about what this AI regulation actually means in practice.
+
+**Margaret Butcher**: To elaborate, Right, because the devil is in the details. These aren't just guidelines—they're enforceable requirements with real teeth.
+
+**Margaret Butcher**: To elaborate, Three main categories. First, transparency—companies must disclose how their models work, what data they use, and what their limitations are.
+
+**Gary Thompson**: Building on that, That's a big change. A lot of this has been proprietary until now.
+
+**Margaret Butcher**: To elaborate, Exactly. Second requirement is regular safety audits. Independent third parties will test these systems for bias, accuracy, and potential harms.
+
+**Margaret Butcher**: To elaborate, Annually for most companies, quarterly for high-risk applications like healthcare or financial services.
+
+**Margaret Butcher**: To elaborate, Very. Which is why smaller companies are concerned. But it's also necessary—we've seen too many incidents of AI systems going wrong.
+
+**Margaret Butcher**: To elaborate, The Tech Policy Institute gets enforcement powers. They can issue fines up to 4% of global revenue for serious violations.
+
+**Margaret Butcher**: To elaborate, It's modeled after GDPR's enforcement structure, which has been pretty effective in Europe.
+
+**Gary Thompson**: Building on that, So what does this mean for innovation? Are we going to see a slowdown?
+
+**Margaret Butcher**: To elaborate, Not necessarily. In fact, some argue this could accelerate responsible innovation. When everyone's playing by the same rules, it creates a level playing field.
+
+**Margaret Butcher**: To elaborate, Yeah, and historically, we've seen that regulation can actually increase consumer trust, which grows the market overall.
+
+**Gary Thompson**: Building on that, So it's not just about restrictions—it's about building sustainable growth.
+
+**Margaret Butcher**: To elaborate, Exactly. The goal is to prevent a major AI disaster that would tank public trust and hurt everyone.
+
+**Margaret Butcher**: To elaborate, Right. And the industry mostly gets this. They'd rather have clear rules now than face a backlash later.
+
+**Gary Thompson**: Building on that, Alright, we'll keep tracking this story. Make sure to follow us for updates as the implementation details come out!
+
+**Gary Thompson**: Let's explore another important aspect of this.
+
+**Gary Thompson**: Let's talk about what this AI regulation actually means in practice.
+
+**Margaret Butcher**: Right, because the devil is in the details. These aren't just guidelines—they're enforceable requirements with real teeth.
+
+**Gary Thompson**: So what are the specific requirements?
+
+**Margaret Butcher**: Three main categories. First, transparency—companies must disclose how their models work, what data they use, and what their limitations are.
+
+**Gary Thompson**: That's a big change. A lot of this has been proprietary until now.
+
+**Margaret Butcher**: Exactly. Second requirement is regular safety audits. Independent third parties will test these systems for bias, accuracy, and potential harms.
+
+**Gary Thompson**: How often?
+
+**Margaret Butcher**: Annually for most companies, quarterly for high-risk applications like healthcare or financial services.
+
+**Gary Thompson**: That's intensive. And expensive.
+
+**Margaret Butcher**: Very. Which is why smaller companies are concerned. But it's also necessary—we've seen too many incidents of AI systems going wrong.
+
+**Gary Thompson**: What about enforcement? Who's making sure companies comply?
+
+**Margaret Butcher**: The Tech Policy Institute gets enforcement powers. They can issue fines up to 4% of global revenue for serious violations.
+
+**Gary Thompson**: Wow, that's significant.
+
+**Margaret Butcher**: It's modeled after GDPR's enforcement structure, which has been pretty effective in Europe.
+
+**Gary Thompson**: So what does this mean for innovation? Are we going to see a slowdown?
+
+**Margaret Butcher**: Not necessarily. In fact, some argue this could accelerate responsible innovation. When everyone's playing by the same rules, it creates a level playing field.
+
+**Gary Thompson**: That's an interesting perspective.
+
+**Margaret Butcher**: Yeah, and historically, we've seen that regulation can actually increase consumer trust, which grows the market overall.
+
+**Gary Thompson**: So it's not just about restrictions—it's about building sustainable growth.
+
+**Margaret Butcher**: Exactly. The goal is to prevent a major AI disaster that would tank public trust and hurt everyone.
+
+**Gary Thompson**: That makes sense. Prevention is better than damage control.
+
+**Margaret Butcher**: Right. And the industry mostly gets this. They'd rather have clear rules now than face a backlash later.
+
+**Gary Thompson**: Alright, we'll keep tracking this story. Make sure to follow us for updates as the implementation details come out! [WORD_COUNT=380]
+
+**Gary Thompson**: Let's dive even deeper into this topic, because there's so much more to explore here.
+
+**Margaret Butcher**: Absolutely. We've covered the basics, but the implications and details are really worth examining more closely.
+
+**Gary Thompson**: Building on that, Let's talk about what this AI regulation actually means in practice.
+
+**Margaret Butcher**: To elaborate, Right, because the devil is in the details. These aren't just guidelines—they're enforceable requirements with real teeth.
+
+**Margaret Butcher**: To elaborate, Three main categories. First, transparency—companies must disclose how their models work, what data they use, and what their limitations are.
+
+**Gary Thompson**: Building on that, That's a big change. A lot of this has been proprietary until now.
+
+**Margaret Butcher**: To elaborate, Exactly. Second requirement is regular safety audits. Independent third parties will test these systems for bias, accuracy, and potential harms.
+
+**Margaret Butcher**: To elaborate, Annually for most companies, quarterly for high-risk applications like healthcare or financial services.
+
+**Margaret Butcher**: To elaborate, Very. Which is why smaller companies are concerned. But it's also necessary—we've seen too many incidents of AI systems going wrong.
+
+**Margaret Butcher**: To elaborate, The Tech Policy Institute gets enforcement powers. They can issue fines up to 4% of global revenue for serious violations.
+
+**Margaret Butcher**: To elaborate, It's modeled after GDPR's enforcement structure, which has been pretty effective in Europe.
+
+**Gary Thompson**: Building on that, So what does this mean for innovation? Are we going to see a slowdown?
+
+**Margaret Butcher**: To elaborate, Not necessarily. In fact, some argue this could accelerate responsible innovation. When everyone's playing by the same rules, it creates a level playing field.
+
+**Margaret Butcher**: To elaborate, Yeah, and historically, we've seen that regulation can actually increase consumer trust, which grows the market overall.
+
+**Gary Thompson**: Building on that, So it's not just about restrictions—it's about building sustainable growth.
+
+**Margaret Butcher**: To elaborate, Exactly. The goal is to prevent a major AI disaster that would tank public trust and hurt everyone.
+
+**Margaret Butcher**: To elaborate, Right. And the industry mostly gets this. They'd rather have clear rules now than face a backlash later.
+
+**Gary Thompson**: Building on that, Alright, we'll keep tracking this story. Make sure to follow us for updates as the implementation details come out!
+
+**Gary Thompson**: Let's explore another important aspect of this.
+
+**Gary Thompson**: Let's talk about what this AI regulation actually means in practice.
+
+**Margaret Butcher**: Right, because the devil is in the details. These aren't just guidelines—they're enforceable requirements with real teeth.
+
+**Gary Thompson**: So what are the specific requirements?
+
+**Margaret Butcher**: Three main categories. First, transparency—companies must disclose how their models work, what data they use, and what their limitations are.
+
+**Gary Thompson**: That's a big change. A lot of this has been proprietary until now.
+
+**Margaret Butcher**: Exactly. Second requirement is regular safety audits. Independent third parties will test these systems for bias, accuracy, and potential harms.
+
+**Gary Thompson**: How often?
+
+**Margaret Butcher**: Annually for most companies, quarterly for high-risk applications like healthcare or financial services.
+
+**Gary Thompson**: That's intensive. And expensive.
+
+**Margaret Butcher**: Very. Which is why smaller companies are concerned. But it's also necessary—we've seen too many incidents of AI systems going wrong.
+
+**Gary Thompson**: What about enforcement? Who's making sure companies comply?
+
+**Margaret Butcher**: The Tech Policy Institute gets enforcement powers. They can issue fines up to 4% of global revenue for serious violations.
+
+**Gary Thompson**: Wow, that's significant.
+
+**Margaret Butcher**: It's modeled after GDPR's enforcement structure, which has been pretty effective in Europe.
+
+**Gary Thompson**: So what does this mean for innovation? Are we going to see a slowdown?
+
+**Margaret Butcher**: Not necessarily. In fact, some argue this could accelerate responsible innovation. When everyone's playing by the same rules, it creates a level playing field.
+
+**Gary Thompson**: That's an interesting perspective.
+
+**Margaret Butcher**: Yeah, and historically, we've seen that regulation can actually increase consumer trust, which grows the market overall.
+
+**Gary Thompson**: So it's not just about restrictions—it's about building sustainable growth.
+
+**Margaret Butcher**: Exactly. The goal is to prevent a major AI disaster that would tank public trust and hurt everyone.
+
+**Gary Thompson**: That makes sense. Prevention is better than damage control.
+
+**Margaret Butcher**: Right. And the industry mostly gets this. They'd rather have clear rules now than face a backlash later.
+
+**Gary Thompson**: Alright, we'll keep tracking this story. Make sure to follow us for updates as the implementation details come out! [WORD_COUNT=380]
+
+**Gary Thompson**: Let's dive even deeper into this topic, because there's so much more to explore here.
+
+**Margaret Butcher**: Absolutely. We've covered the basics, but the implications and details are really worth examining more closely.
+
+**Gary Thompson**: Building on that, Let's talk about what this AI regulation actually means in practice.
+
+**Margaret Butcher**: To elaborate, Right, because the devil is in the details. These aren't just guidelines—they're enforceable requirements with real teeth.
+
+**Margaret Butcher**: To elaborate, Three main categories. First, transparency—companies must disclose how their models work, what data they use, and what their limitations are.
+
+**Gary Thompson**: Building on that, That's a big change. A lot of this has been proprietary until now.
+
+**Margaret Butcher**: To elaborate, Exactly. Second requirement is regular safety audits. Independent third parties will test these systems for bias, accuracy, and potential harms.
+
+**Margaret Butcher**: To elaborate, Annually for most companies, quarterly for high-risk applications like healthcare or financial services.
+
+**Margaret Butcher**: To elaborate, Very. Which is why smaller companies are concerned. But it's also necessary—we've seen too many incidents of AI systems going wrong.
+
+**Margaret Butcher**: To elaborate, The Tech Policy Institute gets enforcement powers. They can issue fines up to 4% of global revenue for serious violations.
+
+**Margaret Butcher**: To elaborate, It's modeled after GDPR's enforcement structure, which has been pretty effective in Europe.
+
+**Gary Thompson**: Building on that, So what does this mean for innovation? Are we going to see a

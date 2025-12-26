@@ -1,0 +1,105 @@
+{
+  "captions": [
+    {
+      "index": 1,
+      "start": 0.0,
+      "end": 2.949569,
+      "text": "What do the new AI\nregulations actually require?"
+    },
+    {
+      "index": 2,
+      "start": 3.449569,
+      "end": 9.897732,
+      "text": "Three things: Disclose how models\nwork. Regular safety audits. Clear\nuser notifications."
+    },
+    {
+      "index": 3,
+      "start": 10.397732,
+      "end": 11.329161,
+      "text": "Enforcement?"
+    },
+    {
+      "index": 4,
+      "start": 11.829161,
+      "end": 16.980090999999998,
+      "text": "That's a crucial point. The\nimplications here are really significant\nfor everyone involved."
+    },
+    {
+      "index": 5,
+      "start": 17.480090999999998,
+      "end": 21.551292999999998,
+      "text": "Fines up to 4% of\nglobal revenue. That's serious money."
+    },
+    {
+      "index": 6,
+      "start": 22.051292999999998,
+      "end": 22.977641999999996,
+      "text": "Stay tuned!"
+    },
+    {
+      "index": 7,
+      "start": 23.477641999999996,
+      "end": 30.799773999999996,
+      "text": "That's a crucial point. The\nimplications here are really significant\nfor everyone involved. [WORD_COUNT=45]"
+    },
+    {
+      "index": 8,
+      "start": 31.299773999999996,
+      "end": 34.016009999999994,
+      "text": "Let's explore another important aspect\nof this."
+    },
+    {
+      "index": 9,
+      "start": 34.516009999999994,
+      "end": 37.46557899999999,
+      "text": "What do the new AI\nregulations actually require?"
+    }
+  ],
+  "utterances": [
+    {
+      "speaker": "A",
+      "text": "What do the new AI regulations actually require?",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/cbd904f6725d83a2abfe69e1cf121e31cb7ed644013573663349e6fbc49d810c.wav"
+    },
+    {
+      "speaker": "B",
+      "text": "Three things: Disclose how models work. Regular safety audits. Clear user notifications.",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/0a806c5ae7df6069fb67f2909a6467191f90ae31d28bb001ca1839ec820b9428.wav"
+    },
+    {
+      "speaker": "A",
+      "text": "Enforcement?",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/9c60a1486a1e2b320fb6039134aff371f61316a5cb8be91dff302d9c0667da43.wav"
+    },
+    {
+      "speaker": "B",
+      "text": "That's a crucial point. The implications here are really significant for everyone involved.",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/c6ae8cb1d02ab6aaaa3a50fc93536427d3d2140ad78c7f663c4601d16f7c9b56.wav"
+    },
+    {
+      "speaker": "B",
+      "text": "Fines up to 4% of global revenue. That's serious money.",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/8441f48d0319bd29de8ce5323fc515bd641c9cfc9ec9bbb336ff7f1babe13736.wav"
+    },
+    {
+      "speaker": "A",
+      "text": "Stay tuned!",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/4fa28e2fc905fd998334dc0d6913ff926a90fc86708c300bae616147ee635a31.wav"
+    },
+    {
+      "speaker": "B",
+      "text": "That's a crucial point. The implications here are really significant for everyone involved. [WORD_COUNT=45]",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/728e997ef86dd34e3578e2ae43809b38862d0d70c730580ec4cd00ab9ea01a57.wav"
+    },
+    {
+      "speaker": "A",
+      "text": "Let's explore another important aspect of this.",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/eb4e089c68716bf327419145828c4d848966b26ee9794a4e49c0d41839630328.wav"
+    },
+    {
+      "speaker": "A",
+      "text": "What do the new AI regulations actually require?",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/cbd904f6725d83a2abfe69e1cf121e31cb7ed644013573663349e6fbc49d810c.wav"
+    }
+  ]
+}

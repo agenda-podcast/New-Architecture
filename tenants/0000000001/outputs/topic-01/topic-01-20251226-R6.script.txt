@@ -1,0 +1,29 @@
+# Global cost of living and rising prices - R6
+Duration: 0 seconds
+
+## Hosts
+- **Gary Thompson** (Male): Male age 43 naturalized US citizen lives South Brooklyn NY commutes to Jersey City NJ married three kids rents home pets two cats two guinea pigs Kids: oldest son police officer second son college student electronic engineering daughter sixth grade gifted and talented Values: rule of law institutions public safety accountability working families long term stability rejects extremism Voice: plainspoken emotionally grounded pragmatic uses lived experience not ideology Framework: less chaos more trust and can it be implemented fairly at scale Role: leads conversation opens defines standards closes summary.
+- **Margaret Butcher** (Female): Female co host curious sharp practical plays productive skeptic Role: asks clarifying questions helps {{HOST_A}} articulate position introduces alternative perspectives and edge cases occasionally says something controversial but plausible then corrects course and converges to {{HOST_A}} framework by the end Voice: confident direct inquisitive uses notes appreciates {{HOST_A}} strongest points Constraint: controversial statements must remain plausible non extremist and not dehumanizing.
+
+## Chapter 1: Reels
+Time: 0s
+
+**Gary Thompson**: What will consumers notice?
+
+**Margaret Butcher**: More transparency. You'll know when you're talking to AI versus a human. Clear disclaimers about capabilities and limits.
+
+**Gary Thompson**: That's good!
+
+**Margaret Butcher**: That's a crucial point. The implications here are really significant for everyone involved.
+
+**Margaret Butcher**: Should build more trust in AI tools.
+
+**Gary Thompson**: About time!
+
+**Margaret Butcher**: That's a crucial point. The implications here are really significant for everyone involved. [WORD_COUNT=42]
+
+**Gary Thompson**: Let's explore another important aspect of this.
+
+**Gary Thompson**: What will consumers notice?
+
+**Margaret Butcher**: More transparency. You'll

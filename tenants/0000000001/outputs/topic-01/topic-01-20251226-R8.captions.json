@@ -1,0 +1,105 @@
+{
+  "captions": [
+    {
+      "index": 1,
+      "start": 0.0,
+      "end": 1.707211,
+      "text": "Could this become the global\nstandard?"
+    },
+    {
+      "index": 2,
+      "start": 2.207211,
+      "end": 6.884989,
+      "text": "Possibly! When US and EU\nregulations align, others often follow."
+    },
+    {
+      "index": 3,
+      "start": 7.384989,
+      "end": 9.129116,
+      "text": "So this is bigger than\nit seems?"
+    },
+    {
+      "index": 4,
+      "start": 9.629116,
+      "end": 14.780045999999999,
+      "text": "That's a crucial point. The\nimplications here are really significant\nfor everyone involved."
+    },
+    {
+      "index": 5,
+      "start": 15.280045999999999,
+      "end": 18.264716999999997,
+      "text": "We might be watching the\nbirth of global AI governance."
+    },
+    {
+      "index": 6,
+      "start": 18.764716999999997,
+      "end": 19.893514999999997,
+      "text": "Historic moment!"
+    },
+    {
+      "index": 7,
+      "start": 20.393514999999997,
+      "end": 27.715646999999997,
+      "text": "That's a crucial point. The\nimplications here are really significant\nfor everyone involved. [WORD_COUNT=45]"
+    },
+    {
+      "index": 8,
+      "start": 28.215646999999997,
+      "end": 30.931882999999996,
+      "text": "Let's explore another important aspect\nof this."
+    },
+    {
+      "index": 9,
+      "start": 31.431882999999996,
+      "end": 33.13909399999999,
+      "text": "Could this become the global\nstandard?"
+    }
+  ],
+  "utterances": [
+    {
+      "speaker": "A",
+      "text": "Could this become the global standard?",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/a0c22154854eb8607f671498697352dfb20869cd5647ead0c392bae4e4d28dc9.wav"
+    },
+    {
+      "speaker": "B",
+      "text": "Possibly! When US and EU regulations align, others often follow.",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/c2f40826baf736ca4347ebec038c897727ecca542893c83d726677a1761a7df1.wav"
+    },
+    {
+      "speaker": "A",
+      "text": "So this is bigger than it seems?",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/407dd7a110dc284b26be918d55c853f83ff5db1813b4a5c16e4ce37004692172.wav"
+    },
+    {
+      "speaker": "B",
+      "text": "That's a crucial point. The implications here are really significant for everyone involved.",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/c6ae8cb1d02ab6aaaa3a50fc93536427d3d2140ad78c7f663c4601d16f7c9b56.wav"
+    },
+    {
+      "speaker": "B",
+      "text": "We might be watching the birth of global AI governance.",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/eeb7fb07c4e6902eba7b45083c62ad09f5888bcf58c6d3de56e5a7163407fe2f.wav"
+    },
+    {
+      "speaker": "A",
+      "text": "Historic moment!",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/cfdd6e0e2b78da4ecd98caada4d71224812ccdf6782c8b00d42ccb38b9e33912.wav"
+    },
+    {
+      "speaker": "B",
+      "text": "That's a crucial point. The implications here are really significant for everyone involved. [WORD_COUNT=45]",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/728e997ef86dd34e3578e2ae43809b38862d0d70c730580ec4cd00ab9ea01a57.wav"
+    },
+    {
+      "speaker": "A",
+      "text": "Let's explore another important aspect of this.",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/eb4e089c68716bf327419145828c4d848966b26ee9794a4e49c0d41839630328.wav"
+    },
+    {
+      "speaker": "A",
+      "text": "Could this become the global standard?",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/a0c22154854eb8607f671498697352dfb20869cd5647ead0c392bae4e4d28dc9.wav"
+    }
+  ]
+}

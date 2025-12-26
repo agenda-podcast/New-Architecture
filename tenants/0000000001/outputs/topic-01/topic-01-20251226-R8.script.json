@@ -1,0 +1,57 @@
+{
+  "title": "Global cost of living and rising prices - R8",
+  "duration_sec": 0,
+  "segments": [
+    {
+      "chapter": 1,
+      "title": "Reels",
+      "start_time": 0,
+      "duration": 0,
+      "dialogue": [
+        {
+          "speaker": "A",
+          "text": "Could this become the global standard?"
+        },
+        {
+          "speaker": "B",
+          "text": "Possibly! When US and EU regulations align, others often follow."
+        },
+        {
+          "speaker": "A",
+          "text": "So this is bigger than it seems?"
+        },
+        {
+          "speaker": "B",
+          "text": "That's a crucial point. The implications here are really significant for everyone involved."
+        },
+        {
+          "speaker": "B",
+          "text": "We might be watching the birth of global AI governance."
+        },
+        {
+          "speaker": "A",
+          "text": "Historic moment!"
+        },
+        {
+          "speaker": "B",
+          "text": "That's a crucial point. The implications here are really significant for everyone involved. [WORD_COUNT=45]"
+        },
+        {
+          "speaker": "A",
+          "text": "Let's explore another important aspect of this."
+        },
+        {
+          "speaker": "A",
+          "text": "Could this become the global standard?"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-12-26T06:08:17.784861",
+    "model": "gpt-5-mini",
+    "num_sources": 0,
+    "content_type": "reels",
+    "content_code": "R8"
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "title": "Global cost of living and rising prices - R5",
+  "duration_sec": 0,
+  "segments": [
+    {
+      "chapter": 1,
+      "title": "Reels",
+      "start_time": 0,
+      "duration": 0,
+      "dialogue": [
+        {
+          "speaker": "A",
+          "text": "This isn't the first time."
+        },
+        {
+          "speaker": "B",
+          "text": "Remember GDPR in 2018? Similar approach, just for data privacy instead of AI."
+        },
+        {
+          "speaker": "A",
+          "text": "How did that go?"
+        },
+        {
+          "speaker": "B",
+          "text": "That's a crucial point. The implications here are really significant for everyone involved."
+        },
+        {
+          "speaker": "B",
+          "text": "40% compliance first year, 80% by deadline."
+        },
+        {
+          "speaker": "A",
+          "text": "History repeats!"
+        },
+        {
+          "speaker": "B",
+          "text": "That's a crucial point. The implications here are really significant for everyone involved. [WORD_COUNT=42]"
+        },
+        {
+          "speaker": "A",
+          "text": "Let's explore another important aspect of this."
+        },
+        {
+          "speaker": "A",
+          "text": "This isn't the first time."
+        },
+        {
+          "speaker": "B",
+          "text": "Remember GDPR in 2018?"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-12-26T06:08:17.783329",
+    "model": "gpt-5-mini",
+    "num_sources": 0,
+    "content_type": "reels",
+    "content_code": "R5"
+  }
+}

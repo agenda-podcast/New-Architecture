@@ -1,0 +1,12 @@
+{
+  "note": "Sources are now obtained dynamically via OpenAI Responses API web search",
+  "topic_queries": [
+    "global cost of living",
+    "food prices rising",
+    "rent and housing costs",
+    "energy prices",
+    "wages vs inflation",
+    "inflation affects middle class"
+  ],
+  "generated_at": "2025-12-26T06:08:17.785236"
+}

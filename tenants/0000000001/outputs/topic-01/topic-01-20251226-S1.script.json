@@ -1,0 +1,377 @@
+{
+  "title": "Global cost of living and rising prices - S1",
+  "duration_sec": 0,
+  "segments": [
+    {
+      "chapter": 1,
+      "title": "Short",
+      "start_time": 0,
+      "duration": 0,
+      "dialogue": [
+        {
+          "speaker": "A",
+          "text": "Big AI news today!"
+        },
+        {
+          "speaker": "B",
+          "text": "The Tech Policy Institute just announced a new regulation framework for large AI models."
+        },
+        {
+          "speaker": "A",
+          "text": "What does that mean?"
+        },
+        {
+          "speaker": "B",
+          "text": "If you're using a model with over 1 billion parameters—think ChatGPT size—you need transparency measures and safety audits."
+        },
+        {
+          "speaker": "A",
+          "text": "When?"
+        },
+        {
+          "speaker": "B",
+          "text": "Q2 2026. So 18 months to comply."
+        },
+        {
+          "speaker": "A",
+          "text": "How's the industry reacting?"
+        },
+        {
+          "speaker": "B",
+          "text": "Actually pretty positive. Most companies were already doing this voluntarily, so it's just making it official."
+        },
+        {
+          "speaker": "A",
+          "text": "But smaller startups are worried about costs."
+        },
+        {
+          "speaker": "B",
+          "text": "True. Safety audits aren't cheap. Could be a barrier for new entrants."
+        },
+        {
+          "speaker": "A",
+          "text": "What should users expect?"
+        },
+        {
+          "speaker": "B",
+          "text": "More transparency about AI capabilities and limitations. You'll know when you're talking to AI versus a human."
+        },
+        {
+          "speaker": "A",
+          "text": "That's good. More clarity is always better."
+        },
+        {
+          "speaker": "B",
+          "text": "Exactly. This is about building trust while keeping innovation going."
+        },
+        {
+          "speaker": "A",
+          "text": "Stay tuned for more on this story! [WORD_COUNT=180]"
+        },
+        {
+          "speaker": "A",
+          "text": "Let's dive even deeper into this topic, because there's so much more to explore here."
+        },
+        {
+          "speaker": "B",
+          "text": "Absolutely. We've covered the basics, but the implications and details are really worth examining more closely."
+        },
+        {
+          "speaker": "B",
+          "text": "To elaborate, The Tech Policy Institute just announced a new regulation framework for large AI models."
+        },
+        {
+          "speaker": "B",
+          "text": "To elaborate, If you're using a model with over 1 billion parameters—think ChatGPT size—you need transparency measures and safety audits."
+        },
+        {
+          "speaker": "B",
+          "text": "To elaborate, Actually pretty positive. Most companies were already doing this voluntarily, so it's just making it official."
+        },
+        {
+          "speaker": "B",
+          "text": "To elaborate, True. Safety audits aren't cheap. Could be a barrier for new entrants."
+        },
+        {
+          "speaker": "B",
+          "text": "To elaborate, More transparency about AI capabilities and limitations. You'll know when you're talking to AI versus a human."
+        },
+        {
+          "speaker": "B",
+          "text": "To elaborate, Exactly. This is about building trust while keeping innovation going."
+        },
+        {
+          "speaker": "A",
+          "text": "Let's explore another important aspect of this."
+        },
+        {
+          "speaker": "A",
+          "text": "Big AI news today!"
+        },
+        {
+          "speaker": "B",
+          "text": "The Tech Policy Institute just announced a new regulation framework for large AI models."
+        },
+        {
+          "speaker": "A",
+          "text": "What does that mean?"
+        },
+        {
+          "speaker": "B",
+          "text": "If you're using a model with over 1 billion parameters—think ChatGPT size—you need transparency measures and safety audits."
+        },
+        {
+          "speaker": "A",
+          "text": "When?"
+        },
+        {
+          "speaker": "B",
+          "text": "Q2 2026. So 18 months to comply."
+        },
+        {
+          "speaker": "A",
+          "text": "How's the industry reacting?"
+        },
+        {
+          "speaker": "B",
+          "text": "Actually pretty positive. Most companies were already doing this voluntarily, so it's just making it official."
+        },
+        {
+          "speaker": "A",
+          "text": "But smaller startups are worried about costs."
+        },
+        {
+          "speaker": "B",
+          "text": "True. Safety audits aren't cheap. Could be a barrier for new entrants."
+        },
+        {
+          "speaker": "A",
+          "text": "What should users expect?"
+        },
+        {
+          "speaker": "B",
+          "text": "More transparency about AI capabilities and limitations. You'll know when you're talking to AI versus a human."
+        },
+        {
+          "speaker": "A",
+          "text": "That's good. More clarity is always better."
+        },
+        {
+          "speaker": "B",
+          "text": "Exactly. This is about building trust while keeping innovation going."
+        },
+        {
+          "speaker": "A",
+          "text": "Stay tuned for more on this story! [WORD_COUNT=180]"
+        },
+        {
+          "speaker": "A",
+          "text": "Let's dive even deeper into this topic, because there's so much more to explore here."
+        },
+        {
+          "speaker": "B",
+          "text": "Absolutely. We've covered the basics, but the implications and details are really worth examining more closely."
+        },
+        {
+          "speaker": "B",
+          "text": "To elaborate, The Tech Policy Institute just announced a new regulation framework for large AI models."
+        },
+        {
+          "speaker": "B",
+          "text": "To elaborate, If you're using a model with over 1 billion parameters—think ChatGPT size—you need transparency measures and safety audits."
+        },
+        {
+          "speaker": "B",
+          "text": "To elaborate, Actually pretty positive. Most companies were already doing this voluntarily, so it's just making it official."
+        },
+        {
+          "speaker": "B",
+          "text": "To elaborate, True. Safety audits aren't cheap. Could be a barrier for new entrants."
+        },
+        {
+          "speaker": "B",
+          "text": "To elaborate, More transparency about AI capabilities and limitations. You'll know when you're talking to AI versus a human."
+        },
+        {
+          "speaker": "B",
+          "text": "To elaborate, Exactly. This is about building trust while keeping innovation going."
+        },
+        {
+          "speaker": "A",
+          "text": "Let's explore another important aspect of this."
+        },
+        {
+          "speaker": "A",
+          "text": "Big AI news today!"
+        },
+        {
+          "speaker": "B",
+          "text": "The Tech Policy Institute just announced a new regulation framework for large AI models."
+        },
+        {
+          "speaker": "A",
+          "text": "What does that mean?"
+        },
+        {
+          "speaker": "B",
+          "text": "If you're using a model with over 1 billion parameters—think ChatGPT size—you need transparency measures and safety audits."
+        },
+        {
+          "speaker": "A",
+          "text": "When?"
+        },
+        {
+          "speaker": "B",
+          "text": "Q2 2026. So 18 months to comply."
+        },
+        {
+          "speaker": "A",
+          "text": "How's the industry reacting?"
+        },
+        {
+          "speaker": "B",
+          "text": "Actually pretty positive. Most companies were already doing this voluntarily, so it's just making it official."
+        },
+        {
+          "speaker": "A",
+          "text": "But smaller startups are worried about costs."
+        },
+        {
+          "speaker": "B",
+          "text": "True. Safety audits aren't cheap. Could be a barrier for new entrants."
+        },
+        {
+          "speaker": "A",
+          "text": "What should users expect?"
+        },
+        {
+          "speaker": "B",
+          "text": "More transparency about AI capabilities and limitations. You'll know when you're talking to AI versus a human."
+        },
+        {
+          "speaker": "A",
+          "text": "That's good. More clarity is always better."
+        },
+        {
+          "speaker": "B",
+          "text": "Exactly. This is about building trust while keeping innovation going."
+        },
+        {
+          "speaker": "A",
+          "text": "Stay tuned for more on this story! [WORD_COUNT=180]"
+        },
+        {
+          "speaker": "A",
+          "text": "Let's dive even deeper into this topic, because there's so much more to explore here."
+        },
+        {
+          "speaker": "B",
+          "text": "Absolutely. We've covered the basics, but the implications and details are really worth examining more closely."
+        },
+        {
+          "speaker": "B",
+          "text": "To elaborate, The Tech Policy Institute just announced a new regulation framework for large AI models."
+        },
+        {
+          "speaker": "B",
+          "text": "To elaborate, If you're using a model with over 1 billion parameters—think ChatGPT size—you need transparency measures and safety audits."
+        },
+        {
+          "speaker": "B",
+          "text": "To elaborate, Actually pretty positive. Most companies were already doing this voluntarily, so it's just making it official."
+        },
+        {
+          "speaker": "B",
+          "text": "To elaborate, True. Safety audits aren't cheap. Could be a barrier for new entrants."
+        },
+        {
+          "speaker": "B",
+          "text": "To elaborate, More transparency about AI capabilities and limitations. You'll know when you're talking to AI versus a human."
+        },
+        {
+          "speaker": "B",
+          "text": "To elaborate, Exactly. This is about building trust while keeping innovation going."
+        },
+        {
+          "speaker": "A",
+          "text": "Let's explore another important aspect of this."
+        },
+        {
+          "speaker": "A",
+          "text": "Big AI news today!"
+        },
+        {
+          "speaker": "B",
+          "text": "The Tech Policy Institute just announced a new regulation framework for large AI models."
+        },
+        {
+          "speaker": "A",
+          "text": "What does that mean?"
+        },
+        {
+          "speaker": "B",
+          "text": "If you're using a model with over 1 billion parameters—think ChatGPT size—you need transparency measures and safety audits."
+        },
+        {
+          "speaker": "A",
+          "text": "When?"
+        },
+        {
+          "speaker": "B",
+          "text": "Q2 2026. So 18 months to comply."
+        },
+        {
+          "speaker": "A",
+          "text": "How's the industry reacting?"
+        },
+        {
+          "speaker": "B",
+          "text": "Actually pretty positive. Most companies were already doing this voluntarily, so it's just making it official."
+        },
+        {
+          "speaker": "A",
+          "text": "But smaller startups are worried about costs."
+        },
+        {
+          "speaker": "B",
+          "text": "True. Safety audits aren't cheap. Could be a barrier for new entrants."
+        },
+        {
+          "speaker": "A",
+          "text": "What should users expect?"
+        },
+        {
+          "speaker": "B",
+          "text": "More transparency about AI capabilities and limitations. You'll know when you're talking to AI versus a human."
+        },
+        {
+          "speaker": "A",
+          "text": "That's good. More clarity is always better."
+        },
+        {
+          "speaker": "B",
+          "text": "Exactly. This is about building trust while keeping innovation going."
+        },
+        {
+          "speaker": "A",
+          "text": "Stay tuned for more on this story! [WORD_COUNT=180]"
+        },
+        {
+          "speaker": "A",
+          "text": "Let's dive even deeper into this topic, because there's so much more to explore here."
+        },
+        {
+          "speaker": "B",
+          "text": "Absolutely. We've covered"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-12-26T06:08:17.777526",
+    "model": "gpt-5-mini",
+    "num_sources": 0,
+    "content_type": "short",
+    "content_code": "S1"
+  }
+}

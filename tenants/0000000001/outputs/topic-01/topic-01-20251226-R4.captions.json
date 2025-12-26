@@ -1,0 +1,116 @@
+{
+  "captions": [
+    {
+      "index": 1,
+      "start": 0.0,
+      "end": 2.057596,
+      "text": "Smaller AI startups are worried."
+    },
+    {
+      "index": 2,
+      "start": 2.557596,
+      "end": 6.556689,
+      "text": "Safety audits cost money. Could\nthis create a barrier to\nentry?"
+    },
+    {
+      "index": 3,
+      "start": 7.056689,
+      "end": 8.092607000000001,
+      "text": "That's the concern."
+    },
+    {
+      "index": 4,
+      "start": 8.592607000000001,
+      "end": 13.743537,
+      "text": "That's a crucial point. The\nimplications here are really significant\nfor everyone involved."
+    },
+    {
+      "index": 5,
+      "start": 14.243537,
+      "end": 17.025714,
+      "text": "But safety can't be optional\njust because you're small."
+    },
+    {
+      "index": 6,
+      "start": 17.525714,
+      "end": 19.481587,
+      "text": "Fair point. Complex issue!"
+    },
+    {
+      "index": 7,
+      "start": 19.981587,
+      "end": 27.254285000000003,
+      "text": "That's a crucial point. The\nimplications here are really significant\nfor everyone involved. [WORD_COUNT=42]"
+    },
+    {
+      "index": 8,
+      "start": 27.754285000000003,
+      "end": 30.470521,
+      "text": "Let's explore another important aspect\nof this."
+    },
+    {
+      "index": 9,
+      "start": 30.970521,
+      "end": 33.028117,
+      "text": "Smaller AI startups are worried."
+    },
+    {
+      "index": 10,
+      "start": 33.528117,
+      "end": 35.179364,
+      "text": "Safety audits cost"
+    }
+  ],
+  "utterances": [
+    {
+      "speaker": "A",
+      "text": "Smaller AI startups are worried.",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/cf90d181c1eac6cd84bd9f895670f862432f2efbebd42bad426730f6e2ad4b47.wav"
+    },
+    {
+      "speaker": "B",
+      "text": "Safety audits cost money. Could this create a barrier to entry?",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/5da6064ceb2545af05705776485a248eaa8382fc9492bfd3302a4a6ac0c07bcd.wav"
+    },
+    {
+      "speaker": "A",
+      "text": "That's the concern.",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/bfe3424a80cdece82fc002128809ae6882fdf5226eb8d8d6edd36ed00312a43e.wav"
+    },
+    {
+      "speaker": "B",
+      "text": "That's a crucial point. The implications here are really significant for everyone involved.",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/c6ae8cb1d02ab6aaaa3a50fc93536427d3d2140ad78c7f663c4601d16f7c9b56.wav"
+    },
+    {
+      "speaker": "B",
+      "text": "But safety can't be optional just because you're small.",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/2962b9f32720753922ec85f6fb2bff2aae3e024c995f0130144313f74557ae60.wav"
+    },
+    {
+      "speaker": "A",
+      "text": "Fair point. Complex issue!",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/7f357ae97ba3d9175fdb60df2170f87e00c2dd2974e221fefbb140ab3b31be79.wav"
+    },
+    {
+      "speaker": "B",
+      "text": "That's a crucial point. The implications here are really significant for everyone involved. [WORD_COUNT=42]",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/032b88f0d9f54f08731add4c1c1dda016fa3ec328796a55242866302ca5a1a3e.wav"
+    },
+    {
+      "speaker": "A",
+      "text": "Let's explore another important aspect of this.",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/eb4e089c68716bf327419145828c4d848966b26ee9794a4e49c0d41839630328.wav"
+    },
+    {
+      "speaker": "A",
+      "text": "Smaller AI startups are worried.",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/cf90d181c1eac6cd84bd9f895670f862432f2efbebd42bad426730f6e2ad4b47.wav"
+    },
+    {
+      "speaker": "B",
+      "text": "Safety audits cost",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/837ae7ff7834eb3aece968671d20244b6bb3b7acd923bab8a360553e6602bb5d.wav"
+    }
+  ]
+}

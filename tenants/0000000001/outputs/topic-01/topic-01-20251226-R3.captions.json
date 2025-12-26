@@ -1,0 +1,105 @@
+{
+  "captions": [
+    {
+      "index": 1,
+      "start": 0.0,
+      "end": 2.357506,
+      "text": "Will AI regulation kill innovation?"
+    },
+    {
+      "index": 2,
+      "start": 2.857506,
+      "end": 7.835148,
+      "text": "Probably not. Clear rules create\nlevel playing fields and build\nconsumer trust."
+    },
+    {
+      "index": 3,
+      "start": 8.335148,
+      "end": 9.8122,
+      "text": "So it might actually help?"
+    },
+    {
+      "index": 4,
+      "start": 10.3122,
+      "end": 15.46313,
+      "text": "That's a crucial point. The\nimplications here are really significant\nfor everyone involved."
+    },
+    {
+      "index": 5,
+      "start": 15.96313,
+      "end": 19.863901,
+      "text": "That's the goal. Better to\nhave rules now than face\na crisis later."
+    },
+    {
+      "index": 6,
+      "start": 20.363901,
+      "end": 21.500363999999998,
+      "text": "Smart thinking!"
+    },
+    {
+      "index": 7,
+      "start": 22.000363999999998,
+      "end": 29.082812999999998,
+      "text": "That's a crucial point. The\nimplications here are really significant\nfor everyone involved. [WORD_COUNT=48]"
+    },
+    {
+      "index": 8,
+      "start": 29.582812999999998,
+      "end": 32.299049,
+      "text": "Let's explore another important aspect\nof this."
+    },
+    {
+      "index": 9,
+      "start": 32.799049,
+      "end": 34.63392399999999,
+      "text": "Will AI regulation kill"
+    }
+  ],
+  "utterances": [
+    {
+      "speaker": "A",
+      "text": "Will AI regulation kill innovation?",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/89e052161774f357db648f67aeea47dd6af6c9c769dc895d05f236cf7346bdfa.wav"
+    },
+    {
+      "speaker": "B",
+      "text": "Probably not. Clear rules create level playing fields and build consumer trust.",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/45f46143e6492df6d1c190e0dc9766dc95d66caed69f01f90ee734f7577c4128.wav"
+    },
+    {
+      "speaker": "A",
+      "text": "So it might actually help?",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/89d7ea1fefb857e9ba7f6fd148e0794876e9aac813db9827bfefc2874edf1a9d.wav"
+    },
+    {
+      "speaker": "B",
+      "text": "That's a crucial point. The implications here are really significant for everyone involved.",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/c6ae8cb1d02ab6aaaa3a50fc93536427d3d2140ad78c7f663c4601d16f7c9b56.wav"
+    },
+    {
+      "speaker": "B",
+      "text": "That's the goal. Better to have rules now than face a crisis later.",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/e9e20d05bdf7123985342221496b2384f65f50a897424e276511826505e34a34.wav"
+    },
+    {
+      "speaker": "A",
+      "text": "Smart thinking!",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/149789460dd66f9069a9b7afee5f752f87ed369e5adfe1b591d86db13b166679.wav"
+    },
+    {
+      "speaker": "B",
+      "text": "That's a crucial point. The implications here are really significant for everyone involved. [WORD_COUNT=48]",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/4e98ab83fd01a1ad33e8c695750ee1e81a43144ee2e1ba2570ece61f006dde53.wav"
+    },
+    {
+      "speaker": "A",
+      "text": "Let's explore another important aspect of this.",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/eb4e089c68716bf327419145828c4d848966b26ee9794a4e49c0d41839630328.wav"
+    },
+    {
+      "speaker": "A",
+      "text": "Will AI regulation kill",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/98a222ed6b10372eecdab22776ff3f3f35373ae983e6ec10ff25dd6fd3f2867b.wav"
+    }
+  ]
+}

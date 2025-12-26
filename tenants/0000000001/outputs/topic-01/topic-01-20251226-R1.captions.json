@@ -1,0 +1,105 @@
+{
+  "captions": [
+    {
+      "index": 1,
+      "start": 0.0,
+      "end": 2.672698,
+      "text": "Breaking: New AI regulations just\ndropped!"
+    },
+    {
+      "index": 2,
+      "start": 3.172698,
+      "end": 8.848163,
+      "text": "All large AI models need\nsafety audits and transparency measures\nby Q2 2026."
+    },
+    {
+      "index": 3,
+      "start": 9.348163,
+      "end": 11.84644,
+      "text": "The industry? Actually pretty supportive."
+    },
+    {
+      "index": 4,
+      "start": 12.34644,
+      "end": 17.49737,
+      "text": "That's a crucial point. The\nimplications here are really significant\nfor everyone involved."
+    },
+    {
+      "index": 5,
+      "start": 17.99737,
+      "end": 22.901769,
+      "text": "One CEO said: 'Finally getting\nguardrails, not roadblocks.'"
+    },
+    {
+      "index": 6,
+      "start": 23.401769,
+      "end": 26.228254,
+      "text": "This changes everything. Follow for\nmore!"
+    },
+    {
+      "index": 7,
+      "start": 26.728254,
+      "end": 34.183401,
+      "text": "That's a crucial point. The\nimplications here are really significant\nfor everyone involved. [WORD_COUNT=50]"
+    },
+    {
+      "index": 8,
+      "start": 34.683401,
+      "end": 37.399637000000006,
+      "text": "Let's explore another important aspect\nof this."
+    },
+    {
+      "index": 9,
+      "start": 37.899637000000006,
+      "end": 39.46839000000001,
+      "text": "Breaking: New AI"
+    }
+  ],
+  "utterances": [
+    {
+      "speaker": "A",
+      "text": "Breaking: New AI regulations just dropped!",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/de695fc783deb0e84efd2c3cbf11fa824f39cf6d0ef60012ad4889920888d34e.wav"
+    },
+    {
+      "speaker": "B",
+      "text": "All large AI models need safety audits and transparency measures by Q2 2026.",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/049d1121bfc184261af8859e87d293e14072c9c4d68001445887ae347173fa93.wav"
+    },
+    {
+      "speaker": "A",
+      "text": "The industry? Actually pretty supportive.",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/fa624766ca6e6b986e1ad08f155166bf33002d25ac65f9689e4cca579034ac1e.wav"
+    },
+    {
+      "speaker": "B",
+      "text": "That's a crucial point. The implications here are really significant for everyone involved.",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/c6ae8cb1d02ab6aaaa3a50fc93536427d3d2140ad78c7f663c4601d16f7c9b56.wav"
+    },
+    {
+      "speaker": "B",
+      "text": "One CEO said: 'Finally getting guardrails, not roadblocks.'",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/85a74f604fb20e236a23af3bd486bfe1445fb84f621ddfae82fe74d84c7ea45b.wav"
+    },
+    {
+      "speaker": "A",
+      "text": "This changes everything. Follow for more!",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/f5ae05d3ced3807b6a409d211b8df1f0408cf4083f012047f69643cf7c538c2a.wav"
+    },
+    {
+      "speaker": "B",
+      "text": "That's a crucial point. The implications here are really significant for everyone involved. [WORD_COUNT=50]",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/a145bee0ce540ce10cc265c87ef29c5d7d050cb6a9e4ec0e89abb94a9899e790.wav"
+    },
+    {
+      "speaker": "A",
+      "text": "Let's explore another important aspect of this.",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/eb4e089c68716bf327419145828c4d848966b26ee9794a4e49c0d41839630328.wav"
+    },
+    {
+      "speaker": "A",
+      "text": "Breaking: New AI",
+      "audio_path": "/home/runner/work/New-Architecture/New-Architecture/.cache/tts/f96e458ff7d04d1fb09050a4461e814d6ee4c3769064166eced1a01a88d574b7.wav"
+    }
+  ]
+}
