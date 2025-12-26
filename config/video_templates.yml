@@ -1,0 +1,30 @@
+# Video Templates Configuration
+# Defines template selection strategies per content type
+
+version: 1
+
+selection:
+  # Default behavior: sequential rotation (next video uses next template)
+  default_strategy: sequential
+
+  # If templates are missing, either:
+  # - fallback_to_none: render without template
+  # - or fallback_template_id: use a built-in minimal template if present
+  fallback_to_none: true
+  fallback_template_id: "minimal"
+
+  # Template selection configuration per content type
+  by_content_type:
+    long:
+      strategy: weighted
+      candidates: ["neutral", "clean", "teal-orange", "golden-hour", "vintage-film"]
+    medium:
+      strategy: sequential
+      candidates: ["clean", "neutral", "teal-orange"]
+    short:
+      strategy: sequential
+      candidates: ["clean", "high-contrast", "neon-glow"]
+    reels:
+      strategy: sequential
+      # Most "social" looking by default
+      candidates: ["neon-glow", "glitch", "high-contrast", "vintage-film", "clean"]

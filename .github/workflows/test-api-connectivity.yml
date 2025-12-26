@@ -1,0 +1,224 @@
+name: API Connectivity Tests
+
+on:
+  # Allow manual triggering with option to select which API to test
+  workflow_dispatch:
+    inputs:
+      api_to_test:
+        description: 'Which API to test'
+        required: true
+        type: choice
+        options:
+          - all
+          - openai
+          - google-search
+          - google-tts
+        default: 'all'
+  # Also run on schedule (weekly) to catch credential expiration
+  schedule:
+    # Run every Monday at 08:00 UTC
+    - cron: '0 8 * * 1'
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  test-openai:
+    name: Test OpenAI API
+    runs-on: ubuntu-latest
+    # Only run this job if testing all APIs or specifically OpenAI
+    if: github.event_name == 'schedule' || github.event.inputs.api_to_test == 'all' || github.event.inputs.api_to_test == 'openai'
+    environment: Main
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install openai
+
+      - name: Test OpenAI API connectivity
+        env:
+          GPT_KEY: ${{ secrets.GPT_KEY }}
+        run: |
+          cd scripts
+          python test_openai_connectivity.py
+
+  test-google-search:
+    name: Test Google Custom Search API
+    runs-on: ubuntu-latest
+    # Only run this job if testing all APIs or specifically Google Search
+    if: github.event_name == 'schedule' || github.event.inputs.api_to_test == 'all' || github.event.inputs.api_to_test == 'google-search'
+    environment: Main
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install google-api-python-client
+
+      - name: Test Google Custom Search API connectivity
+        env:
+          GOOGLE_CUSTOM_SEARCH_API_KEY: ${{ secrets.GOOGLE_CUSTOM_SEARCH_API_KEY }}
+          GOOGLE_SEARCH_ENGINE_ID: ${{ secrets.GOOGLE_SEARCH_ENGINE_ID }}
+        run: |
+          cd scripts
+          python test_google_search_connectivity.py
+
+      - name: Commit and push test image
+        if: success()
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # Check if the test image was created
+          if [ -f "test_data/test_google_search_image.jpg" ]; then
+            git add test_data/test_google_search_image.jpg
+            
+            # Only commit if there are changes
+            if git diff --staged --quiet; then
+              echo "No changes to commit - test image already up to date"
+            else
+              git commit -m "Update test image from Google Search API test [skip ci]"
+              git push || echo "Warning: Failed to push test image"
+              echo "Test image committed and pushed successfully"
+            fi
+          else
+            echo "Warning: Test image was not created"
+          fi
+
+  test-google-tts:
+    name: Test Google Cloud TTS API
+    runs-on: ubuntu-latest
+    # Only run this job if testing all APIs or specifically Google TTS
+    if: github.event_name == 'schedule' || github.event.inputs.api_to_test == 'all' || github.event.inputs.api_to_test == 'google-tts'
+    environment: Main
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install google-cloud-texttospeech
+
+      - name: Test Google Cloud TTS API connectivity
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          cd scripts
+          python test_google_tts_connectivity.py
+
+  test-all:
+    name: Test All APIs (Summary)
+    runs-on: ubuntu-latest
+    # Only run this job if testing all APIs
+    if: github.event_name == 'schedule' || github.event.inputs.api_to_test == 'all'
+    environment: Main
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          # Install only the specific dependencies needed for API tests
+          pip install openai google-api-python-client google-cloud-texttospeech
+
+      - name: Test all API connectivity
+        id: api_tests
+        env:
+          GPT_KEY: ${{ secrets.GPT_KEY }}
+          GOOGLE_CUSTOM_SEARCH_API_KEY: ${{ secrets.GOOGLE_CUSTOM_SEARCH_API_KEY }}
+          GOOGLE_SEARCH_ENGINE_ID: ${{ secrets.GOOGLE_SEARCH_ENGINE_ID }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          cd scripts
+          python test_all_api_connectivity.py
+
+      - name: Commit and push test image
+        if: success()
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # Check if the test image was created
+          if [ -f "test_data/test_google_search_image.jpg" ]; then
+            git add test_data/test_google_search_image.jpg
+            
+            # Only commit if there are changes
+            if git diff --staged --quiet; then
+              echo "No changes to commit - test image already up to date"
+            else
+              git commit -m "Update test image from Google Search API test [skip ci]"
+              git push || echo "Warning: Failed to push test image"
+              echo "Test image committed and pushed successfully"
+            fi
+          else
+            echo "Warning: Test image was not created"
+          fi
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          echo "## API Connectivity Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Date:** $(date -u +%Y-%m-%d\ %H:%M:%S) UTC" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.api_tests.outcome }}" = "success" ]; then
+            echo "### ✓ All tests passed!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All API credentials are properly configured and working." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ✗ Some tests failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please check the logs above for details on which API tests failed." >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### APIs Tested" >> $GITHUB_STEP_SUMMARY
+          echo "- OpenAI API (for script generation)" >> $GITHUB_STEP_SUMMARY
+          echo "- Google Custom Search API (for image collection)" >> $GITHUB_STEP_SUMMARY
+          echo "- Google Cloud Text-to-Speech API (for premium TTS)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Total estimated cost:** < $0.001" >> $GITHUB_STEP_SUMMARY

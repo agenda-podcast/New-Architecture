@@ -1,0 +1,41 @@
+name: Python Syntax Check
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'copilot/**'
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  syntax-check:
+    name: Check Python Syntax
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Python syntax check
+        run: |
+          echo "Checking Python syntax for all .py files..."
+          find scripts -name "*.py" -type f | while read -r file; do
+            if python -m py_compile "$file"; then
+              echo "✓ $file"
+            else
+              echo "✗ $file - SYNTAX ERROR"
+              exit 1
+            fi
+          done
+          echo ""
+          echo "✓ All Python files have valid syntax!"

@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv/
+
+# Cache
+.cache/
+*.cache
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+*.backup
+*.bak
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Test coverage
+.coverage
+htmlcov/
+
+# Local config
+.env
+.env.local
+*.local
+
+# FFmpeg temp files
+*.wav.tmp
+concat_list.txt
+images_concat.txt
+
+# Data and output files - only real data from Google Search, never mock data
+data/*/fresh.json
+data/*/backlog.json
+data/*/picked_for_script.json
+# NOTE: outputs are intentionally tracked for this repo distribution,
+# including sample images and mock-data-driven artifacts.
+# If you need to ignore specific large artifacts, add narrow rules here.
+
+
+# Piper TTS extracted files (archive is kept in repo root)
+piper/

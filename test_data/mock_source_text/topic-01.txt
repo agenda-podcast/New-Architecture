@@ -1,0 +1,12 @@
+This is a placeholder SOURCE_TEXT for topic-01.
+
+Replace this file if you enable Pass B (medium/short/reels) while disabling Pass A (long).
+
+Example structure you may paste here:
+
+SOURCES:
+- https://example.com
+
+SCRIPT:
+HOST_A: ...
+HOST_B: ...

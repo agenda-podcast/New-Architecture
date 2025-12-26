@@ -1,0 +1,36 @@
+{
+  "id": "topic-10",
+  "enabled": false,
+  "title": "Entertainment & Culture Digest",
+  "description": "Daily updates on entertainment and cultural trends",
+  "language": "en",
+  "queries": [
+    "entertainment news",
+    "cultural trends",
+    "movie and music releases"
+  ],
+  "search_languages": [
+    "en"
+  ],
+  "search_regions": [
+    "us",
+    "uk"
+  ],
+  "min_fresh_sources": 5,
+  "freshness_hours": 24,
+  "max_backlog_items": 100,
+  "max_fresh_items": 50,
+  "premium_tts": false,
+  "voice_quality": "high",
+  "voice_a_gender": "Male",
+  "voice_b_gender": "Female",
+  "tts_voice_a": "en_US-ryan-high",
+  "tts_voice_b": "en_US-lessac-high",
+  "llm_model": "gemini-1.5-flash",
+  "content_types": {
+    "long": true,
+    "medium": true,
+    "short": true,
+    "reels": true
+  }
+}

@@ -1,0 +1,220 @@
+# Template Inventory
+# Metadata for all available Blender templates
+
+# Format:
+# template_id:
+#   name: Human-readable name
+#   category: safe | cinematic | experimental
+#   description: Brief description
+#   effects: List of effects applied
+#   intensity_range: Min/max intensity for random effects
+#   incompatibilities: List of effect combinations to avoid
+#   preview: Path to preview image (optional)
+
+# Base template (reference only, not for selection)
+base:
+  name: "Base Template"
+  category: base
+  description: "Foundation template with all effect node groups (muted by default)"
+  effects:
+    - color_grade: "none"
+    - grain: "none"
+    - vignette: "none"
+    - bloom: "none"
+    - sharpen: "none"
+    - chromatic_aberration: "none"
+  path: "templates/base_template.blend"
+  selectable: false
+
+# Safe Templates (60% selection weight)
+# Minimal, professional effects for all content
+
+minimal:
+  name: "Minimal"
+  category: safe
+  description: "Clean, minimal template with no effects - pure images and audio"
+  effects: []
+  intensity_range:
+    min: 0.0
+    max: 0.0
+  incompatibilities: []
+  path: "templates/safe/minimal.blend"
+  preview: "templates/safe/previews/minimal.jpg"
+
+neutral:
+  name: "Neutral Grade"
+  category: safe
+  description: "Subtle color correction with neutral grading"
+  effects:
+    - color_grade: "neutral"
+    - grain: "light"
+  intensity_range:
+    min: 0.05
+    max: 0.15
+  incompatibilities: []
+  path: "templates/safe/neutral.blend"
+  preview: "templates/safe/previews/neutral.jpg"
+
+clean:
+  name: "Clean Professional"
+  category: safe
+  description: "Clean, professional look with minimal grain"
+  effects:
+    - color_grade: "clean"
+    - grain: "minimal"
+    - vignette: "subtle"
+  intensity_range:
+    min: 0.05
+    max: 0.20
+  incompatibilities: []
+  path: "templates/safe/clean.blend"
+  preview: "templates/safe/previews/clean.jpg"
+
+# Cinematic Templates (30% selection weight)
+# Film-quality effects for engaging content
+
+film-noir:
+  name: "Film Noir"
+  category: cinematic
+  description: "High-contrast black and white with dramatic shadows"
+  effects:
+    - color_grade: "noir"
+    - vignette: "moderate"
+    - grain: "medium"
+    - contrast: "high"
+  intensity_range:
+    min: 0.30
+    max: 0.60
+  incompatibilities:
+    - "light_leaks"  # Noir is dark, leaks are bright
+  path: "templates/cinematic/film-noir.blend"
+  preview: "templates/cinematic/previews/film-noir.jpg"
+
+golden-hour:
+  name: "Golden Hour"
+  category: cinematic
+  description: "Warm, golden tones inspired by sunset lighting"
+  effects:
+    - color_grade: "golden"
+    - bloom: "soft"
+    - grain: "light"
+  intensity_range:
+    min: 0.20
+    max: 0.50
+  incompatibilities:
+    - "cool_grade"  # Warm and cool grades conflict
+  path: "templates/cinematic/golden-hour.blend"
+  preview: "templates/cinematic/previews/golden-hour.jpg"
+
+teal-orange:
+  name: "Teal & Orange"
+  category: cinematic
+  description: "Popular cinema look with teal shadows and orange highlights"
+  effects:
+    - color_grade: "teal_orange"
+    - vignette: "light"
+    - grain: "medium"
+  intensity_range:
+    min: 0.25
+    max: 0.55
+  incompatibilities: []
+  path: "templates/cinematic/teal-orange.blend"
+  preview: "templates/cinematic/previews/teal-orange.jpg"
+
+vintage-film:
+  name: "Vintage Film"
+  category: cinematic
+  description: "Authentic film look with grain, dust, and light leaks"
+  effects:
+    - color_grade: "vintage"
+    - grain: "heavy"
+    - dust: "light"
+    - light_leaks: "moderate"
+  intensity_range:
+    min: 0.30
+    max: 0.70
+  incompatibilities:
+    - "sharpen"  # Vintage is soft, sharpen conflicts
+  path: "templates/cinematic/vintage-film.blend"
+  preview: "templates/cinematic/previews/vintage-film.jpg"
+
+# Experimental Templates (10% selection weight)
+# Bold, artistic effects for creative content
+
+neon-glow:
+  name: "Neon Glow"
+  category: experimental
+  description: "Vibrant colors with strong glow and bloom"
+  effects:
+    - color_grade: "saturated"
+    - bloom: "strong"
+    - glow: "intense"
+    - chromatic_aberration: "light"
+  intensity_range:
+    min: 0.40
+    max: 0.80
+  incompatibilities:
+    - "sharpen"  # Glow and sharpen conflict
+    - "noir"     # Neon is bright, noir is dark
+  path: "templates/experimental/neon-glow.blend"
+  preview: "templates/experimental/previews/neon-glow.jpg"
+
+glitch:
+  name: "Glitch"
+  category: experimental
+  description: "Digital glitch effects with chromatic aberration and distortion"
+  effects:
+    - chromatic_aberration: "strong"
+    - distortion: "moderate"
+    - color_shift: "random"
+  intensity_range:
+    min: 0.30
+    max: 0.70
+  incompatibilities:
+    - "vintage"  # Analog and digital aesthetics conflict
+  path: "templates/experimental/glitch.blend"
+  preview: "templates/experimental/previews/glitch.jpg"
+
+high-contrast:
+  name: "High Contrast"
+  category: experimental
+  description: "Extreme contrast with crushed blacks and blown highlights"
+  effects:
+    - color_grade: "extreme_contrast"
+    - vignette: "heavy"
+    - sharpen: "moderate"
+  intensity_range:
+    min: 0.50
+    max: 0.90
+  incompatibilities:
+    - "vintage"  # Soft vintage conflicts with sharp high-contrast
+    - "blur"     # Conflicts with sharpen
+  path: "templates/experimental/high-contrast.blend"
+  preview: "templates/experimental/previews/high-contrast.jpg"
+
+# Template Selection Statistics
+selection_weights:
+  safe: 0.60       # 60%
+  cinematic: 0.30  # 30%
+  experimental: 0.10  # 10%
+
+# Global Effect Constraints
+constraints:
+  max_strong_effects: 3  # Maximum strong effects per video
+  required_stabilizer: true  # Always include neutral grade element
+  
+  # Effect strength classifications
+  strong_effects:
+    - "bloom_strong"
+    - "glow_intense"
+    - "chromatic_aberration_strong"
+    - "vignette_heavy"
+    - "grain_heavy"
+    - "extreme_contrast"
+  
+  # Effect incompatibilities (global)
+  global_incompatibilities:
+    - ["heavy_glow", "heavy_sharpen"]
+    - ["strong_vignette", "dark_grade"]
+    - ["film_burn", "light_leaks"]
+    - ["high_grain", "chromatic_aberration"]

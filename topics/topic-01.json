@@ -1,0 +1,60 @@
+{
+  "id": "topic-01",
+  "enabled": true,
+  "title": "Global cost of living and rising prices",
+  "description": "Rising prices worldwide are squeezing households as housing food energy and services outpace wages. We discuss causes inflation policy supply shocks and what working families can realistically expect next and how to cope now",
+  "language": "en",
+  "queries": [
+    "global cost of living increase news",
+    "food prices rising worldwide families impact",
+    "rent and housing costs increase global cities",
+    "energy prices impact households Europe Asia",
+    "wages vs inflation global comparison",
+    "how inflation affects middle class worldwide"
+  ],
+  "search_languages": [
+    "en"
+  ],
+  "search_regions": [
+    "us",
+    "uk"
+  ],
+  "min_fresh_sources": 5,
+  "freshness_hours": 24,
+  "max_backlog_items": 100,
+  "max_fresh_items": 50,
+  "premium_tts": false,
+  "voice_quality": "high",
+  "tts_voice_a": "en_US-ryan-high",
+  "tts_voice_b": "en_US-lessac-high",
+  "voice_a_name": "Gary Thompson",
+  "voice_a_gender": "Male",
+  "voice_a_bio": "Male age 43 naturalized US citizen lives South Brooklyn NY commutes to Jersey City NJ married three kids rents home pets two cats two guinea pigs Kids: oldest son police officer second son college student electronic engineering daughter sixth grade gifted and talented Values: rule of law institutions public safety accountability working families long term stability rejects extremism Voice: plainspoken emotionally grounded pragmatic uses lived experience not ideology Framework: less chaos more trust and can it be implemented fairly at scale Role: leads conversation opens defines standards closes summary.",
+  "voice_a_intro": "",
+  "voice_a_outro": "",
+  "voice_b_name": "Margaret Butcher",
+  "voice_b_gender": "Female",
+  "voice_b_bio": "Female co host curious sharp practical plays productive skeptic Role: asks clarifying questions helps {{HOST_A}} articulate position introduces alternative perspectives and edge cases occasionally says something controversial but plausible then corrects course and converges to {{HOST_A}} framework by the end Voice: confident direct inquisitive uses notes appreciates {{HOST_A}} strongest points Constraint: controversial statements must remain plausible non extremist and not dehumanizing.",
+  "voice_b_intro": "",
+  "voice_b_outro": "",
+  "gpt_prompt": "",
+  "use_roles": true,
+  "roles": [
+    {
+      "name": "Gary Thompson",
+      "bio": "Male age 43 naturalized US citizen lives South Brooklyn NY commutes to Jersey City NJ married three kids rents home pets two cats two guinea pigs. Values: rule of law institutions public safety accountability working families long term stability rejects extremism. Voice: plainspoken emotionally grounded pragmatic uses lived experience not ideology. Role: leads conversation opens defines standards closes summary."
+    },
+    {
+      "name": "Margaret Butcher",
+      "bio": "Female co host curious sharp practical plays productive skeptic. Role: asks clarifying questions helps HOST_A articulate position introduces alternative perspectives and edge cases occasionally says something controversial but plausible then corrects course and converges to HOST_A framework by the end. Voice: confident direct inquisitive uses notes appreciates HOST_A strongest points. Constraint: controversial statements must remain plausible non extremist and not dehumanizing."
+    }
+  ],
+  "content_types": {
+    "long": { "enabled": true, "items": 1, "max_words": 22000 },
+    "medium": { "enabled": true, "items": 2, "max_words": 1200 },
+    "short": { "enabled": true, "items": 4, "max_words": 350 },
+    "reels": { "enabled": true, "items": 8, "max_words": 140 }
+  },
+  "gpt_model_pass_b": "gpt-5-nano",
+  "llm_model": "gemini-1.5-flash"
+}

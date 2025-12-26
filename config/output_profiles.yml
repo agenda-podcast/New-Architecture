@@ -1,0 +1,162 @@
+# Output Profiles Configuration
+# Single source of truth for video output specifications
+# Used by Blender rendering scripts and post-render validation
+
+# Profile Format:
+# Each profile defines non-negotiable output requirements for a content type
+# - resolution: Exact width and height in pixels
+# - aspect_ratio: Expected aspect ratio (for validation)
+# - fps: Frames per second
+# - color_space: Color space for rendering
+# - audio_policy: Audio codec and bitrate requirements
+# - bitrate_policy: Video bitrate constraints
+# - container: Output container format
+# - codec: Video codec
+
+profiles:
+  # Long Format - Desktop/TV Viewing (Horizontal)
+  long:
+    description: "Full deep dive podcast - Desktop/TV viewing"
+    resolution:
+      width: 1920
+      height: 1080
+    aspect_ratio: "16:9"
+    fps: 30
+    color_space: "sRGB"
+    audio_policy:
+      codec: "aac"
+      bitrate: "128k"
+      sample_rate: 44100
+      channels: 2
+    bitrate_policy:
+      target: "10M"      # Target bitrate
+      max: "12M"         # Maximum bitrate
+      buffer: "24M"      # Buffer size (2x max)
+    container: "mp4"
+    codec:
+      name: "libx264"
+      profile: "high"
+      preset: "medium"   # Balance between speed and quality
+      crf: 23           # Constant Rate Factor (lower = higher quality)
+      keyframe_interval: 60  # Keyframes every 2 seconds (30fps * 2)
+      pix_fmt: "yuv420p"
+    validation:
+      min_duration: 600  # Minimum 10 minutes
+      max_duration: 3600 # Maximum 60 minutes
+      
+  # Medium Format - Desktop/TV Viewing (Horizontal)
+  medium:
+    description: "Focused segment - Desktop/TV viewing"
+    resolution:
+      width: 1920
+      height: 1080
+    aspect_ratio: "16:9"
+    fps: 30
+    color_space: "sRGB"
+    audio_policy:
+      codec: "aac"
+      bitrate: "128k"
+      sample_rate: 44100
+      channels: 2
+    bitrate_policy:
+      target: "10M"
+      max: "12M"
+      buffer: "24M"
+    container: "mp4"
+    codec:
+      name: "libx264"
+      profile: "high"
+      preset: "medium"
+      crf: 23
+      keyframe_interval: 60
+      pix_fmt: "yuv420p"
+    validation:
+      min_duration: 300   # Minimum 5 minutes
+      max_duration: 1200  # Maximum 20 minutes
+      
+  # Short Format - Mobile/Social Media (Vertical)
+  short:
+    description: "Quick update - Mobile/social media"
+    resolution:
+      width: 1080
+      height: 1920
+    aspect_ratio: "9:16"
+    fps: 30
+    color_space: "sRGB"
+    audio_policy:
+      codec: "aac"
+      bitrate: "128k"
+      sample_rate: 44100
+      channels: 2
+    bitrate_policy:
+      target: "8M"
+      max: "10M"
+      buffer: "20M"
+    container: "mp4"
+    codec:
+      name: "libx264"
+      profile: "high"
+      preset: "medium"
+      crf: 23
+      keyframe_interval: 60
+      pix_fmt: "yuv420p"
+    validation:
+      min_duration: 120   # Minimum 2 minutes
+      max_duration: 600   # Maximum 10 minutes
+      
+  # Reels Format - Social Media Clips (Vertical)
+  reels:
+    description: "Social media clip - Instagram/TikTok/YouTube Shorts"
+    resolution:
+      width: 1080
+      height: 1920
+    aspect_ratio: "9:16"
+    fps: 30
+    color_space: "sRGB"
+    audio_policy:
+      codec: "aac"
+      bitrate: "128k"
+      sample_rate: 44100
+      channels: 2
+    bitrate_policy:
+      target: "8M"
+      max: "10M"
+      buffer: "20M"
+    container: "mp4"
+    codec:
+      name: "libx264"
+      profile: "high"
+      preset: "medium"
+      crf: 23
+      keyframe_interval: 60
+      pix_fmt: "yuv420p"
+    validation:
+      min_duration: 15    # Minimum 15 seconds
+      max_duration: 90    # Maximum 90 seconds
+
+# Master Quality Profile (for re-encoding/archival)
+# Not currently used, but defined for future use
+master:
+  description: "High-bitrate mezzanine format for re-encoding"
+  resolution:
+    width: 1920
+    height: 1080
+  aspect_ratio: "16:9"
+  fps: 30
+  color_space: "sRGB"
+  audio_policy:
+    codec: "pcm_s16le"  # Uncompressed audio
+    sample_rate: 48000
+    channels: 2
+  bitrate_policy:
+    target: "50M"
+    max: "100M"
+    buffer: "200M"
+  container: "mov"
+  codec:
+    name: "prores_ks"  # ProRes codec
+    profile: "standard"
+    pix_fmt: "yuv422p10le"
+  validation:
+    min_duration: 0
+    max_duration: 7200  # Maximum 2 hours

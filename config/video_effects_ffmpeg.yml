@@ -1,0 +1,82 @@
+# FFmpeg Video Effects Configuration
+# Defines preset parameters for FFmpeg filtergraph-based video rendering
+# Supports Ken Burns motion effects, xfade transitions, and finishing passes
+
+version: 1
+
+# Transition configurations by content type
+transitions:
+  long:
+    # Full deep dive content (~40-45 minutes)
+    transitions:
+      - smoothleft
+      - smoothright
+      - smoothup
+      - smoothdown
+      - circleopen
+      - circleclose
+    duration: 1.0  # Transition duration in seconds
+  
+  medium:
+    # Focused segments (~10 minutes)
+    transitions:
+      - wipeleft
+      - wiperight
+      - wipeup
+      - wipedown
+      - slideleft
+      - slideright
+    duration: 0.8
+  
+  short:
+    # Quick updates (~4 minutes)
+    transitions:
+      - slideleft
+      - slideright
+      - slideup
+      - slidedown
+      - fade
+    duration: 0.5
+  
+  reels:
+    # Social media clips (~30 seconds)
+    transitions:
+      - circleopen
+      - circleclose
+      - radial
+      - pixelize
+      - dissolve
+      - fade
+    duration: 0.3
+
+# Ken Burns motion parameters
+kenburns:
+  enabled: true
+  max_zoom: 1.15          # Maximum zoom factor (1.0 = no zoom, higher = more zoom)
+  zoom_per_frame: 0.002   # Zoom increment per frame (adjust for speed)
+  pan_enabled: true       # Enable panning motion
+  pan_speed: 0.5          # Pan speed factor (0.0 = no pan, 1.0 = full frame pan)
+
+# Still image duration per content type (seconds)
+still_duration:
+  long:
+    min: 4.0
+    max: 8.0
+  medium:
+    min: 3.5
+    max: 7.0
+  short:
+    min: 2.5
+    max: 5.0
+  reels:
+    min: 1.5
+    max: 3.0
+
+# Finishing pass effects (applied after transitions)
+finishing:
+  vignette:
+    enabled: false        # Subtle vignette effect
+    angle: 0.785398       # PI/4 radians (45 degrees)
+  grain:
+    enabled: false        # Film grain texture
+    intensity: 5          # 0-100 scale

@@ -1,0 +1,21 @@
+[
+  {
+    "topic_id": "topic-01",
+    "timestamp": "2025-12-17T12:57:17.797241",
+    "status": "success",
+    "fresh_count": 50,
+    "backlog_count": 100,
+    "new_sources_found": 30,
+    "valid_sources": 30,
+    "meets_minimum": true,
+    "min_required": 5,
+    "fresh_with_images": 0,
+    "valid_with_images": 28,
+    "tier_breakdown": {
+      "tier1": 50,
+      "tier2": 0,
+      "tier3": 0,
+      "untrusted": 0
+    }
+  }
+]

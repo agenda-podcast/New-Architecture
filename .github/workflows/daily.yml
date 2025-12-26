@@ -1,0 +1,740 @@
+name: Daily Podcast Generation
+
+on:
+  # schedule:
+    ## Run daily at 06:00 UTC
+    #- cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      topics:
+        description: 'Comma-separated topic IDs (e.g., topic-01,topic-02) or "all"'
+        required: false
+        default: 'all'
+      video_renderer:
+        description: 'Video renderer to use (ffmpeg or blender)'
+        required: false
+        default: 'ffmpeg'
+
+env:
+  PYTHON_VERSION: '3.11'
+  # Defaults to FFmpeg. When manually triggering the workflow, you can override via workflow_dispatch input.
+  # For scheduled runs (or other triggers without inputs), this will evaluate to 'ffmpeg'.
+  VIDEO_RENDERER: ${{ github.event.inputs.video_renderer || 'ffmpeg' }}
+  BLENDER_TEMPLATES_VERSION: "v1"
+
+jobs:
+  prepare-matrix:
+    name: Prepare Topic Matrix
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+
+      - name: Ensure pip cache directory exists
+        run: mkdir -p ~/.cache/pip
+
+      - name: Generate matrix of enabled topics
+        id: set-matrix
+        run: |
+          python3 << 'PYTHON_EOF'
+          import json
+          import os
+          from pathlib import Path
+
+          topics_dir = Path('topics')
+          enabled_topics = []
+
+          for topic_file in sorted(topics_dir.glob('topic-*.json')):
+              with open(topic_file, 'r') as f:
+                  config = json.load(f)
+                  # Default to True for backward compatibility
+                  if config.get('enabled', True):
+                      enabled_topics.append(config['id'])
+
+          matrix = {'topic': enabled_topics}
+          print(f"matrix={json.dumps(matrix)}")
+          
+          # Set output for GitHub Actions
+          github_output = os.environ.get('GITHUB_OUTPUT')
+          if github_output:
+              with open(github_output, 'a') as f:
+                  f.write(f"matrix={json.dumps(matrix)}\n")
+          PYTHON_EOF
+
+  run:
+    name: Generate Podcast
+    needs: [prepare-matrix]
+    runs-on: ubuntu-latest
+    environment: Main
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TENANT_ID: "0000000001"
+      CACHE_RESET: "true"
+      # Disable tenant cache downloads/uploads by default to reduce storage
+      ENABLE_TENANT_ASSETS_CACHE: "false"
+      # Captions / social defaults
+      CAPTIONS_STYLE: "tiktok"
+      REQUIRE_BURNED_CAPTIONS: "true"
+      # FFmpeg speed defaults for vertical social video
+      FFMPEG_FAST_MODE: "true"
+      FFMPEG_PRESET: "veryfast"
+      FFMPEG_CRF: "23"
+      ENABLE_TENANT_ASSETS: "true"
+      # Output retention (disk control)
+      # Defaults keep only burned videos; set any to "true" to retain.
+      KEEP_OUTPUT_BURNED_VIDEOS: "true"
+      KEEP_OUTPUT_AUDIO: "false"
+      KEEP_OUTPUT_SUBTITLES: "false"
+      KEEP_OUTPUT_JSON: "false"
+      KEEP_OUTPUT_TEXT: "false"
+      KEEP_OUTPUT_IMAGE_CACHE: "false"
+      # Do not hard-code Blender here. Use the workflow input (or default) so FFmpeg runs don't require Blender secrets.
+      VIDEO_RENDERER: ${{ github.event.inputs.video_renderer || 'ffmpeg' }}
+      BLENDER_TEMPLATES_BUNDLE_URL: ${{ secrets.BLENDER_TEMPLATES_BUNDLE_URL }}
+    strategy:
+      fail-fast: false
+      matrix: ${{fromJson(needs.prepare-matrix.outputs.matrix)}}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Piper TTS binaries
+        id: cache-piper
+        uses: actions/cache@v4
+        with:
+          path: piper/
+          key: piper-binaries-${{ hashFiles('./piper_linux_x86_64.tar.gz') }}
+          restore-keys: |
+            piper-binaries-
+
+      - name: Setup Piper TTS
+        id: setup-piper
+        run: |
+          set -e  # Exit on any error
+          
+          echo "=== Piper TTS Setup ==="
+          echo "Current directory: $(pwd)"
+          echo "Current user: $(whoami)"
+          
+          # Check if Piper tarball exists in repo
+          echo ""
+          echo "Step 1: Checking for piper_linux_x86_64.tar.gz..."
+          if [ ! -f piper_linux_x86_64.tar.gz ]; then
+            echo "ERROR: piper_linux_x86_64.tar.gz not found in repository"
+            echo "This file is required for TTS generation. Please ensure it's committed to the repository."
+            echo "Expected location: $(pwd)/piper_linux_x86_64.tar.gz"
+            ls -la | grep -i piper || echo "No files matching 'piper' found"
+            exit 1
+          fi
+          echo "✓ Found piper_linux_x86_64.tar.gz ($(du -h piper_linux_x86_64.tar.gz | cut -f1))"
+          
+          # Extract Piper if required files are not present (even if directory exists from cache)
+          echo ""
+          echo "Step 2: Checking for extracted Piper files..."
+          NEEDS_EXTRACTION=false
+          if [ ! -f piper/piper ]; then
+            echo "  - piper/piper not found, extraction needed"
+            NEEDS_EXTRACTION=true
+          fi
+          if [ ! -f piper/libpiper_phonemize.so ]; then
+            echo "  - piper/libpiper_phonemize.so not found, extraction needed"
+            NEEDS_EXTRACTION=true
+          fi
+          
+          if [ "$NEEDS_EXTRACTION" = true ]; then
+            echo "Extracting Piper TTS binary..."
+            # Remove potentially corrupted cache directory
+            rm -rf piper/
+            tar -xzf piper_linux_x86_64.tar.gz
+            echo "✓ Piper TTS extracted from tarball"
+            
+            # List extracted contents for verification
+            echo "Extracted contents:"
+            ls -lah piper/ | head -20
+          else
+            echo "✓ Piper TTS files exist (restored from cache)"
+            echo "Cached contents:"
+            ls -lah piper/ | head -10
+          fi
+          
+          # Verify required files exist with detailed error messages
+          echo ""
+          echo "Step 3: Verifying required files..."
+          
+          REQUIRED_FILES=(
+            "piper/piper"
+            "piper/libpiper_phonemize.so"
+            "piper/libonnxruntime.so"
+          )
+          
+          MISSING_FILES=()
+          for file in "${REQUIRED_FILES[@]}"; do
+            if [ -f "$file" ]; then
+              SIZE=$(du -h "$file" | cut -f1)
+              PERMS=$(ls -lh "$file" | awk '{print $1}')
+              echo "✓ Found: $file ($SIZE, $PERMS)"
+            else
+              echo "✗ Missing: $file"
+              MISSING_FILES+=("$file")
+            fi
+          done
+          
+          if [ ${#MISSING_FILES[@]} -gt 0 ]; then
+            echo ""
+            echo "ERROR: Missing required Piper files:"
+            for file in "${MISSING_FILES[@]}"; do
+              echo "  - $file"
+            done
+            echo ""
+            echo "Directory contents:"
+            ls -laR piper/ || echo "piper/ directory is empty or missing"
+            exit 1
+          fi
+          
+          # Ensure binary is executable (permissions may be lost during cache restore)
+          echo ""
+          echo "Step 4: Setting executable permissions..."
+          chmod +x piper/piper
+          PERMS_AFTER=$(ls -lh piper/piper | awk '{print $1}')
+          echo "✓ Permissions set: $PERMS_AFTER"
+          
+          # Verify espeak-ng-data directory exists
+          if [ -d piper/espeak-ng-data ]; then
+            DATA_SIZE=$(du -sh piper/espeak-ng-data | cut -f1)
+            echo "✓ Found espeak-ng-data directory ($DATA_SIZE)"
+          else
+            echo "⚠ Warning: piper/espeak-ng-data directory not found (may cause issues)"
+          fi
+          
+          # Test that Piper binary is functional
+          echo ""
+          echo "Step 5: Testing Piper binary functionality..."
+          export LD_LIBRARY_PATH="$(pwd)/piper:$LD_LIBRARY_PATH"
+          echo "LD_LIBRARY_PATH set to: $LD_LIBRARY_PATH"
+          
+          if PIPER_VERSION=$(./piper/piper --version 2>&1); then
+            echo "✓ Piper TTS is functional"
+            echo "  Version: $PIPER_VERSION"
+          else
+            echo "ERROR: Piper binary exists but fails to execute"
+            echo "This may indicate missing system dependencies or corrupted binary"
+            echo ""
+            echo "Attempting to diagnose the issue..."
+            echo "Binary info:"
+            file piper/piper
+            echo ""
+            echo "Library dependencies:"
+            ldd piper/piper || echo "ldd failed"
+            exit 1
+          fi
+          
+          echo ""
+          echo "✓ Piper TTS setup complete and verified"
+          echo "======================="
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+
+      - name: Install system dependencies
+        run: |
+          set -e  # Exit on error
+          sudo apt-get update -qq
+          # Add universe repository if needed
+          sudo add-apt-repository -y universe || true
+          # Install with explicit error checking
+          if [ "${VIDEO_RENDERER}" = "blender" ]; then
+            sudo apt-get install -y ffmpeg libxi6 libxrender1 libgl1
+          else
+            sudo apt-get install -y ffmpeg
+          fi
+          # Verify installation
+          if ! command -v ffmpeg &> /dev/null; then
+            echo "ERROR: ffmpeg installation failed"
+            exit 1
+          fi
+          echo "✓ FFmpeg installed successfully"
+          ffmpeg -version
+
+      - name: Cache reset cleanup (reduce disk usage)
+        if: env.CACHE_RESET == 'true'
+        run: |
+          echo "CACHE_RESET=true: removing local caches and large temp artifacts"
+          rm -rf outputs/**/processed_images || true
+          rm -rf outputs/**/_prepared_images || true
+          rm -rf blender-4.5.0-linux-x64 || true
+          rm -rf templates/safe templates/cinematic templates/experimental || true
+          rm -rf /tmp/podcast_chunks /tmp/podcast_* /tmp/ffmpeg_* /tmp/blender_* /tmp/captions_* || true
+          df -h || true
+
+
+      - name: Cache Blender
+        if: env.VIDEO_RENDERER == 'blender' && env.CACHE_RESET != 'true'
+        id: cache-blender
+        uses: actions/cache@v4
+        with:
+          path: blender-4.5.0-linux-x64
+          key: blender-4.5.0-linux-x64
+
+      - name: Download and Setup Blender 4.5 LTS
+        if: env.VIDEO_RENDERER == 'blender' && env.CACHE_RESET != 'true' && steps.cache-blender.outputs.cache-hit != 'true'
+        run: |
+          echo "Downloading Blender 4.5 LTS..."
+          wget -q https://download.blender.org/release/Blender4.5/blender-4.5.0-linux-x64.tar.xz
+          
+          echo "Extracting Blender..."
+          tar -xf blender-4.5.0-linux-x64.tar.xz
+          
+          echo "Cleaning up archive..."
+          rm blender-4.5.0-linux-x64.tar.xz
+          
+          echo "✓ Blender 4.5 LTS ready"
+
+      - name: Debug Blender Cache
+        if: env.VIDEO_RENDERER == 'blender'
+        run: |
+          echo "Checking Blender cache restoration..."
+          echo "Current directory: $(pwd)"
+          echo "Looking for: blender-4.5.0-linux-x64/"
+          if [ -d "blender-4.5.0-linux-x64" ]; then
+            echo "✓ Blender directory exists"
+            ls -la blender-4.5.0-linux-x64/ | head -10
+          else
+            echo "✗ Blender directory not found"
+            echo "Cache reported hit but directory missing - cache may be corrupted"
+            echo "Contents of current directory:"
+            ls -la | grep -i blender || echo "No blender-related files found"
+          fi
+
+      - name: Verify Blender Installation
+        if: env.VIDEO_RENDERER == 'blender'
+        run: |
+          if [ -x "./blender-4.5.0-linux-x64/blender" ]; then
+            ./blender-4.5.0-linux-x64/blender --version
+            echo "✓ Blender is functional"
+          else
+            echo "✗ Blender binary not found or not executable"
+            echo "Attempting to list directory contents:"
+            ls -la blender-4.5.0-linux-x64/ 2>&1 || echo "Directory does not exist"
+            exit 1
+          fi
+
+      - name: Cache Blender Templates
+        if: env.VIDEO_RENDERER == 'blender' && env.CACHE_RESET != 'true'
+        id: cache-blender-templates
+        uses: actions/cache@v4
+        with:
+          path: |
+            templates/safe
+            templates/cinematic
+            templates/experimental
+            templates/**/previews
+          key: blender-templates-${{ env.BLENDER_TEMPLATES_VERSION }}-${{ hashFiles('templates/inventory.yml') }}
+          restore-keys: |
+            blender-templates-${{ env.BLENDER_TEMPLATES_VERSION }}-
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ "${CACHE_RESET}" = "true" ]; then
+            echo "CACHE_RESET=true: purging pip cache to reduce disk usage"
+            pip cache purge || true
+          fi
+
+      - name: Check templates bundle URL is available
+        if: env.VIDEO_RENDERER == 'blender'
+        run: |
+          if [ -z "${BLENDER_TEMPLATES_BUNDLE_URL}" ]; then
+            echo "ERROR: BLENDER_TEMPLATES_BUNDLE_URL is empty."
+            echo ""
+            echo "This secret must be configured for Blender template downloads to work."
+            echo ""
+            echo "To fix this issue, configure the secret at:"
+            echo "  Settings → Environments → Main → Secrets"
+            echo "  OR"
+            echo "  Settings → Secrets and variables → Actions → Repository secrets"
+            echo ""
+            echo "Current configuration uses environment: Main, so the secret should be set in:"
+            echo "  Settings → Environments → Main → Secrets → BLENDER_TEMPLATES_BUNDLE_URL"
+            echo ""
+            exit 1
+          fi
+          echo "✓ BLENDER_TEMPLATES_BUNDLE_URL is configured"
+
+      - name: Verify/Download Blender Templates
+        if: env.VIDEO_RENDERER == 'blender'
+        run: |
+          python3 scripts/ensure_blender_templates.py --required
+
+      - name: Verify Piper integration with Python TTS code
+        run: |
+          echo "Verifying TTS code can locate Piper binary..."
+          cd scripts
+          python3 << 'PYTHON_EOF'
+          import sys
+          from pathlib import Path
+          # Import the TTS module's config function to test the lookup logic
+          sys.path.insert(0, str(Path.cwd()))
+          from config import get_repo_root
+          
+          # Use the same logic as tts_generate.py to find piper binary
+          piper_binary = get_repo_root() / 'piper' / 'piper'
+          
+          if not piper_binary.exists():
+              print(f"ERROR: TTS code cannot find Piper binary at expected location: {piper_binary}")
+              print(f"This indicates a mismatch between workflow setup and TTS code expectations")
+              sys.exit(1)
+          
+          print(f"✓ TTS code can locate Piper binary: {piper_binary}")
+          print("✓ Integration between workflow and TTS code verified")
+          PYTHON_EOF
+
+      - name: Cache Piper voices
+        id: cache-voices-run
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/piper-tts/voices
+          key: piper-voices-${{ hashFiles('topics/*.json') }}
+          restore-keys: |
+            piper-voices-
+
+      - name: Download voice models from HuggingFace
+        if: steps.cache-voices-run.outputs.cache-hit != 'true'
+        run: |
+          set -e
+          echo "=== Voice Model Download ==="
+          echo "Downloading voice models from HuggingFace..."
+          mkdir -p ~/.local/share/piper-tts/voices
+          cd ~/.local/share/piper-tts/voices
+          
+          # Function to download and verify a voice model
+          download_voice() {
+            local voice_name=$1
+            local voice_url_base=$2
+            
+            echo ""
+            echo "Downloading ${voice_name}..."
+            
+            # Download model file
+            if curl -fL -o "${voice_name}.onnx" "${voice_url_base}.onnx?download=true"; then
+              local size=$(du -h "${voice_name}.onnx" | cut -f1)
+              echo "✓ Downloaded ${voice_name}.onnx ($size)"
+            else
+              echo "✗ Failed to download ${voice_name}.onnx"
+              return 1
+            fi
+            
+            # Download config file
+            if curl -fL -o "${voice_name}.onnx.json" "${voice_url_base}.onnx.json?download=true"; then
+              echo "✓ Downloaded ${voice_name}.onnx.json"
+            else
+              echo "✗ Failed to download ${voice_name}.onnx.json"
+              return 1
+            fi
+            
+            # Verify files are not empty
+            if [ ! -s "${voice_name}.onnx" ]; then
+              echo "✗ ${voice_name}.onnx is empty"
+              return 1
+            fi
+            if [ ! -s "${voice_name}.onnx.json" ]; then
+              echo "✗ ${voice_name}.onnx.json is empty"
+              return 1
+            fi
+            
+            echo "✓ ${voice_name} downloaded and verified"
+            return 0
+          }
+          
+          # Download en_US-ryan-high voice model
+          download_voice "en_US-ryan-high" "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/ryan/high/en_US-ryan-high"
+          
+          # Download en_US-lessac-high voice model
+          download_voice "en_US-lessac-high" "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/lessac/high/en_US-lessac-high"
+          
+          echo ""
+          echo "Voice models downloaded successfully:"
+          ls -lh ~/.local/share/piper-tts/voices/
+          echo "======================="
+
+      - name: Verify voice models
+        run: |
+          set -e
+          echo "=== Verifying Voice Models ==="
+          
+          VOICES_DIR="$HOME/.local/share/piper-tts/voices"
+          
+          # Check if voices directory exists
+          if [ ! -d "$VOICES_DIR" ]; then
+            echo "ERROR: Voices directory not found: $VOICES_DIR"
+            exit 1
+          fi
+          
+          echo "Voices directory: $VOICES_DIR"
+          
+          # Required voice models
+          REQUIRED_VOICES=(
+            "en_US-ryan-high"
+            "en_US-lessac-high"
+          )
+          
+          MISSING_VOICES=()
+          for voice in "${REQUIRED_VOICES[@]}"; do
+            ONNX_FILE="${VOICES_DIR}/${voice}.onnx"
+            JSON_FILE="${VOICES_DIR}/${voice}.onnx.json"
+            
+            if [ -f "$ONNX_FILE" ] && [ -f "$JSON_FILE" ]; then
+              ONNX_SIZE=$(du -h "$ONNX_FILE" | cut -f1)
+              # Check file is not empty (should be > 1MB for voice models)
+              ONNX_BYTES=$(stat -f%z "$ONNX_FILE" 2>/dev/null || stat -c%s "$ONNX_FILE")
+              if [ "$ONNX_BYTES" -lt 1000000 ]; then
+                echo "✗ $voice: Model file too small ($ONNX_SIZE), may be corrupted"
+                MISSING_VOICES+=("$voice")
+              else
+                echo "✓ $voice: Available ($ONNX_SIZE)"
+              fi
+            else
+              echo "✗ $voice: Missing files"
+              [ ! -f "$ONNX_FILE" ] && echo "  - Missing: ${voice}.onnx"
+              [ ! -f "$JSON_FILE" ] && echo "  - Missing: ${voice}.onnx.json"
+              MISSING_VOICES+=("$voice")
+            fi
+          done
+          
+          if [ ${#MISSING_VOICES[@]} -gt 0 ]; then
+            echo ""
+            echo "ERROR: Missing or corrupted voice models:"
+            for voice in "${MISSING_VOICES[@]}"; do
+              echo "  - $voice"
+            done
+            echo ""
+            echo "Available files in voices directory:"
+            ls -lh "$VOICES_DIR"
+            exit 1
+          fi
+          
+          echo ""
+          echo "✓ All required voice models verified"
+          echo "======================="
+
+      - name: Cache TTS files
+        uses: actions/cache@v4
+        with:
+          path: .cache/tts
+          key: tts-cache-${{ matrix.topic }}-${{ github.run_id }}
+          restore-keys: |
+            tts-cache-${{ matrix.topic }}-
+
+      - name: Run pipeline for topic
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GOOGLE_CUSTOM_SEARCH_API_KEY: ${{ secrets.GOOGLE_CUSTOM_SEARCH_API_KEY }}
+          GOOGLE_SEARCH_ENGINE_ID: ${{ secrets.GOOGLE_SEARCH_ENGINE_ID }}
+          GPT_KEY: ${{ secrets.GPT_KEY }}
+          VIDEO_RENDERER: ${{ env.VIDEO_RENDERER }}
+        run: |
+          cd scripts
+          python run_pipeline.py --topic ${{ matrix.topic }}
+
+      - name: Publish tenant outputs to tenant release (per type)
+        if: success()
+        run: |
+          DATE=$(date -u +%Y%m%d)
+          python scripts/publish_tenant_outputs.py --topic ${{ matrix.topic }} --date $DATE
+
+      - name: Cleanup outputs (retain only configured types)
+        if: success()
+        run: |
+          DATE=$(date -u +%Y%m%d)
+          python scripts/cleanup_outputs.py --topic ${{ matrix.topic }} --date $DATE
+
+      - name: Commit and push downloaded images
+        if: success()
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # Check if images were downloaded
+          if [ -d "outputs/${{ matrix.topic }}/images" ]; then
+            git add outputs/${{ matrix.topic }}/images/
+            
+            # Only commit if there are changes
+            if git diff --staged --quiet; then
+              echo "No new images to commit - images already up to date"
+            else
+              git commit -m "Update images for ${{ matrix.topic }} [skip ci]"
+              git push || echo "Warning: Failed to push images"
+              echo "Images committed and pushed successfully"
+            fi
+          else
+            echo "Warning: No images directory found for ${{ matrix.topic }}"
+          fi
+
+      - name: Upload outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: outputs-${{ matrix.topic }}
+          path: outputs/${{ matrix.topic }}/
+          retention-days: 90
+
+  finalize:
+    name: Finalize and Publish
+    needs: run
+    runs-on: ubuntu-latest
+    if: always()
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TENANT_ID: "0000000001"
+      ENABLE_TENANT_ASSETS: "true"
+      # Keep cache disabled by default to reduce storage.
+      ENABLE_TENANT_ASSETS_CACHE: "false"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Merge artifacts into working tree
+        run: |
+          # Copy outputs from all topics
+          for topic_dir in artifacts/outputs-topic-*; do
+            if [ -d "$topic_dir" ]; then
+              topic_name=$(basename "$topic_dir" | sed 's/outputs-//')
+              mkdir -p outputs/$topic_name
+              cp -r "$topic_dir"/* outputs/$topic_name/ || true
+            fi
+          done
+
+      - name: Commit and push changes
+        run: |
+          git add outputs/
+          
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Daily podcast generation: $(date -u +%Y-%m-%d)"
+            
+            # Retry logic for rebase with conflict detection
+            max_retries=3
+            retry_count=0
+            
+            while [ $retry_count -lt $max_retries ]; do
+              if ! git pull --rebase origin ${{ github.ref_name }}; then
+                # Check if rebase failed due to conflicts
+                if git status | grep -q "rebase in progress"; then
+                  echo "ERROR: Rebase conflicts detected. Manual intervention required."
+                  git rebase --abort
+                  exit 1
+                fi
+                
+                retry_count=$((retry_count + 1))
+                echo "Rebase failed, retry $retry_count of $max_retries"
+                
+                if [ $retry_count -ge $max_retries ]; then
+                  echo "Failed to rebase after $max_retries attempts"
+                  exit 1
+                fi
+                
+                sleep 5
+                continue
+              fi
+              
+              # Try to push
+              if git push origin ${{ github.ref_name }}; then
+                echo "Successfully pushed changes"
+                break
+              else
+                retry_count=$((retry_count + 1))
+                echo "Push failed, retry $retry_count of $max_retries"
+                
+                if [ $retry_count -ge $max_retries ]; then
+                  echo "Failed to push after $max_retries attempts"
+                  exit 1
+                fi
+                
+                sleep 5
+              fi
+            done
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+
+      - name: Ensure pip cache directory exists
+        run: mkdir -p ~/.cache/pip
+
+      - name: Create/Update Releases
+        run: |
+          DATE=$(date -u +%Y%m%d)
+          
+          for topic_dir in outputs/topic-*; do
+            if [ ! -d "$topic_dir" ]; then
+              continue
+            fi
+            
+            TOPIC=$(basename "$topic_dir")
+            
+            # Check if any files exist for this topic
+            file_count=$(ls "$topic_dir"/${TOPIC}-${DATE}*.* 2>/dev/null | wc -l)
+            if [ "$file_count" -eq 0 ]; then
+              echo "No files found for $TOPIC on $DATE, skipping release"
+              continue
+            fi
+            
+            echo "Publishing release for $TOPIC..."
+            cd scripts
+            python release_uploader.py \
+              --topic "$TOPIC" \
+              --date "$DATE" \
+              --output-dir "../$topic_dir" || echo "Warning: Release upload failed for $TOPIC"
+            cd ..
+          done
+
+      - name: Generate run summary
+        run: |
+          echo "## Daily Podcast Generation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Date:** $(date -u +%Y-%m-%d)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Generated Outputs" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          for topic_dir in outputs/topic-*; do
+            if [ -d "$topic_dir" ]; then
+              TOPIC=$(basename "$topic_dir")
+              echo "#### $TOPIC" >> $GITHUB_STEP_SUMMARY
+              ls -lh "$topic_dir" | tail -n +2 | awk '{print "- " $9 " (" $5 ")"}' >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          done

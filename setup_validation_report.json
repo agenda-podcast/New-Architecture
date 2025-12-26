@@ -1,0 +1,85 @@
+{
+  "system_deps": {
+    "ffmpeg": {
+      "installed": false,
+      "version": "Not found"
+    },
+    "blender": {
+      "installed": false,
+      "version": "Not found"
+    }
+  },
+  "python_deps": {
+    "requests": {
+      "installed": true,
+      "required": true
+    },
+    "yaml": {
+      "installed": true,
+      "required": true
+    },
+    "openai": {
+      "installed": false,
+      "required": true
+    },
+    "PIL": {
+      "installed": false,
+      "required": true
+    },
+    "google.cloud.texttospeech": {
+      "installed": false,
+      "required": false
+    },
+    "googleapiclient": {
+      "installed": false,
+      "required": false
+    },
+    "feedgen": {
+      "installed": false,
+      "required": false
+    }
+  },
+  "config_files": {
+    "config/output_profiles.yml": {
+      "exists": true,
+      "path": "/home/runner/work/podcast-maker/podcast-maker/config/output_profiles.yml"
+    },
+    "scripts/global_config.py": {
+      "exists": true,
+      "path": "/home/runner/work/podcast-maker/podcast-maker/scripts/global_config.py"
+    },
+    "scripts/video_render.py": {
+      "exists": true,
+      "path": "/home/runner/work/podcast-maker/podcast-maker/scripts/video_render.py"
+    },
+    "scripts/blender/build_video.py": {
+      "exists": true,
+      "path": "/home/runner/work/podcast-maker/podcast-maker/scripts/blender/build_video.py"
+    },
+    "scripts/blender/template_selector.py": {
+      "exists": true,
+      "path": "/home/runner/work/podcast-maker/podcast-maker/scripts/blender/template_selector.py"
+    }
+  },
+  "blender_setup": {
+    "templates_dir": {
+      "exists": true
+    },
+    "template_count": 0,
+    "assets_dir": {
+      "exists": true
+    },
+    "asset_counts": {
+      "luts": 0,
+      "overlays": 0,
+      "fonts": 0
+    }
+  },
+  "summary": {
+    "total_errors": 3,
+    "total_warnings": 6,
+    "can_run_pipeline": false,
+    "can_use_blender": false,
+    "ffmpeg_available": false
+  }
+}

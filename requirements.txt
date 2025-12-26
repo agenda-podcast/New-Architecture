@@ -1,0 +1,29 @@
+# Core dependencies
+requests>=2.31.0
+
+# HTML parsing for article content extraction
+# Only required if FETCH_ARTICLES=True in global_config.py
+# When FETCH_ARTICLES=False, GPT models (5+) fetch content directly from URLs
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# Google Cloud TTS (for premium text-to-speech)
+google-cloud-texttospeech>=2.14.0
+
+# Google Custom Search API (for image collection)
+google-api-python-client>=2.100.0
+
+# OpenAI (for ChatGPT API script generation)
+openai>=1.0.0
+
+# Piper TTS (local text-to-speech)
+piper-tts>=1.2.0
+
+# RSS Feed Generation
+feedgen>=0.9.0
+
+# Image Processing
+Pillow>=10.0.0
+
+# YAML configuration parsing (for output profiles)
+PyYAML>=6.0
