@@ -12,7 +12,7 @@ from pathlib import Path
 # ============================================================================
 
 # Testing Configuration
-TESTING_MODE = True  # When True, use saved mock responses instead of calling OpenAI API
+TESTING_MODE = False  # When True, use saved mock responses instead of calling OpenAI API
 
 # Resolve repo-rooted paths robustly (GitHub Actions may run scripts from ./scripts, so relative paths break)
 REPO_ROOT = Path(os.environ.get('GITHUB_WORKSPACE', Path(__file__).resolve().parents[1])).resolve()
