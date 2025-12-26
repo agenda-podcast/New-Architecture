@@ -5,7 +5,7 @@ Pass A (gpt-5.2-pro + web_search)
 - Generates long-form scripts (L1..Ln) only.
 - Output is stored as raw text (not JSON) to preserve everything returned.
 
-Pass B (gpt-4.1-nano, no web_search)
+Pass B (gpt-5-nano, no web_search)
 - Summarizes a SOURCE_TEXT into enabled content types (M/S/R) according to the topic config.
 - Output is JSON (content array) suitable for downstream pipeline.
 
@@ -761,7 +761,7 @@ def generate_pass_b_content(
     model = str(config.get("gpt_model_pass_b", "gpt-5-nano"))
 
     # Bound source size (chars) to keep inputs reasonable.
-    source_max_chars = int(os.environ.get("PASS_B_SOURCE_MAX_CHARS", "40000") or "40000")
+    source_max_chars = int(os.environ.get("PASS_B_SOURCE_MAX_CHARS", "125000") or "125000")
     bounded_source = (source_text or "")
     if source_max_chars > 0 and len(bounded_source) > source_max_chars:
         bounded_source = bounded_source[:source_max_chars]
@@ -921,7 +921,7 @@ def generate_pass_b_content(
     def _gen_one(content_type: str, code: str, max_words: int, chunk_text: str, part_idx: int, part_total: int) -> Dict[str, Any]:
         # Token budget per item. Setting a higher max_output_tokens does not increase spend if not used;
         # it prevents incomplete (max_output_tokens) failures.
-        per_item_cap = int(os.environ.get("PASS_B_ITEM_MAX_TOKENS", "4096") or "4096")
+        per_item_cap = int(os.environ.get("PASS_B_ITEM_MAX_TOKENS", "12500") or "12500")
         max_tokens = calculate_max_output_tokens(
             max_words,
             buffer_ratio=float(os.environ.get("PASS_B_ITEM_BUFFER", "1.12") or "1.12"),
@@ -949,7 +949,7 @@ def generate_pass_b_content(
             tools=None,
             json_mode=False,
             max_completion_tokens=max_tokens,
-            reasoning={"effort": os.environ.get("PASS_B_REASONING_EFFORT", "low")},
+            reasoning={"effort": os.environ.get("PASS_B_REASONING_EFFORT", "minimal")},
         )
 
         _persist_item_raw(code, resp, None)
