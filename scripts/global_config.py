@@ -3,14 +3,21 @@ Global configuration for podcast maker system.
 Contains all constants and shared settings used across scripts.
 """
 
+import os
+from pathlib import Path
+
+
 # ============================================================================
 # ChatGPT / Script Generation Settings
 # ============================================================================
 
 # Testing Configuration
-TESTING_MODE = True # When True, use saved mock responses instead of calling OpenAI API
-MOCK_RESPONSES_DIR = "test_data/mock_responses"  # Directory for saved API responses
-MOCK_SOURCE_TEXT_DIR = "test_data/mock_source_text"  # Directory for Pass-B source text fallback files
+TESTING_MODE = True  # When True, use saved mock responses instead of calling OpenAI API
+
+# Resolve repo-rooted paths robustly (GitHub Actions may run scripts from ./scripts, so relative paths break)
+REPO_ROOT = Path(os.environ.get('GITHUB_WORKSPACE', Path(__file__).resolve().parents[1])).resolve()
+MOCK_RESPONSES_DIR = str(REPO_ROOT / 'test_data' / 'mock_responses')  # Directory for saved API responses
+MOCK_SOURCE_TEXT_DIR = str(REPO_ROOT / 'test_data' / 'mock_source_text')  # Directory for Pass-B source text fallback files
 
 # OpenAI Model Configuration
 GPT_MODEL = "gpt-5.2-pro"  # Model for Pass A in two-pass architecture (with web search)

@@ -28,13 +28,13 @@ def test_mock_response_paths():
     """Test that mock response paths are constructed correctly."""
     print("Testing mock response path construction...")
     
-    pass_a_path = get_mock_response_path("pass_a")
-    pass_b_path = get_mock_response_path("pass_b")
+    pass_a_path = str(get_mock_response_path("pass_a"))
+    pass_b_path = str(get_mock_response_path("pass_b"))
     
     assert "test_data/mock_responses" in pass_a_path, "Pass A path should include test_data/mock_responses"
-    assert "pass_a_response.json" in pass_a_path, "Pass A path should end with pass_a_response.json"
+    assert "pass_a.json" in pass_a_path, "Pass A path should end with pass_a.json"
     assert "test_data/mock_responses" in pass_b_path, "Pass B path should include test_data/mock_responses"
-    assert "pass_b_response.json" in pass_b_path, "Pass B path should end with pass_b_response.json"
+    assert "pass_b.json" in pass_b_path, "Pass B path should end with pass_b.json"
     
     print(f"✓ Pass A path: {pass_a_path}")
     print(f"✓ Pass B path: {pass_b_path}")
