@@ -21,7 +21,7 @@ MOCK_SOURCE_TEXT_DIR = str(REPO_ROOT / 'test_data' / 'mock_source_text')  # Dire
 
 # OpenAI Model Configuration
 GPT_MODEL = "gpt-5.2-pro"  # Model for Pass A in two-pass architecture (with web search)
-MAX_COMPLETION_TOKENS = 100000  # Maximum tokens per API response
+MAX_COMPLETION_TOKENS = 1000000  # Maximum tokens per API response
 
 # DEPRECATED: The following constants are kept for backwards compatibility but are no longer used
 # in the two-pass architecture. They will be removed in a future version.
