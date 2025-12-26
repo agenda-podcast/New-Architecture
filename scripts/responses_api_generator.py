@@ -721,6 +721,7 @@ def generate_pass_a_content(
 # ============================================================================
 
 
+
 def generate_pass_b_content(
     *,
     config: Dict[str, Any],
@@ -731,7 +732,15 @@ def generate_pass_b_content(
     source_text: str,
     output_dir: Optional[Path] = None,
 ) -> List[Dict[str, Any]]:
-    """Generate M/S/R from a given source_text."""
+    """Generate M/S/R from a given source_text.
+
+    REQUIRED BEHAVIOR:
+    - Use ONLY per-type limits from topic config (items + max_words).
+    - Split SOURCE_TEXT into N parts per content type, where N=items for that type.
+      Each generated item summarizes its corresponding part.
+    - Fail fast on incomplete responses (e.g., reason=max_output_tokens) to avoid
+      additional paid retries.
+    """
 
     medium_plan = plan.get("medium", ContentTypePlan(False, 0, 0))
     short_plan = plan.get("short", ContentTypePlan(False, 0, 0))
@@ -748,11 +757,10 @@ def generate_pass_b_content(
     topic_title = str(config.get("title", ""))
     language = str(config.get("language", "en"))
 
-    # Pass B is intended to be a low-cost condensation step. Default to gpt-5-nano.
+    # Pass B is intended to be a low-cost condensation step.
     model = str(config.get("gpt_model_pass_b", "gpt-5-nano"))
 
-    # Keep inputs bounded; repeating an extremely long Pass A script for many items is expensive.
-    # This is a *character* cap (not tokens) and can be overridden.
+    # Bound source size (chars) to keep inputs reasonable.
     source_max_chars = int(os.environ.get("PASS_B_SOURCE_MAX_CHARS", "40000") or "40000")
     bounded_source = (source_text or "")
     if source_max_chars > 0 and len(bounded_source) > source_max_chars:
@@ -770,10 +778,9 @@ def generate_pass_b_content(
         mock = load_mock_response("pass_b")
         return list(mock.get("content", []) or [])
 
-    def _persist_item_raw(code: str, attempt: int, resp_obj: Any, resp_text: Optional[str]) -> None:
-        suffix = "" if attempt == 1 else f".{attempt}"
+    def _persist_item_raw(code: str, resp_obj: Any, resp_text: Optional[str]) -> None:
         try:
-            resp_json_path = output_dir / f"{code}.pass_b.response{suffix}.json"
+            resp_json_path = output_dir / f"{code}.pass_b.response.json"
             if hasattr(resp_obj, "model_dump_json"):
                 resp_json_path.write_text(resp_obj.model_dump_json(indent=2), encoding="utf-8")
             elif hasattr(resp_obj, "model_dump"):
@@ -781,13 +788,13 @@ def generate_pass_b_content(
             else:
                 resp_json_path.write_text(json.dumps(str(resp_obj), ensure_ascii=False), encoding="utf-8")
         except Exception as e:
-            logger.warning(f"Failed to write Pass B raw response JSON for {code} (attempt {attempt}): {e}")
+            logger.warning(f"Failed to write Pass B raw response JSON for {code}: {e}")
 
         if resp_text is not None:
             try:
-                (output_dir / f"{code}.pass_b_raw{suffix}.txt").write_text(resp_text or "", encoding="utf-8")
+                (output_dir / f"{code}.pass_b_raw.txt").write_text(resp_text or "", encoding="utf-8")
             except Exception as e:
-                logger.warning(f"Failed to write Pass B extracted text for {code} (attempt {attempt}): {e}")
+                logger.warning(f"Failed to write Pass B extracted text for {code}: {e}")
 
     def _truncate_to_words(text: str, max_words: int) -> str:
         if max_words <= 0:
@@ -797,104 +804,187 @@ def generate_pass_b_content(
             return text
         return " ".join(words[:max_words]).strip()
 
-    def _build_item_prompt(content_type: str, code: str, max_words: int) -> str:
-        role_block = ""
-        if use_roles and roles:
-            # Include role genders (if present in topic config) as a small hint; this also supports
-            # downstream caption styling by consistent speaker naming.
-            role_lines = []
-            for r in roles:
-                name = str(r.get("name", "")).strip()
-                bio = str(r.get("bio", "")).strip()
-                if name:
-                    role_lines.append(f"- {name}: {bio}")
-            if role_lines:
-                role_block = "\n\nROLES:\n" + "\n".join(role_lines)
+    def _split_text_into_n_parts(text: str, n: int) -> List[str]:
+        """Split text into n parts, preferring paragraph boundaries."""
+        n = int(n or 0)
+        if n <= 1:
+            return [text.strip()]
 
+        src = (text or "").strip()
+        if not src:
+            return [""] * n
+
+        # 1) paragraphs
+        paras = [p.strip() for p in re.split(r"\n\s*\n", src) if p.strip()]
+        units = paras
+
+        # 2) if too few paragraphs, try sentences
+        if len(units) < n:
+            sents = re.split(r"(?<=[\.!\?])\s+", src)
+            sents = [s.strip() for s in sents if s.strip()]
+            if len(sents) >= n:
+                units = sents
+
+        # 3) if still too few, split by word count
+        if len(units) < n:
+            words = src.split()
+            if not words:
+                return [""] * n
+            total = len(words)
+            out = []
+            for i in range(n):
+                a = (total * i) // n
+                b = (total * (i + 1)) // n
+                out.append(" ".join(words[a:b]).strip())
+            return out
+
+        # Greedy pack units into n buckets by approximate char length
+        total_chars = sum(len(u) for u in units)
+        target = max(1, total_chars // n)
+        buckets: List[str] = []
+        cur: List[str] = []
+        cur_len = 0
+        for u in units:
+            if len(buckets) < n - 1 and cur and (cur_len + len(u) > target):
+                buckets.append("\n\n".join(cur).strip())
+                cur = [u]
+                cur_len = len(u)
+            else:
+                cur.append(u)
+                cur_len += len(u)
+        buckets.append("\n\n".join(cur).strip())
+
+        # Ensure exactly n parts
+        if len(buckets) < n:
+            buckets.extend([""] * (n - len(buckets)))
+        elif len(buckets) > n:
+            extra = buckets[n - 1 :]
+            buckets = buckets[: n - 1] + ["\n\n".join(extra).strip()]
+        return buckets
+
+    # Build per-type source splits (each type may require a different N)
+    per_type_chunks: Dict[str, List[str]] = {}
+    for content_type, ct_plan in (("medium", medium_plan), ("short", short_plan), ("reels", reels_plan)):
+        if ct_plan.enabled and ct_plan.items > 0:
+            per_type_chunks[content_type] = _split_text_into_n_parts(bounded_source, int(ct_plan.items))
+
+    def _role_block() -> str:
+        if not (use_roles and roles):
+            return ""
+        lines = []
+        for r in roles:
+            name = str(r.get("name", "")).strip()
+            bio = str(r.get("bio", "")).strip()
+            if name:
+                lines.append(f"- {name}: {bio}")
+        return "\n\nROLES:\n" + "\n".join(lines) if lines else ""
+
+    def _speaker_names() -> Tuple[str, str]:
+        if use_roles and roles and len(roles) >= 2:
+            a = str(roles[0].get("name", "HOST_A")).strip() or "HOST_A"
+            b = str(roles[1].get("name", "HOST_B")).strip() or "HOST_B"
+            return a, b
+        return "HOST_A", "HOST_B"
+
+    def _build_item_prompt(
+        *,
+        content_type: str,
+        code: str,
+        max_words: int,
+        chunk_text: str,
+        part_idx: int,
+        part_total: int,
+    ) -> str:
+        a_name, b_name = _speaker_names()
+        rb = _role_block()
+        # Explicit split requirement in-prompt (requested by user)
         return (
-            f"You are generating a {content_type.upper()} script for a news-style dialogue podcast.\n"
+            f"You are generating a {content_type.upper()} script item for a dialogue show.\n"
             f"Topic: {topic_title}\n"
             f"Language: {language}\n"
             f"Output code: {code}\n\n"
+            f"SOURCE SPLITTING REQUIREMENT:\n"
+            f"- This content type requires {part_total} items.\n"
+            f"- You are writing item {part_idx}/{part_total}.\n"
+            f"- Summarize ONLY the provided SOURCE PART {part_idx}/{part_total}.\n"
+            f"- Do not repeat points that would belong to other parts; focus on this part's unique details.\n\n"
             f"HARD CONSTRAINTS:\n"
             f"- Output ONLY the script text (no JSON, no markdown, no labels).\n"
             f"- Maximum {max_words} words total (hard cap).\n"
-            f"- If you cannot fit everything, prioritize coherence and an engaging arc over completeness.\n"
-            f"- Keep speaker names consistent (e.g., 'Gary Thompson:' / 'Margaret Butcher:') if you use speakers.\n"
-            f"\nSOURCE (may be truncated):\n{bounded_source}\n"
-            f"{role_block}\n"
+            f"- Use ONLY the facts present in SOURCE PART below. Do NOT add external facts.\n"
+            f"- Format as dialogue with two speakers. Every line MUST start with '{a_name}:' or '{b_name}:'.\n"
+            f"- Ensure BOTH speakers appear multiple times; alternate turns frequently.\n\n"
+            f"SOURCE PART {part_idx}/{part_total}:\n{chunk_text.strip()}\n"
+            f"{rb}\n"
         )
 
-    def _gen_one(content_type: str, code: str, max_words: int) -> Dict[str, Any]:
-        # Token budget per item. Keep it tight: we do not request more than needed.
+    def _gen_one(content_type: str, code: str, max_words: int, chunk_text: str, part_idx: int, part_total: int) -> Dict[str, Any]:
+        # Token budget per item. Setting a higher max_output_tokens does not increase spend if not used;
+        # it prevents incomplete (max_output_tokens) failures.
         per_item_cap = int(os.environ.get("PASS_B_ITEM_MAX_TOKENS", "4096") or "4096")
         max_tokens = calculate_max_output_tokens(
             max_words,
-            buffer_ratio=float(os.environ.get("PASS_B_ITEM_BUFFER", "1.15") or "1.15"),
-            min_tokens=int(os.environ.get("PASS_B_ITEM_MIN_TOKENS", "256") or "256"),
+            buffer_ratio=float(os.environ.get("PASS_B_ITEM_BUFFER", "1.12") or "1.12"),
+            min_tokens=int(os.environ.get("PASS_B_ITEM_MIN_TOKENS", "512") or "512"),
             cap_tokens=per_item_cap,
         )
 
-        prompt = _build_item_prompt(content_type=content_type, code=code, max_words=max_words)
+        prompt = _build_item_prompt(
+            content_type=content_type,
+            code=code,
+            max_words=max_words,
+            chunk_text=chunk_text,
+            part_idx=part_idx,
+            part_total=part_total,
+        )
 
-        last_text: str = ""
-        for attempt in (1, 2):
-            attempt_prompt = prompt
-            if attempt == 2:
-                attempt_prompt = (
-                    prompt
-                    + "\n\nRETRY: Your previous output may have been truncated or exceeded the word cap. "
-                    + f"Return a tighter script well under {max_words} words."
-                )
+        # Single attempt: fail fast to avoid additional paid retries.
+        resp = create_openai_completion(
+            client=client,
+            model=model,
+            messages=[
+                {"role": "system", "content": "You write concise dialogue scripts and strictly follow hard word caps."},
+                {"role": "user", "content": prompt},
+            ],
+            tools=None,
+            json_mode=False,
+            max_completion_tokens=max_tokens,
+            reasoning={"effort": os.environ.get("PASS_B_REASONING_EFFORT", "low")},
+        )
 
-            resp = create_openai_completion(
-                client=client,
-                model=model,
-                messages=[
-                    {"role": "system", "content": "You write concise scripts and respect strict word caps."},
-                    {"role": "user", "content": attempt_prompt},
-                ],
-                tools=None,
-                json_mode=False,
-                max_completion_tokens=max_tokens,
-            )
+        _persist_item_raw(code, resp, None)
 
-            _persist_item_raw(code, attempt, resp, None)
+        # Will hard-fail if response.status == 'incomplete' (including max_output_tokens)
+        txt = extract_completion_text(resp, model) or ""
+        _persist_item_raw(code, resp, txt)
 
-            try:
-                txt = extract_completion_text(resp, model) or ""
-            except Exception as e:
-                logger.error(f"Pass B extraction failed for {code} (attempt {attempt}): {e}")
-                if attempt == 1:
-                    continue
-                txt = last_text
-
-            last_text = txt
-            _persist_item_raw(code, attempt, resp, txt)
-
-            # Always accept truncated outputs. Enforce max_words locally.
-            txt = _truncate_to_words(txt.strip(), max_words=max_words)
-            aw = count_words(txt)
-            return {"code": code, "type": content_type, "script": txt, "actual_words": aw, "target_words": max_words}
-
-        # If we reach here, both attempts failed catastrophically. Continue with best-effort placeholder.
-        txt = _truncate_to_words((last_text or "").strip(), max_words=max_words)
-        return {"code": code, "type": content_type, "script": txt, "actual_words": count_words(txt), "target_words": max_words}
+        txt = _truncate_to_words(txt.strip(), max_words=max_words)
+        aw = count_words(txt)
+        return {"code": code, "type": content_type, "script": txt, "actual_words": aw, "target_words": max_words}
 
     out: List[Dict[str, Any]] = []
 
     # Stable order matters for downstream naming.
-    for content_type, ct_plan in (
-        ("medium", medium_plan),
-        ("short", short_plan),
-        ("reels", reels_plan),
-    ):
+    for content_type, ct_plan in (("medium", medium_plan), ("short", short_plan), ("reels", reels_plan)):
         if not ct_plan.enabled or ct_plan.items <= 0:
             continue
-        for idx in range(1, int(ct_plan.items) + 1):
+
+        chunks = per_type_chunks.get(content_type) or [bounded_source]
+        total = int(ct_plan.items)
+        for idx in range(1, total + 1):
             code_prefix = {"medium": "M", "short": "S", "reels": "R"}.get(content_type, content_type[:1].upper())
             code = f"{code_prefix}{idx}"
-            out.append(_gen_one(content_type=content_type, code=code, max_words=int(ct_plan.max_words)))
+            chunk = chunks[idx - 1] if (idx - 1) < len(chunks) else (chunks[-1] if chunks else "")
+            out.append(
+                _gen_one(
+                    content_type=content_type,
+                    code=code,
+                    max_words=int(ct_plan.max_words),
+                    chunk_text=chunk,
+                    part_idx=idx,
+                    part_total=total,
+                )
+            )
 
     # Save mock data for reuse / unit runs
     try:

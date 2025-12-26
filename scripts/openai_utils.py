@@ -363,22 +363,16 @@ def extract_completion_text(response: Any, model: str) -> str:
         # Log the actual response structure for debugging
         logger.info("Attempting to extract from Responses API response...")
         
-        # Check if response is incomplete due to length/token limits.
-        # IMPORTANT: For this repo we treat max_output_tokens truncation as a
-        # *non-fatal* condition and proceed with whatever content we received.
-        # Other incomplete reasons remain fatal.
+        # Fail fast on incomplete Responses API outputs to avoid additional paid retries.
+        # If the response is incomplete (including reason=max_output_tokens), we treat it as a hard failure.
         if hasattr(response, 'status') and response.status == 'incomplete':
-            logger.warning("Response status is 'incomplete'")
             reason = _get_incomplete_reason(response)
-            if str(reason).strip().lower() not in ('max_output_tokens', 'length'):
-                raise ValueError(
-                    "Response is incomplete (reason: %s). The API did not finish generating content. "
-                    "Consider increasing max_output_tokens or implementing continuation logic." % reason
-                )
-            logger.warning(
-                "Continuing despite incomplete response due to %s; attempting best-effort extraction." % reason
+            logger.warning("Response status is 'incomplete' (reason: %s)" % reason)
+            raise ValueError(
+                "Response is incomplete (reason: %s). This is treated as a hard failure to prevent additional spend. "
+                "Reduce requested output (max_words), tighten prompts, or increase max_output_tokens appropriately." % reason
             )
-        
+
         # Try multiple extraction methods for Responses API
         # IMPORTANT: Some SDK convenience properties (e.g., output_text) may throw when the
         # response is incomplete (reason: max_output_tokens). Prefer model_dump() first.
