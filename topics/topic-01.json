@@ -52,7 +52,7 @@
   "content_types": {
     "long": { "enabled": false, "items": 1, "max_words": 22000 },
     "medium": { "enabled": false, "items": 2, "max_words": 1200 },
-    "short": { "enabled": true, "items": 4, "max_words": 350 },
+    "short": { "enabled": false, "items": 4, "max_words": 350 },
     "reels": { "enabled": true, "items": 8, "max_words": 140 }
   },
   "gpt_model_pass_b": "gpt-5-nano",
