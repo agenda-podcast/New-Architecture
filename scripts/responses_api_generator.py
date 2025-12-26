@@ -174,8 +174,20 @@ def _ensure_dir(p: Path) -> None:
     p.mkdir(parents=True, exist_ok=True)
 
 
+def _repo_root() -> Path:
+    """Return repository root directory (parent of the scripts/ folder)."""
+    return Path(__file__).resolve().parents[1]
+
+
+def _resolve_repo_path(path_str: str) -> Path:
+    """Resolve a path that may be repo-relative (preferred) or absolute."""
+    p = Path(path_str)
+    return p if p.is_absolute() else (_repo_root() / p)
+
+
+
 def get_mock_response_path(name: str) -> Path:
-    base = Path(MOCK_RESPONSES_DIR)
+    base = _resolve_repo_path(MOCK_RESPONSES_DIR)
     _ensure_dir(base)
     return base / f"{name}.json"
 
@@ -195,7 +207,7 @@ def load_mock_response(name: str) -> Dict[str, Any]:
 
 
 def get_mock_source_text_path(topic_id: str) -> Path:
-    base = Path(MOCK_SOURCE_TEXT_DIR)
+    base = _resolve_repo_path(MOCK_SOURCE_TEXT_DIR)
     _ensure_dir(base)
     return base / f"{topic_id}.txt"
 
