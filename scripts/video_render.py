@@ -47,6 +47,9 @@ from global_config import (
     ENABLE_BURN_IN_CAPTIONS, CAPTIONS_BOTTOM_MARGIN_FRACTION
 )
 
+# Sidecar metadata written by image_collector.py
+IMAGES_METADATA_FILENAME = "images_metadata.json"
+
 from multi_format_generator import get_enabled_content_types
 
 # Video rendering configuration (internal defaults)
@@ -438,6 +441,32 @@ def render_slideshow_ffmpeg_effects(
         if not schedule:
             print("  ✗ Failed to build slideshow schedule")
             return False
+
+        # Write image-title timeline sidecar for post-processing overlays.
+        # This intentionally happens outside the slideshow filtergraph so titles do not move
+        # with Ken Burns / pan-zoom.
+        try:
+            title_map = _load_image_title_map([Path(s['image']) for s in schedule])
+            segs: List[Dict[str, Any]] = []
+            t0 = 0.0
+            for idx, it in enumerate(schedule):
+                img_p = Path(it['image'])
+                title = title_map.get(img_p.name, "").strip()
+                still_dur = float(it.get('still_duration', 0.0) or 0.0)
+                if title and still_dur > 0:
+                    segs.append(
+                        {
+                            "start": round(t0, 3),
+                            "end": round(min(duration, t0 + still_dur), 3),
+                            "text": title,
+                            "filename": img_p.name,
+                            "index": idx,
+                        }
+                    )
+                t0 += still_dur
+            _write_image_titles_sidecar(output_path, segs)
+        except Exception:
+            pass
         
         print(f"  Building FFmpeg effects slideshow:")
         print(f"    Images: {len(schedule)} slots from {len(images)} source images")
@@ -864,6 +893,53 @@ def get_audio_duration(audio_path: Path) -> float:
         raise RuntimeError(f"Invalid duration from ffprobe: {e}")
     except Exception as e:
         raise RuntimeError(f"Failed to read audio duration with ffprobe: {e}")
+
+
+def _find_images_metadata(start_dir: Path) -> Optional[Path]:
+    """Locate images_metadata.json in this directory or parents (bounded)."""
+    d = start_dir
+    for _ in range(4):
+        p = d / IMAGES_METADATA_FILENAME
+        if p.exists():
+            return p
+        if d.parent == d:
+            break
+        d = d.parent
+    return None
+
+
+def _load_image_title_map(images: List[Path]) -> Dict[str, str]:
+    """Map filename -> cleaned Google-visible title."""
+    if not images:
+        return {}
+    meta_path = _find_images_metadata(images[0].parent)
+    if not meta_path:
+        return {}
+    try:
+        with open(meta_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        items = data.get("images", []) if isinstance(data, dict) else []
+        out: Dict[str, str] = {}
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            fn = str(it.get("filename", "")).strip()
+            title = str(it.get("title_clean") or it.get("title") or "").strip()
+            if fn and title:
+                out[fn] = title
+        return out
+    except Exception:
+        return {}
+
+
+def _write_image_titles_sidecar(video_out: Path, segments: List[Dict[str, Any]]) -> None:
+    """Write a sidecar file consumed by post-processing overlays."""
+    try:
+        sidecar = video_out.with_suffix(".image_titles.json")
+        payload = {"version": 1, "segments": segments}
+        sidecar.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
 
 
 
@@ -2168,6 +2244,29 @@ def create_video_from_images(background_images: List[Path], audio_path: Optional
             loops = images_used // len(background_images)
             print(f"    Images looped {loops}x to cover audio duration")
         print(f"    Image duration range: {IMAGE_TRANSITION_MIN_SEC}-{IMAGE_TRANSITION_MAX_SEC}s per image")
+
+        # Write image-title timeline sidecar for post-processing overlays.
+        try:
+            title_map = _load_image_title_map([img for img, _ in image_durations])
+            segs: List[Dict[str, Any]] = []
+            t0 = 0.0
+            for idx, (img, dur) in enumerate(image_durations):
+                title = title_map.get(Path(img).name, "").strip()
+                d = float(dur or 0.0)
+                if title and d > 0:
+                    segs.append(
+                        {
+                            "start": round(t0, 3),
+                            "end": round(min(audio_duration, t0 + d), 3),
+                            "text": title,
+                            "filename": Path(img).name,
+                            "index": idx,
+                        }
+                    )
+                t0 += d
+            _write_image_titles_sidecar(output_path, segs)
+        except Exception:
+            pass
         
         # Create concat file for images with variable durations
         concat_file = output_path.parent / 'images_concat.txt'
@@ -2551,23 +2650,6 @@ def render_multi_format_for_topic(topic_id: str, date_str: str,
         prepared_images_by_res[(w, h)] = process_images_for_video(
             image_files, w, h, cache_dir, min_required_images=min_pool_default
         )
-
-        # Optional overlay: burn Google-visible image titles + host badges into the top band.
-        try:
-            from image_title_burner import burn_prepared_pool
-            prepared_images_by_res[(w, h)] = burn_prepared_pool(
-                prepared_pool=list(prepared_images_by_res.get((w, h), []) or []),
-                cache_dir=cache_dir,
-                images_dir=images_dir,
-                topic_cfg=config,
-                target_width=w,
-                target_height=h,
-            )
-            if prepared_images_by_res.get((w, h)):
-                print(f"  ✓ Burned title overlays for {w}x{h}: {len(prepared_images_by_res[(w, h)])} images")
-        except Exception as _e:
-            print(f"  ⚠ Image title burn-in failed for {w}x{h} (non-fatal): {_e}")
-
 
     for job in audio_jobs:
         audio_path = job['audio_path']

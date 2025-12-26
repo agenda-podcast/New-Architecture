@@ -106,27 +106,10 @@ def prepare_for_topic(topic_id: str, date_str: str) -> bool:
         cache_dir = output_dir / "_prepared_images" / f"{w}x{h}"
         cache_dir.mkdir(parents=True, exist_ok=True)
         prepared = process_images_for_video(images, w, h, cache_dir, min_required_images=min_pool)
-        # Burn Google-visible titles + host badges into prepared images (TikTok-style)
-        try:
-            from image_title_burner import burn_prepared_pool
-            images_dir = output_dir / 'images'
-            burned = burn_prepared_pool(
-                prepared_pool=list(prepared or []),
-                cache_dir=cache_dir,
-                images_dir=images_dir,
-                topic_cfg=config,
-                target_width=w,
-                target_height=h,
-            )
-        except Exception as e:
-            burned = []
-            print(f'  ⚠ Image title burn-in failed for {w}x{h} (non-fatal): {e}')
         summary[f"{w}x{h}"] = {
             "source_images": len(images),
             "prepared_images": len(prepared),
-            "burned_images": len(burned or []),
             "processed_dir": str((cache_dir / "processed").resolve()),
-            "burned_dir": str((cache_dir / "processed_burned").resolve()),
         }
 
     meta_path = output_dir / f"{topic_id}-{date_str}.images_prepared.json"

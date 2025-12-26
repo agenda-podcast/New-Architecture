@@ -23,6 +23,9 @@ import os
 import re
 import subprocess
 import tempfile
+import json
+
+from config import load_topic_config
 
 
 # ---------------------------------------------------------------------------
@@ -122,6 +125,66 @@ def _pick_first_existing(paths: List[str]) -> Optional[str]:
     return None
 
 
+_TOPIC_ID_RE = re.compile(r"\b(topic-\d+)\b", re.IGNORECASE)
+
+
+def _infer_topic_id_from_path(p: Path) -> Optional[str]:
+    # Prefer a directory segment (e.g., .../outputs/topic-01/...)
+    for part in reversed(p.parts):
+        m = _TOPIC_ID_RE.search(part)
+        if m:
+            return m.group(1).lower()
+    # Fallback: search full path
+    m = _TOPIC_ID_RE.search(str(p))
+    return m.group(1).lower() if m else None
+
+
+def _normalize_gender(g: Optional[str]) -> str:
+    if not g:
+        return "unknown"
+    v = str(g).strip().lower()
+    if v in {"m", "male", "man"}:
+        return "male"
+    if v in {"f", "female", "woman"}:
+        return "female"
+    return "unknown"
+
+
+def _load_host_gender_map(topic_id: Optional[str]) -> dict:
+    """Return a case-insensitive mapping of host name -> gender."""
+    if not topic_id:
+        return {}
+    try:
+        cfg = load_topic_config(topic_id)
+    except Exception:
+        return {}
+
+    a_name = str(cfg.get("voice_a_name", "")).strip()
+    b_name = str(cfg.get("voice_b_name", "")).strip()
+    a_gender = _normalize_gender(cfg.get("voice_a_gender"))
+    b_gender = _normalize_gender(cfg.get("voice_b_gender"))
+
+    out = {}
+    if a_name:
+        out[a_name.lower()] = a_gender
+    if b_name:
+        out[b_name.lower()] = b_gender
+    return out
+
+
+def _pick_glow_color_for_gender(gender: str) -> str:
+    male = os.environ.get("CAPTIONS_GLOW_COLOR_MALE", "#00D1FF").strip()  # cyan
+    female = os.environ.get("CAPTIONS_GLOW_COLOR_FEMALE", "#FF4FD8").strip()  # magenta
+    neutral = os.environ.get("CAPTIONS_GLOW_COLOR_NEUTRAL", "#C0C0C0").strip()  # silver
+
+    g = (gender or "unknown").lower()
+    if g == "male":
+        return male
+    if g == "female":
+        return female
+    return neutral
+
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -212,6 +275,43 @@ def _load_config_from_env() -> CaptionBurnConfig:
     )
 
 
+def _ass_time(t: float) -> str:
+    # ASS uses H:MM:SS.cs (centiseconds)
+    t = max(0.0, float(t))
+    hh = int(t // 3600)
+    mm = int((t % 3600) // 60)
+    ss = int(t % 60)
+    cs = int(round((t - int(t)) * 100))
+    if cs >= 100:
+        cs = 99
+    return f"{hh}:{mm:02d}:{ss:02d}.{cs:02d}"
+
+
+def _ass_color_rgba(hex_rgb: str, alpha: int) -> str:
+    """Return ASS &HAABBGGRR from #RRGGBB and alpha 0-255 (0=opaque)."""
+    h = (hex_rgb or "").strip()
+    if h.startswith("#"):
+        h = h[1:]
+    if len(h) != 6:
+        # fallback white
+        rr, gg, bb = (255, 255, 255)
+    else:
+        rr = int(h[0:2], 16)
+        gg = int(h[2:4], 16)
+        bb = int(h[4:6], 16)
+    aa = max(0, min(255, int(alpha)))
+    # ASS expects BBGGRR
+    return f"&H{aa:02X}{bb:02X}{gg:02X}{rr:02X}"
+
+
+def _ass_escape(text: str) -> str:
+    t = (text or "").replace("\r\n", "\n").replace("\r", "\n")
+    t = t.replace("\\", "\\\\")
+    t = t.replace("{", "\\{").replace("}", "\\}")
+    t = t.replace("\n", "\\N")
+    return t
+
+
 # ---------------------------------------------------------------------------
 # Core burn-in implementation
 # ---------------------------------------------------------------------------
@@ -258,6 +358,165 @@ class CaptionBurner:
                 continue
 
         return None, checked
+
+    def _load_image_title_segments(self, video_path: Path) -> List[dict]:
+        """Load image title timeline sidecar produced by video_render.py.
+
+        Expected sidecar: <video>.image_titles.json (same directory, same stem).
+        """
+        sidecar = video_path.with_suffix(".image_titles.json")
+        if not sidecar.exists() or sidecar.stat().st_size == 0:
+            return []
+        try:
+            data = json.loads(sidecar.read_text(encoding="utf-8", errors="ignore"))
+        except Exception:
+            return []
+        segs = data.get("segments") if isinstance(data, dict) else None
+        if not isinstance(segs, list):
+            return []
+        out: List[dict] = []
+        for seg in segs:
+            try:
+                start = float(seg.get("start", 0.0))
+                end = float(seg.get("end", 0.0))
+                text = str(seg.get("text", "")).strip()
+                if text and end > start:
+                    out.append({"start": start, "end": end, "text": text})
+            except Exception:
+                continue
+        return out
+
+    def _split_speaker(self, text: str, host_gender_map: dict) -> Tuple[Optional[str], str]:
+        """Try to identify speaker from a line prefix like 'Name: ...'."""
+        t = (text or "").strip()
+        m = re.match(r"^\s*([^:\n]{1,48})\s*:\s*(.+)$", t)
+        if not m:
+            return None, t
+        speaker = m.group(1).strip()
+        rest = m.group(2).strip()
+
+        # Only treat it as a speaker prefix if it matches a known host name.
+        if host_gender_map:
+            s_l = speaker.lower()
+            for name in host_gender_map.keys():
+                # allow partial match (e.g., 'Gary' vs 'Gary Thompson')
+                if s_l == name or s_l in name or name in s_l:
+                    return name, rest
+        return None, t
+
+    def _build_ass_file(
+        self,
+        width: int,
+        height: int,
+        caption_segments: List[dict],
+        title_segments: List[dict],
+        host_gender_map: dict,
+    ) -> Path:
+        """Build a temporary ASS subtitle file with TikTok-like glow.
+
+        We duplicate each line into 2 layers:
+          - Glow layer (colored outline, slightly transparent)
+          - Main layer (white text with black stroke)
+        """
+        font_size = max(24, int(height * self.config.font_size_fraction))
+        margin_v_bottom = max(24, int(height * self.config.bottom_margin_fraction))
+        # Title is placed within top 20% of the screen, centered vertically around 10% height.
+        margin_v_top = max(24, int(height * 0.10))
+        margin_lr = max(24, int(width * self.config.left_right_margin_fraction))
+
+        # Glow colors
+        title_glow = os.environ.get("CAPTIONS_TITLE_GLOW_COLOR", "#C0C0C0").strip()  # silver
+        glow_alpha = int(float(os.environ.get("CAPTIONS_GLOW_ALPHA_ASS", "0.55")) * 255)
+        glow_alpha = max(0, min(255, glow_alpha))
+
+        # Main stroke size approximations
+        main_outline = int(os.environ.get("CAPTIONS_MAIN_OUTLINE", str(self.config.tiktok_main_borderw)))
+        glow_outline = int(os.environ.get("CAPTIONS_GLOW_OUTLINE", str(self.config.tiktok_glow_borderw)))
+        shadow = int(os.environ.get("CAPTIONS_SHADOW", str(self.config.tiktok_shadow_xy)))
+
+        # ASS colors: alpha 0=opaque; convert from 0..255 opacity
+        glow_aa = max(0, min(255, 255 - glow_alpha))
+
+        # Common colors
+        white = _ass_color_rgba("#FFFFFF", 0)
+        black = _ass_color_rgba("#000000", 0)
+
+        def style_line(name: str, primary: str, outline: str, shadow_col: str, outline_sz: int, shadow_sz: int, alignment: int, margin_v: int) -> str:
+            return (
+                f"Style: {name},DejaVu Sans,{font_size},{primary},&H00000000,{outline},&H00000000,"
+                f"-1,0,0,0,100,100,0,0,1,{outline_sz},{shadow_sz},{alignment},{margin_lr},{margin_lr},{margin_v},1"
+            )
+
+        # Styles
+        # Glow styles use semi-transparent white primary and colored outline.
+        glow_primary = _ass_color_rgba("#FFFFFF", glow_aa)
+        title_outline = _ass_color_rgba(title_glow, glow_aa)
+
+        # Gender-specific outlines
+        male_outline = _ass_color_rgba(_pick_glow_color_for_gender("male"), glow_aa)
+        female_outline = _ass_color_rgba(_pick_glow_color_for_gender("female"), glow_aa)
+        neutral_outline = _ass_color_rgba(_pick_glow_color_for_gender("unknown"), glow_aa)
+
+        lines: List[str] = []
+        lines.append("[Script Info]")
+        lines.append("ScriptType: v4.00+")
+        lines.append(f"PlayResX: {width}")
+        lines.append(f"PlayResY: {height}")
+        lines.append("WrapStyle: 2")
+        lines.append("ScaledBorderAndShadow: yes")
+        lines.append("")
+
+        lines.append("[V4+ Styles]")
+        lines.append(
+            "Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding"
+        )
+        # Bottom captions
+        lines.append(style_line("CapGlowMale", glow_primary, male_outline, black, glow_outline, 0, 2, margin_v_bottom))
+        lines.append(style_line("CapGlowFemale", glow_primary, female_outline, black, glow_outline, 0, 2, margin_v_bottom))
+        lines.append(style_line("CapGlowNeutral", glow_primary, neutral_outline, black, glow_outline, 0, 2, margin_v_bottom))
+        lines.append(style_line("CapMain", white, black, black, main_outline, shadow, 2, margin_v_bottom))
+        # Top titles
+        lines.append(style_line("TitleGlow", glow_primary, title_outline, black, glow_outline, 0, 8, margin_v_top))
+        lines.append(style_line("TitleMain", white, black, black, main_outline, shadow, 8, margin_v_top))
+        lines.append("")
+
+        lines.append("[Events]")
+        lines.append("Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text")
+
+        def cap_style_for_text(raw_text: str) -> str:
+            speaker, _ = self._split_speaker(raw_text, host_gender_map)
+            if not speaker:
+                return "CapGlowNeutral"
+            g = host_gender_map.get(speaker.lower(), "unknown")
+            if g == "male":
+                return "CapGlowMale"
+            if g == "female":
+                return "CapGlowFemale"
+            return "CapGlowNeutral"
+
+        # Image titles (silver glow) - always top
+        for seg in title_segments:
+            start = _ass_time(seg["start"])
+            end = _ass_time(seg["end"])
+            text = _ass_escape(str(seg["text"]))
+            # Glow then main
+            lines.append(f"Dialogue: 0,{start},{end},TitleGlow,,0,0,0,,{text}")
+            lines.append(f"Dialogue: 1,{start},{end},TitleMain,,0,0,0,,{text}")
+
+        # Captions - bottom
+        for seg in caption_segments:
+            start = _ass_time(seg["start"])
+            end = _ass_time(seg["end"])
+            raw = str(seg["text"]) 
+            text = _ass_escape(raw)
+            glow_style = cap_style_for_text(raw)
+            lines.append(f"Dialogue: 0,{start},{end},{glow_style},,0,0,0,,{text}")
+            lines.append(f"Dialogue: 1,{start},{end},CapMain,,0,0,0,,{text}")
+
+        tmp_dir = Path(tempfile.mkdtemp(prefix="ass_"))
+        ass_path = tmp_dir / "overlays.ass"
+        ass_path.write_text("\n".join(lines), encoding="utf-8")
+        return ass_path
 
     def _build_ass_force_style(self, width: int, height: int) -> str:
         margin_v = max(24, int(height * self.config.bottom_margin_fraction))
@@ -348,20 +607,26 @@ class CaptionBurner:
             output_path = video_path
 
         captions_srt, checked = self.discover_captions_srt(video_path=video_path, audio_path=audio_path)
-        if captions_srt is None:
+        title_segments = self._load_image_title_segments(video_path)
+
+        if captions_srt is None and not title_segments:
             looked_for = ", ".join(p.name for p in checked) if checked else "(none)"
-            print(f"  ⓘ No captions file found; skipping burn-in. Looked for: {looked_for}")
+            print(f"  ⓘ No captions/titles to burn; skipping post-process overlays. Looked for captions: {looked_for}")
             return True
 
-        print(f"  Captions detected: {captions_srt.name} (preset={self.config.style_preset})")
+        if captions_srt is not None:
+            print(f"  Captions detected: {captions_srt.name} (preset={self.config.style_preset})")
+        if title_segments:
+            print(f"  Image title overlay segments: {len(title_segments)}")
 
         # Decide renderer
         preset = self.config.style_preset
         renderer = self.config.renderer
 
-        # TikTok is always drawtext unless user forces subtitles
-        if preset == "tiktok" and renderer == "auto":
-            renderer = "drawtext"
+        # TikTok overlays are rendered via a generated ASS file to avoid command-length issues
+        # (drawtext-per-cue can exceed OS argv limits on long episodes).
+        if preset == "tiktok":
+            renderer = "subtitles"
 
         tmp_dir = video_path.parent
         tmp_out = tmp_dir / (video_path.stem + ".captions.tmp.mp4")
@@ -375,15 +640,37 @@ class CaptionBurner:
         # Build filtergraph and run ffmpeg
         try:
             if renderer == "subtitles" or (renderer == "auto" and _ffmpeg_has_filter("subtitles")):
-                # Boxed/plain via libass subtitles filter
-                force_style = self._build_ass_force_style(width, height)
-                safe_style = force_style.replace("'", "\\'")
-                vf = f"subtitles=filename='{_escape_filter_path(str(captions_srt))}':charenc=UTF-8:force_style='{safe_style}'"
-                print("  ⓘ Using subtitles filter (libass) for burn-in")
+                if not _ffmpeg_has_filter("subtitles"):
+                    print("  ⚠ subtitles filter unavailable in this ffmpeg build; skipping burn-in")
+                    return False
+
+                if preset == "tiktok":
+                    topic_id = _infer_topic_id_from_path(video_path)
+                    host_gender_map = _load_host_gender_map(topic_id)
+
+                    caption_segments: List[dict] = []
+                    if captions_srt is not None:
+                        caption_segments = _parse_srt_simple(captions_srt)
+
+                    ass_path = self._build_ass_file(width=width, height=height, caption_segments=caption_segments, title_segments=title_segments, host_gender_map=host_gender_map)
+                    vf = f"subtitles=filename='{_escape_filter_path(str(ass_path))}':charenc=UTF-8"
+                    print("  ⓘ Using subtitles filter (libass) with generated ASS (TikTok glow + titles)")
+                else:
+                    # Boxed/plain via libass subtitles filter
+                    if captions_srt is None:
+                        print("  ⓘ No captions available; skipping burn-in for non-TikTok preset")
+                        return True
+                    force_style = self._build_ass_force_style(width, height)
+                    safe_style = force_style.replace("'", "\\'")
+                    vf = f"subtitles=filename='{_escape_filter_path(str(captions_srt))}':charenc=UTF-8:force_style='{safe_style}'"
+                    print("  ⓘ Using subtitles filter (libass) for burn-in")
             else:
                 if not _ffmpeg_has_filter("drawtext"):
                     print("  ⚠ drawtext filter unavailable in this ffmpeg build; skipping burn-in")
                     return False
+                if captions_srt is None:
+                    print("  ⓘ Drawtext renderer requires captions; skipping")
+                    return True
                 segments = _parse_srt_simple(captions_srt)
                 if not segments:
                     print("  ⚠ Captions file parsed as empty; skipping burn-in")
@@ -408,7 +695,9 @@ class CaptionBurner:
                 "-c:v", "libx264",
                 "-pix_fmt", "yuv420p",
                 "-movflags", "+faststart",
-                "-an",
+                "-map", "0:v:0",
+                "-map", "0:a?",
+                "-c:a", "copy",
                 str(tmp_out),
             ]
             r = subprocess.run(cmd, capture_output=True, text=True, check=False)

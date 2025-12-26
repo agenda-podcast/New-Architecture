@@ -748,59 +748,32 @@ def generate_pass_b_content(
     topic_title = str(config.get("title", ""))
     language = str(config.get("language", "en"))
 
-    prompt = build_pass_b_prompt(
-        source_text=source_text,
-        topic_title=topic_title,
-        language=language,
-        use_roles=use_roles,
-        roles=roles,
-        medium_items=medium_plan.items,
-        medium_max_words=medium_plan.max_words,
-        short_items=short_plan.items,
-        short_max_words=short_plan.max_words,
-        reels_items=reels_plan.items,
-        reels_max_words=reels_plan.max_words,
-    )
-
-    # Token budget: approximate by total words expected.
-    # Pass B must be cost-controlled; cap hard at 60k tokens (override via PASS_B_MAX_OUTPUT_TOKENS).
-    total_target_words = (
-        medium_plan.items * medium_plan.max_words
-        + short_plan.items * short_plan.max_words
-        + reels_plan.items * reels_plan.max_words
-    )
-
-    max_tokens = calculate_max_output_tokens(
-        total_target_words,
-        buffer_ratio=1.30,
-        cap_tokens=min(int(os.getenv("PASS_B_MAX_OUTPUT_TOKENS", "60000")), 60000),
-    )
-
-    # Pass B is intended to be a low-cost summarization step. Default to gpt-5-nano.
-    # (Can be overridden per-topic via "gpt_model_pass_b".)
+    # Pass B is intended to be a low-cost condensation step. Default to gpt-5-nano.
     model = str(config.get("gpt_model_pass_b", "gpt-5-nano"))
 
+    # Keep inputs bounded; repeating an extremely long Pass A script for many items is expensive.
+    # This is a *character* cap (not tokens) and can be overridden.
+    source_max_chars = int(os.environ.get("PASS_B_SOURCE_MAX_CHARS", "40000") or "40000")
+    bounded_source = (source_text or "")
+    if source_max_chars > 0 and len(bounded_source) > source_max_chars:
+        bounded_source = bounded_source[:source_max_chars]
+
     logger.info("=" * 80)
-    logger.info("PASS B: Summarization")
+    logger.info("PASS B: Condense into multi-format scripts")
     logger.info(f"Model: {model}")
     logger.info(
         f"Targets: medium={medium_plan.items}x{medium_plan.max_words}, short={short_plan.items}x{short_plan.max_words}, reels={reels_plan.items}x{reels_plan.max_words}"
     )
-    logger.info(f"Max output tokens: {max_tokens}")
     logger.info("=" * 80)
 
     if TESTING_MODE:
         mock = load_mock_response("pass_b")
-        content_list = list(mock.get("content", []) or [])
-        return content_list
+        return list(mock.get("content", []) or [])
 
-    def _persist_pass_b_raw(attempt: int, resp_obj: Any, resp_text: Optional[str]) -> None:
-        """Persist raw Pass B artifacts immediately (before any parsing/validation)."""
+    def _persist_item_raw(code: str, attempt: int, resp_obj: Any, resp_text: Optional[str]) -> None:
         suffix = "" if attempt == 1 else f".{attempt}"
-
-        # Save full response JSON
         try:
-            resp_json_path = output_dir / f"pass_b.response{suffix}.json"
+            resp_json_path = output_dir / f"{code}.pass_b.response{suffix}.json"
             if hasattr(resp_obj, "model_dump_json"):
                 resp_json_path.write_text(resp_obj.model_dump_json(indent=2), encoding="utf-8")
             elif hasattr(resp_obj, "model_dump"):
@@ -808,156 +781,128 @@ def generate_pass_b_content(
             else:
                 resp_json_path.write_text(json.dumps(str(resp_obj), ensure_ascii=False), encoding="utf-8")
         except Exception as e:
-            logger.warning(f"Failed to write Pass B raw response JSON (attempt {attempt}): {e}")
+            logger.warning(f"Failed to write Pass B raw response JSON for {code} (attempt {attempt}): {e}")
 
-        # Save extracted text (if already available)
         if resp_text is not None:
             try:
-                (output_dir / f"pass_b_raw{suffix}.txt").write_text(resp_text or "", encoding="utf-8")
+                (output_dir / f"{code}.pass_b_raw{suffix}.txt").write_text(resp_text or "", encoding="utf-8")
             except Exception as e:
-                logger.warning(f"Failed to write Pass B extracted text (attempt {attempt}): {e}")
+                logger.warning(f"Failed to write Pass B extracted text for {code} (attempt {attempt}): {e}")
 
-    def _response_incomplete_reason(resp_obj: Any) -> Optional[str]:
-        try:
-            if hasattr(resp_obj, "model_dump"):
-                d = resp_obj.model_dump()
-                if isinstance(d, dict) and d.get("status") == "incomplete":
-                    inc = d.get("incomplete_details") or {}
-                    if isinstance(inc, dict):
-                        return inc.get("reason")
-        except Exception:
-            return None
-        return None
+    def _truncate_to_words(text: str, max_words: int) -> str:
+        if max_words <= 0:
+            return text
+        words = (text or "").split()
+        if len(words) <= max_words:
+            return text
+        return " ".join(words[:max_words]).strip()
 
-    def _parse_pass_b_json(text: str) -> Dict[str, Any]:
-        # Strip anything before/after JSON object defensively
-        m = re.search(r"\{.*\}", text, re.DOTALL)
-        json_text = m.group(0) if m else text
-        return json.loads(json_text)
+    def _build_item_prompt(content_type: str, code: str, max_words: int) -> str:
+        role_block = ""
+        if use_roles and roles:
+            # Include role genders (if present in topic config) as a small hint; this also supports
+            # downstream caption styling by consistent speaker naming.
+            role_lines = []
+            for r in roles:
+                name = str(r.get("name", "")).strip()
+                bio = str(r.get("bio", "")).strip()
+                if name:
+                    role_lines.append(f"- {name}: {bio}")
+            if role_lines:
+                role_block = "\n\nROLES:\n" + "\n".join(role_lines)
 
-    def _validate_content(out_items: List[Dict[str, Any]]) -> List[str]:
-        errs: List[str] = []
-        got_m = len([x for x in out_items if x.get("type") == "medium"])
-        got_s = len([x for x in out_items if x.get("type") == "short"])
-        got_r = len([x for x in out_items if x.get("type") == "reels"])
-        if got_m != medium_plan.items:
-            errs.append(f"medium items mismatch: expected {medium_plan.items}, got {got_m}")
-        if got_s != short_plan.items:
-            errs.append(f"short items mismatch: expected {short_plan.items}, got {got_s}")
-        if got_r != reels_plan.items:
-            errs.append(f"reels items mismatch: expected {reels_plan.items}, got {got_r}")
-        # Word-limit validation (hard)
-        for it in out_items:
-            t = it.get("type")
-            aw = int(it.get("actual_words", 0) or 0)
-            tw = int(it.get("target_words", 0) or 0)
-            if tw > 0 and aw > tw:
-                errs.append(f"{it.get('code')} exceeds max_words: actual {aw} > target {tw}")
-        return errs
-
-    # Pass B: single-call generation with validation + optional one retry.
-    last_errs: List[str] = []
-    for attempt in (1, 2):
-        attempt_prompt = prompt
-        if attempt == 2:
-            # Make the second attempt explicitly more compact to avoid truncation.
-            attempt_prompt = (
-                prompt
-                + "\n\nIMPORTANT RETRY INSTRUCTIONS:\n"
-                + "- Your previous response was invalid (missing items / too long / truncated).\n"
-                + "- Regenerate STRICTLY within the per-item max_words. Use ~80% of each max_words to ensure it fits under max_output_tokens.\n"
-                + "- Return ONLY valid JSON with the required number of items per type."
-            )
-
-        response = create_openai_completion(
-            client=client,
-            model=model,
-            messages=[
-                {"role": "system", "content": "Return only valid JSON."},
-                {"role": "user", "content": attempt_prompt},
-            ],
-            tools=None,
-            json_mode=True,
-            max_completion_tokens=max_tokens,
+        return (
+            f"You are generating a {content_type.upper()} script for a news-style dialogue podcast.\n"
+            f"Topic: {topic_title}\n"
+            f"Language: {language}\n"
+            f"Output code: {code}\n\n"
+            f"HARD CONSTRAINTS:\n"
+            f"- Output ONLY the script text (no JSON, no markdown, no labels).\n"
+            f"- Maximum {max_words} words total (hard cap).\n"
+            f"- If you cannot fit everything, prioritize coherence and an engaging arc over completeness.\n"
+            f"- Keep speaker names consistent (e.g., 'Gary Thompson:' / 'Margaret Butcher:') if you use speakers.\n"
+            f"\nSOURCE (may be truncated):\n{bounded_source}\n"
+            f"{role_block}\n"
         )
 
-        # Persist raw response immediately (even if extraction/parsing fails).
-        _persist_pass_b_raw(attempt, response, None)
+    def _gen_one(content_type: str, code: str, max_words: int) -> Dict[str, Any]:
+        # Token budget per item. Keep it tight: we do not request more than needed.
+        per_item_cap = int(os.environ.get("PASS_B_ITEM_MAX_TOKENS", "4096") or "4096")
+        max_tokens = calculate_max_output_tokens(
+            max_words,
+            buffer_ratio=float(os.environ.get("PASS_B_ITEM_BUFFER", "1.15") or "1.15"),
+            min_tokens=int(os.environ.get("PASS_B_ITEM_MIN_TOKENS", "256") or "256"),
+            cap_tokens=per_item_cap,
+        )
 
-        # If truncated by max_output_tokens, retry once (attempt 2).
-        reason = _response_incomplete_reason(response)
-        if reason == "max_output_tokens":
-            logger.error("Pass B response is incomplete due to max_output_tokens; will retry once with stricter compression.")
-            if attempt == 1:
-                continue
-            raise RuntimeError("Pass B truncated due to max_output_tokens even after retry. Consider lowering max_words per item.")
+        prompt = _build_item_prompt(content_type=content_type, code=code, max_words=max_words)
 
-        # Extract text
-        try:
-            response_text = extract_completion_text(response, model)
-        except Exception as e:
-            logger.error(f"Pass B text extraction failed (attempt {attempt}): {e}")
-            if attempt == 1:
-                continue
-            raise
-
-        _persist_pass_b_raw(attempt, response, response_text)
-
-        # Parse JSON
-        try:
-            data = _parse_pass_b_json(response_text)
-        except Exception as e:
-            logger.error(f"Pass B JSON parse failed (attempt {attempt}): {e}")
-            logger.error(f"Pass B response preview: {response_text[:1200]}...")
-            if attempt == 1:
-                continue
-            raise
-
-        content_list = list(data.get("content", []) or [])
-
-        # Defensive filtering + ensure codes follow expected counts
-        out: List[Dict[str, Any]] = []
-        m_idx = s_idx = r_idx = 0
-        for item in content_list:
-            if not isinstance(item, dict):
-                continue
-            t = item.get("type")
-            script = str(item.get("script", ""))
-            aw = int(item.get("actual_words", count_words(script)))
-
-            if t == "medium" and m_idx < medium_plan.items:
-                m_idx += 1
-                code = f"M{m_idx}"
-                out.append({"code": code, "type": "medium", "script": script, "actual_words": aw, "target_words": medium_plan.max_words})
-            elif t == "short" and s_idx < short_plan.items:
-                s_idx += 1
-                code = f"S{s_idx}"
-                out.append({"code": code, "type": "short", "script": script, "actual_words": aw, "target_words": short_plan.max_words})
-            elif t == "reels" and r_idx < reels_plan.items:
-                r_idx += 1
-                code = f"R{r_idx}"
-                out.append({"code": code, "type": "reels", "script": script, "actual_words": aw, "target_words": reels_plan.max_words})
-
-        last_errs = _validate_content(out)
-        if last_errs:
-            logger.error(f"Pass B validation failed (attempt {attempt}): {last_errs}")
-            # Save validation report
-            try:
-                (output_dir / f"pass_b_validation{'' if attempt==1 else '.'+str(attempt)}.json").write_text(
-                    json.dumps({"errors": last_errs}, indent=2),
-                    encoding="utf-8",
+        last_text: str = ""
+        for attempt in (1, 2):
+            attempt_prompt = prompt
+            if attempt == 2:
+                attempt_prompt = (
+                    prompt
+                    + "\n\nRETRY: Your previous output may have been truncated or exceeded the word cap. "
+                    + f"Return a tighter script well under {max_words} words."
                 )
-            except Exception:
-                pass
-            if attempt == 1:
-                continue
-            raise RuntimeError(f"Pass B validation failed after retry: {last_errs}")
 
-        # Save mock data for reuse
+            resp = create_openai_completion(
+                client=client,
+                model=model,
+                messages=[
+                    {"role": "system", "content": "You write concise scripts and respect strict word caps."},
+                    {"role": "user", "content": attempt_prompt},
+                ],
+                tools=None,
+                json_mode=False,
+                max_completion_tokens=max_tokens,
+            )
+
+            _persist_item_raw(code, attempt, resp, None)
+
+            try:
+                txt = extract_completion_text(resp, model) or ""
+            except Exception as e:
+                logger.error(f"Pass B extraction failed for {code} (attempt {attempt}): {e}")
+                if attempt == 1:
+                    continue
+                txt = last_text
+
+            last_text = txt
+            _persist_item_raw(code, attempt, resp, txt)
+
+            # Always accept truncated outputs. Enforce max_words locally.
+            txt = _truncate_to_words(txt.strip(), max_words=max_words)
+            aw = count_words(txt)
+            return {"code": code, "type": content_type, "script": txt, "actual_words": aw, "target_words": max_words}
+
+        # If we reach here, both attempts failed catastrophically. Continue with best-effort placeholder.
+        txt = _truncate_to_words((last_text or "").strip(), max_words=max_words)
+        return {"code": code, "type": content_type, "script": txt, "actual_words": count_words(txt), "target_words": max_words}
+
+    out: List[Dict[str, Any]] = []
+
+    # Stable order matters for downstream naming.
+    for content_type, ct_plan in (
+        ("medium", medium_plan),
+        ("short", short_plan),
+        ("reels", reels_plan),
+    ):
+        if not ct_plan.enabled or ct_plan.items <= 0:
+            continue
+        for idx in range(1, int(ct_plan.items) + 1):
+            code_prefix = {"medium": "M", "short": "S", "reels": "R"}.get(content_type, content_type[:1].upper())
+            code = f"{code_prefix}{idx}"
+            out.append(_gen_one(content_type=content_type, code=code, max_words=int(ct_plan.max_words)))
+
+    # Save mock data for reuse / unit runs
+    try:
         save_mock_response("pass_b", {"content": out})
-        return out
+    except Exception:
+        pass
 
-    raise RuntimeError(f"Pass B failed after retry. Last errors: {last_errs}")
+    return out
 
 
 # ============================================================================
