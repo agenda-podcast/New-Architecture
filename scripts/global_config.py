@@ -308,7 +308,7 @@ ENABLE_TTS_GENERATION = True
 ENABLE_VIDEO_RENDERING = False
 ENABLE_VIDEO_GENERATION = True  # Generate video (visual component)
 ENABLE_VIDEO_AUDIO_MUX = True  # Combine video with audio (when False, outputs video-only)
-ENABLE_IMAGE_CLEANUP = True  # Clean up images after video generation
+ENABLE_IMAGE_CLEANUP = False  # Clean up images after video generation
 
 # Error Handling
 MAX_ERROR_MESSAGE_LENGTH = 500  # Maximum length for sanitized error messages
