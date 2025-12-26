@@ -2552,6 +2552,23 @@ def render_multi_format_for_topic(topic_id: str, date_str: str,
             image_files, w, h, cache_dir, min_required_images=min_pool_default
         )
 
+        # Optional overlay: burn Google-visible image titles + host badges into the top band.
+        try:
+            from image_title_burner import burn_prepared_pool
+            prepared_images_by_res[(w, h)] = burn_prepared_pool(
+                prepared_pool=list(prepared_images_by_res.get((w, h), []) or []),
+                cache_dir=cache_dir,
+                images_dir=images_dir,
+                topic_cfg=config,
+                target_width=w,
+                target_height=h,
+            )
+            if prepared_images_by_res.get((w, h)):
+                print(f"  ✓ Burned title overlays for {w}x{h}: {len(prepared_images_by_res[(w, h)])} images")
+        except Exception as _e:
+            print(f"  ⚠ Image title burn-in failed for {w}x{h} (non-fatal): {_e}")
+
+
     for job in audio_jobs:
         audio_path = job['audio_path']
         code = job['code']

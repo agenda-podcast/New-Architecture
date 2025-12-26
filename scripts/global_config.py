@@ -268,6 +268,11 @@ CAPTIONS_WORDS_PER_LINE = int(os.environ.get('CAPTIONS_WORDS_PER_LINE', '5'))
 CAPTIONS_MAX_LINES = int(os.environ.get('CAPTIONS_MAX_LINES', '3'))
 CAPTIONS_TARGET_LINES = int(os.environ.get('CAPTIONS_TARGET_LINES', '2'))  # preferred 2, allow up to CAPTIONS_MAX_LINES
 
+# Burn Google image titles + host badges into prepared images (TikTok-style)
+ENABLE_IMAGE_TITLE_BURN = os.environ.get('ENABLE_IMAGE_TITLE_BURN', 'true').lower() in ('true', '1', 'yes')
+IMAGE_TITLE_BURN_TOP_FRACTION = float(os.environ.get('IMAGE_TITLE_BURN_TOP_FRACTION', '0.20'))  # top 20%
+
+
 # Video Text Overlay Settings
 VIDEO_TITLE_FONT_SIZE = 72
 VIDEO_TIMER_FONT_SIZE = 48
