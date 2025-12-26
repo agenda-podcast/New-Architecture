@@ -8,7 +8,7 @@ Contains all constants and shared settings used across scripts.
 # ============================================================================
 
 # Testing Configuration
-TESTING_MODE = False # When True, use saved mock responses instead of calling OpenAI API
+TESTING_MODE = True # When True, use saved mock responses instead of calling OpenAI API
 MOCK_RESPONSES_DIR = "test_data/mock_responses"  # Directory for saved API responses
 MOCK_SOURCE_TEXT_DIR = "test_data/mock_source_text"  # Directory for Pass-B source text fallback files
 
@@ -301,7 +301,7 @@ ENABLE_TTS_GENERATION = True
 ENABLE_VIDEO_RENDERING = False
 ENABLE_VIDEO_GENERATION = True  # Generate video (visual component)
 ENABLE_VIDEO_AUDIO_MUX = True  # Combine video with audio (when False, outputs video-only)
-ENABLE_IMAGE_CLEANUP = False  # Clean up images after video generation
+ENABLE_IMAGE_CLEANUP = True  # Clean up images after video generation
 
 # Error Handling
 MAX_ERROR_MESSAGE_LENGTH = 500  # Maximum length for sanitized error messages
