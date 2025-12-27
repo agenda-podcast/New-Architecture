@@ -1,9 +1,0 @@
-{
-  "test_field": "test_value",
-  "test_number": 42,
-  "test_list": [
-    1,
-    2,
-    3
-  ]
-}
