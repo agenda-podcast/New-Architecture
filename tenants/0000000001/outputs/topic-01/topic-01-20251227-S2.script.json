@@ -1,0 +1,28 @@
+{
+  "title": "Global cost of living and rising prices - S2",
+  "duration_sec": 140,
+  "segments": [
+    {
+      "chapter": 1,
+      "title": "Short",
+      "start_time": 0,
+      "duration": 0,
+      "dialogue": [
+        {
+          "speaker": "A",
+          "text": "Across the globe, several forces keep prices elevated: energy costs, housing rents, and broad service inflation, plus lingering supply chain frictions and weather-driven disruptions. In the UK, shoppers are feeling the pull of living-cost pressures as Boxing Day sales unfold; in the US, households are watching energy bills and shelter costs alongside steady demand for services. The pattern isn’t one-off or temporary; it’s shaping wages and expectations for next year."
+        },
+        {
+          "speaker": "B",
+          "text": "So are we seeing a global inflation shock that sticks, or a patchwork of country-specific impulses? And what does this mean for families trying to budget a paycheck-to-paycheck month? These questions frame our next steps."
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-12-27T06:44:56.215148",
+    "num_sources": 5,
+    "content_type": "short",
+    "content_code": "S2"
+  }
+}

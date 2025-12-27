@@ -1,0 +1,24 @@
+{
+  "title": "Global cost of living and rising prices - R5",
+  "duration_sec": 56,
+  "segments": [
+    {
+      "chapter": 1,
+      "title": "Reels",
+      "start_time": 0,
+      "duration": 0,
+      "dialogue": [
+        {
+          "speaker": "A",
+          "text": "The energy picture matters. UK households face energy bills that can swing with price caps and policy levers; in the US, electricity and gas prices shape the monthly bills. Know where your bill comes from and how to trim costs."
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-12-27T06:44:56.218870",
+    "num_sources": 5,
+    "content_type": "reels",
+    "content_code": "R5"
+  }
+}

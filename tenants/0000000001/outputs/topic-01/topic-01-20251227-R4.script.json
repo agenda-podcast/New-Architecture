@@ -1,0 +1,24 @@
+{
+  "title": "Global cost of living and rising prices - R4",
+  "duration_sec": 56,
+  "segments": [
+    {
+      "chapter": 1,
+      "title": "Reels",
+      "start_time": 0,
+      "duration": 0,
+      "dialogue": [
+        {
+          "speaker": "B",
+          "text": "From data this week, UK inflation has cooled but remains above the Bank of England’s target, with services and housing inflation still stubborn. The policy path will influence households for months to come."
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-12-27T06:44:56.218385",
+    "num_sources": 5,
+    "content_type": "reels",
+    "content_code": "R4"
+  }
+}
