@@ -3,25 +3,43 @@
 """
 Two-pass script generation using the OpenAI Responses API.
 
-This module is used by ``multi_format_generator.py``.
+Updated behavior (Dec 2025 + mock-mode support):
 
-Updated behavior (Dec 2025):
-- Pass A is ONLY used to generate long-form scripts (L*). It outputs plain text (no JSON):
+Pass A:
+- Only used for long scripts (type == "long") AND only when:
+  - long is enabled AND
+  - NOT testing/gesting mode AND
+  - NO test data source file present
+- Pass A outputs PLAIN TEXT (no JSON):
     SOURCES:
-    - ...
+    - [1] Publisher — Title (YYYY-MM-DD). URL
     SCRIPT:
     HOST_A: ...
     HOST_B: ...
 
-- Pass A is SKIPPED when any of the following is true:
-    1) Topic content_types.long.enabled == False
-    2) Testing / "gesting" mode is enabled (global_config.TESTING_MODE, or config.testing_mode / gisting_mode / gesting_mode)
-    3) A test data source file is configured (config.test_data_source_file / config.sources_file / config.data_source_file etc.) and exists
+Pass B:
+- Always returns ONE JSON object with ALL non-long items in ONE response.
+- If Pass A ran: derive from Pass A script and sources (no new facts, no web_search).
+- If Pass A skipped: generate non-long items directly (may use web_search unless sources provided).
 
-- Pass B returns a SINGLE JSON object with *all* requested non-long items (M/S/R, etc.) in one response.
-  Pass B generates only summarized/derived pieces per item of each content type.
+Mock mode (NEW):
+- If Testing Mode is True AND a Source Text file exists:
+  - DO NOT call OpenAI at all.
+  - Create mock Pass A (SOURCES + SCRIPT plain text) and mock Pass B (single JSON with all items).
+  - Return the same shape as normal:
+      {"content":[...], "sources":[...], "pass_a_raw_text":"..."}
+- If Testing Mode is True AND Source Text file does NOT exist:
+  - This module will not create it (script_generate will), but will still fall back to minimal mocks.
 
-- Pass A is never re-requested. Whatever comes back (even if incomplete) is treated as completed and saved upstream.
+Source Text file format supported (plain text):
+- If the file contains these headers, they will be parsed:
+    SOURCES:
+    - [1] ...
+    FULL_TEXT:
+    <full article text...>
+  Also accepts TEXT: instead of FULL_TEXT:
+- If headers absent: entire file is treated as FULL_TEXT.
+
 """
 
 from __future__ import annotations
@@ -34,7 +52,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 try:
-    # Optional in some CI/test environments
     from openai import OpenAI
 except Exception:  # pragma: no cover
     OpenAI = None  # type: ignore
@@ -67,6 +84,10 @@ def _truthy(v: Any) -> bool:
 
 def _normalize_ws(s: str) -> str:
     return re.sub(r"[ \t]+\n", "\n", (s or "").strip())
+
+
+def _count_words(s: str) -> int:
+    return len([w for w in re.split(r"\s+", (s or "").strip()) if w])
 
 
 def _extract_first_json_object(text: str) -> Dict[str, Any]:
@@ -114,34 +135,30 @@ def _extract_first_json_object(text: str) -> Dict[str, Any]:
     raise ValueError("Could not find a complete JSON object in output")
 
 
+# ---------------------------------------------------------------------------
+# Hosts / roles resolver (ROBUST: supports dict and list)
+# ---------------------------------------------------------------------------
+
 def _resolve_hosts(config: Dict[str, Any]) -> Dict[str, str]:
     """
     Robust host resolver.
 
     Supports config["roles"] in multiple shapes:
     1) dict:
-       {
-         "host_a": {"name": "...", "bio": "..."},
-         "host_b": {"name": "...", "bio": "..."}
-       }
+       {"host_a": {"name": "...", "bio": "..."}, "host_b": {...}}
     2) dict with uppercase keys:
        {"HOST_A": {...}, "HOST_B": {...}}
     3) list:
-       [
-         {"role": "host_a", "name": "...", "bio": "..."},
-         {"role": "host_b", "name": "...", "bio": "..."}
-       ]
-       or simply [ {...}, {...} ] (first is A, second is B)
-    4) anything else -> fallback defaults
+       [{"role":"host_a","name":"...","bio":"..."}, {"role":"host_b",...}]
+       or simply [{...}, {...}] where first=A second=B
     """
     roles = config.get("roles") or {}
 
-    # Normalize roles if it's a list (your current failing case)
+    # Normalize roles if it's a list
     if isinstance(roles, list):
         host_a: Dict[str, Any] = {}
         host_b: Dict[str, Any] = {}
 
-        # Try to identify by explicit labels inside dicts
         for item in roles:
             if not isinstance(item, dict):
                 continue
@@ -150,7 +167,6 @@ def _resolve_hosts(config: Dict[str, Any]) -> Dict[str, str]:
                 or item.get("id")
                 or item.get("code")
                 or item.get("key")
-                or item.get("name")
                 or ""
             )
             k = str(key).strip().lower()
@@ -160,7 +176,6 @@ def _resolve_hosts(config: Dict[str, Any]) -> Dict[str, str]:
             elif k in ("host_b", "host b", "b", "hostb", "cohost", "co-host", "secondary"):
                 host_b = item
 
-        # If still missing, fall back to list order
         if not host_a and len(roles) >= 1 and isinstance(roles[0], dict):
             host_a = roles[0]
         if not host_b and len(roles) >= 2 and isinstance(roles[1], dict):
@@ -168,7 +183,6 @@ def _resolve_hosts(config: Dict[str, Any]) -> Dict[str, str]:
 
         roles = {"host_a": host_a, "host_b": host_b}
 
-    # If roles is not a dict by now, reset to empty
     if not isinstance(roles, dict):
         roles = {}
 
@@ -189,6 +203,10 @@ def _resolve_hosts(config: Dict[str, Any]) -> Dict[str, str]:
         "host_b_bio": _pick(host_b_obj, "bio", "Co-host"),
     }
 
+
+# ---------------------------------------------------------------------------
+# Spec helpers
+# ---------------------------------------------------------------------------
 
 def _enabled_specs_from_content_specs(content_specs: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """Split enabled specs into (long_specs, nonlong_specs)."""
@@ -226,7 +244,7 @@ def _has_existing_test_data_source_file(config: Dict[str, Any]) -> bool:
 
 
 def _is_testing_or_gesting_mode(config: Dict[str, Any]) -> bool:
-    # 1) topic-level flags
+    # 1) config flags
     if _truthy(config.get("testing_mode")):
         return True
     if _truthy(config.get("gesting_mode")):
@@ -234,7 +252,7 @@ def _is_testing_or_gesting_mode(config: Dict[str, Any]) -> bool:
     if _truthy(config.get("gisting_mode")):
         return True
 
-    # 2) environment flags
+    # 2) env flags
     if _truthy(os.getenv("TESTING_MODE")):
         return True
     if _truthy(os.getenv("GESTING_MODE")):
@@ -275,7 +293,301 @@ def _should_run_pass_a(config: Dict[str, Any], content_specs: List[Dict[str, Any
 
 
 # ---------------------------------------------------------------------------
-# Prompt builders
+# Source Text file support + mock mode
+# ---------------------------------------------------------------------------
+
+def _source_text_file_path(config: Dict[str, Any]) -> Optional[Path]:
+    """
+    Locate a Source Text file path from config.
+    Supported keys:
+      - source_text_file
+      - sources_text_file
+      - source_text_path
+      - sources_text_path
+    """
+    candidates = [
+        config.get("source_text_file"),
+        config.get("sources_text_file"),
+        config.get("source_text_path"),
+        config.get("sources_text_path"),
+    ]
+    for c in candidates:
+        if not c:
+            continue
+        p = Path(str(c))
+        if p.is_file():
+            return p
+    return None
+
+
+def _split_source_text_file(text: str) -> Tuple[str, str]:
+    """
+    Return (sources_text, full_text) from a source text file content.
+
+    Supported headers:
+      SOURCES:
+      FULL_TEXT:
+    or
+      SOURCES:
+      TEXT:
+    """
+    t = (text or "").replace("\r\n", "\n").replace("\r", "\n")
+    if not t.strip():
+        return "", ""
+
+    m_sources = re.search(r"(?im)^\s*sources\s*:\s*$", t)
+    m_full = re.search(r"(?im)^\s*(full_text|text)\s*:\s*$", t)
+
+    if not m_sources and not m_full:
+        return "", t.strip()
+
+    sources_text = ""
+    full_text = ""
+
+    if m_sources and m_full:
+        if m_sources.start() < m_full.start():
+            sources_text = t[m_sources.end() : m_full.start()].strip()
+            full_text = t[m_full.end() :].strip()
+        else:
+            # uncommon ordering; treat everything after FULL_TEXT as full_text
+            sources_text = ""
+            full_text = t[m_full.end() :].strip()
+        return _normalize_ws(sources_text), _normalize_ws(full_text)
+
+    # If only FULL_TEXT exists
+    if m_full and not m_sources:
+        full_text = t[m_full.end() :].strip()
+        return "", _normalize_ws(full_text)
+
+    # If only SOURCES exists
+    if m_sources and not m_full:
+        sources_text = t[m_sources.end() :].strip()
+        return _normalize_ws(sources_text), ""
+
+    return "", t.strip()
+
+
+def _sources_text_to_list(sources_text: str) -> List[Dict[str, Any]]:
+    """
+    Best-effort parse of sources lines into a structured list.
+    Accepts lines like:
+      - [1] Publisher — Title (YYYY-MM-DD). URL
+    """
+    out: List[Dict[str, Any]] = []
+    if not sources_text:
+        return out
+
+    for line in sources_text.splitlines():
+        l = line.strip()
+        if not l or l.startswith("#"):
+            continue
+
+        l = re.sub(r"^[\-\*\u2022]\s*", "", l)
+
+        n = None
+        m = re.match(r"^\[(\d+)\]\s*(.*)$", l)
+        if m:
+            n = _safe_int(m.group(1), 0)
+            l = m.group(2).strip()
+
+        url = ""
+        murl = re.search(r"(https?://\S+)", l)
+        if murl:
+            url = murl.group(1).rstrip(").,;")
+            l_wo_url = (l[:murl.start()] + l[murl.end():]).strip()
+        else:
+            l_wo_url = l
+
+        date = ""
+        mdate = re.search(r"\((\d{4}-\d{2}-\d{2})\)", l_wo_url)
+        if mdate:
+            date = mdate.group(1)
+            l_wo_url = (l_wo_url[:mdate.start()] + l_wo_url[mdate.end():]).strip()
+
+        publisher = ""
+        title = l_wo_url.strip(" .")
+        if "—" in l_wo_url:
+            parts = [p.strip() for p in l_wo_url.split("—", 1)]
+            publisher = parts[0]
+            title = parts[1] if len(parts) > 1 else title
+        elif " - " in l_wo_url:
+            parts = [p.strip() for p in l_wo_url.split(" - ", 1)]
+            publisher = parts[0]
+            title = parts[1] if len(parts) > 1 else title
+
+        item = {"title": title}
+        if n:
+            item["n"] = n
+        if publisher:
+            item["publisher"] = publisher
+        if date:
+            item["date"] = date
+        if url:
+            item["url"] = url
+
+        out.append(item)
+
+    return out
+
+
+def _sentences_from_text(text: str) -> List[str]:
+    t = re.sub(r"\s+", " ", (text or "").strip())
+    if not t:
+        return []
+    # basic sentence split
+    parts = re.split(r"(?<=[\.\!\?])\s+", t)
+    return [p.strip() for p in parts if p and p.strip()]
+
+
+def _mock_dialogue_from_text(full_text: str, target_words: int, min_lines: int = 20) -> str:
+    """
+    Deterministic mock dialogue generator: alternates HOST_A/HOST_B by sentence,
+    until target_words reached.
+    """
+    target_words = max(120, int(target_words or 0))
+    sents = _sentences_from_text(full_text)
+
+    if not sents:
+        # hard fallback
+        base = [
+            "HOST_A: [MOCK] Source text is empty or missing. Provide FULL_TEXT in the source text file.",
+            "HOST_B: [MOCK] Once FULL_TEXT is present, this mock generator will build realistic dialogue.",
+        ]
+        # extend to satisfy downstream parsers
+        while _count_words("\n".join(base)) < min(target_words, 250):
+            base.append("HOST_A: [MOCK] Placeholder continuation.")
+            base.append("HOST_B: [MOCK] Placeholder continuation.")
+        return "\n".join(base).strip()
+
+    lines: List[str] = []
+    word_budget = target_words
+    speaker_a = True
+    i = 0
+
+    while i < len(sents) and _count_words("\n".join(lines)) < word_budget:
+        spk = "HOST_A" if speaker_a else "HOST_B"
+        sent = sents[i]
+        lines.append(f"{spk}: {sent}")
+        speaker_a = not speaker_a
+        i += 1
+
+    # Ensure minimum dialogue density for downstream processing
+    while len(lines) < min_lines:
+        spk = "HOST_A" if speaker_a else "HOST_B"
+        lines.append(f"{spk}: [MOCK] Continuation segment.")
+        speaker_a = not speaker_a
+
+    return "\n".join(lines).strip()
+
+
+def _truncate_dialogue_to_words(dialogue: str, max_words: int) -> str:
+    if max_words <= 0:
+        return dialogue.strip()
+    words = re.split(r"\s+", dialogue.strip())
+    if len(words) <= max_words:
+        return dialogue.strip()
+    cut = " ".join(words[:max_words]).strip()
+    # try to cut to last punctuation for cleaner end
+    m = re.search(r"^(.+[\.\!\?])\s", cut[::-1])
+    return cut
+
+
+def _make_mock_outputs_from_source_text(config: Dict[str, Any], enabled_specs: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Build:
+      - pass_a_raw_text (plain text SOURCES+SCRIPT) if long enabled, otherwise empty
+      - content list for ALL enabled specs (long + non-long)
+      - sources list
+    """
+    src_path = _source_text_file_path(config)
+    src_text = ""
+    if src_path and src_path.is_file():
+        src_text = src_path.read_text(encoding="utf-8", errors="ignore")
+    sources_text, full_text = _split_source_text_file(src_text)
+
+    sources_list = _sources_text_to_list(sources_text)
+
+    # If no structured sources, create at least one local reference
+    if not sources_list:
+        sources_list = [{
+            "n": 1,
+            "publisher": "LOCAL",
+            "title": "Source Text File",
+            "date": "",
+            "url": f"file://{str(src_path) if src_path else 'missing'}",
+        }]
+
+    long_specs, nonlong_specs = _enabled_specs_from_content_specs(enabled_specs)
+
+    # Long script (Pass A mock)
+    pass_a_raw_text = ""
+    long_script_text = ""
+    if long_specs:
+        target_words = 9000
+        for s in long_specs:
+            target_words = max(target_words, _safe_int(s.get("target_words") or s.get("max_words"), 9000))
+
+        long_script_text = _mock_dialogue_from_text(full_text or src_text, target_words=target_words)
+
+        # Build Pass A plain text output
+        src_lines = []
+        for idx, it in enumerate(sources_list, start=1):
+            pub = it.get("publisher", "Source")
+            title = it.get("title", "Untitled")
+            date = it.get("date", "")
+            url = it.get("url", "")
+            d = f" ({date})" if date else ""
+            u = f" {url}" if url else ""
+            src_lines.append(f"- [{idx}] {pub} — {title}{d}.{u}".rstrip("."))
+
+        pass_a_raw_text = "SOURCES:\n" + "\n".join(src_lines).strip() + "\n\nSCRIPT:\n" + long_script_text.strip() + "\n"
+
+    # Build content list for all items
+    content: List[Dict[str, Any]] = []
+
+    # long items use the same long_script_text
+    for i, spec in enumerate(long_specs):
+        code = str(spec.get("code") or f"L{i+1}")
+        mw = _safe_int(spec.get("target_words") or spec.get("max_words"), 9000)
+        content.append({
+            "code": code,
+            "type": "long",
+            "script": _truncate_dialogue_to_words(long_script_text, mw),
+            "max_words": mw,
+        })
+
+    # non-long items: summarized parts per item
+    # Requirement: "Pass B we need to get only summarized parts per each item of each content type."
+    # Here: simply take the first N words from the long_script_text (or build from full_text if no long).
+    base_for_summary = long_script_text or _mock_dialogue_from_text(full_text or src_text, target_words=2000)
+
+    for spec in nonlong_specs:
+        code = str(spec.get("code") or "X1")
+        t = str(spec.get("type") or "unknown")
+        mw = _safe_int(spec.get("target_words") or spec.get("max_words"), 350)
+
+        # create a short/medium/reel from the base text, capped to mw
+        short_script = _truncate_dialogue_to_words(base_for_summary, mw)
+        # ensure it starts with HOST_A
+        if not short_script.strip().upper().startswith("HOST_A:"):
+            short_script = "HOST_A: [MOCK] " + short_script.strip()
+
+        content.append({
+            "code": code,
+            "type": t,
+            "script": short_script.strip(),
+            "max_words": mw,
+        })
+
+    return {
+        "content": content,
+        "sources": sources_list,
+        "pass_a_raw_text": pass_a_raw_text.strip(),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Prompt builders (real OpenAI paths)
 # ---------------------------------------------------------------------------
 
 def _pick_model_pass_a(config: Dict[str, Any]) -> str:
@@ -303,7 +615,6 @@ def _build_pass_a_prompt(config: Dict[str, Any], long_specs: List[Dict[str, Any]
     queries = config.get("queries") or []
     query_txt = "\n".join([f"- {q}" for q in queries]) if queries else "- (use your judgment)"
 
-    # Word target: take max target_words among long specs.
     target_words = 9000
     for s in long_specs:
         target_words = max(target_words, _safe_int(s.get("target_words") or s.get("max_words"), 9000))
@@ -350,7 +661,6 @@ def _build_pass_b_prompt_from_pass_a(
     Pass B prompt when Pass A ran: derive summaries from Pass A script only.
     Must return ONE JSON object with ALL items.
     """
-    hosts = _resolve_hosts(config)
     topic = str(config.get("title") or config.get("topic") or "").strip() or "(untitled topic)"
 
     req_lines: List[str] = []
@@ -486,7 +796,7 @@ Rules:
 
 
 # ---------------------------------------------------------------------------
-# Parsing helpers for Pass A output
+# Parsing helpers for Pass A output (real OpenAI path)
 # ---------------------------------------------------------------------------
 
 def _parse_pass_a_text(pass_a_text: str) -> Tuple[str, str]:
@@ -497,15 +807,12 @@ def _parse_pass_a_text(pass_a_text: str) -> Tuple[str, str]:
     if not t:
         return "", ""
 
-    # Normalize common variants
     t = t.replace("\r\n", "\n").replace("\r", "\n")
 
-    # Find SOURCES and SCRIPT blocks
     m_sources = re.search(r"(?im)^\s*sources\s*:\s*$", t)
     m_script = re.search(r"(?im)^\s*script\s*:\s*$", t)
 
     if not m_sources or not m_script:
-        # Fallback: treat the whole thing as script
         return "", t.strip()
 
     sources_start = m_sources.end()
@@ -515,81 +822,14 @@ def _parse_pass_a_text(pass_a_text: str) -> Tuple[str, str]:
         sources_text = t[sources_start : m_script.start()].strip()
         script_text = t[script_start :].strip()
     else:
-        # weird ordering; fallback
         sources_text = ""
         script_text = t[script_start :].strip()
 
     return _normalize_ws(sources_text), _normalize_ws(script_text)
 
 
-def _sources_text_to_list(sources_text: str) -> List[Dict[str, Any]]:
-    """
-    Best-effort parse of sources lines into a structured list.
-    Accepts lines like:
-      - [1] Publisher — Title (YYYY-MM-DD). URL
-    """
-    out: List[Dict[str, Any]] = []
-    if not sources_text:
-        return out
-
-    for line in sources_text.splitlines():
-        l = line.strip()
-        if not l or l.startswith("#"):
-            continue
-
-        # Remove leading bullets
-        l = re.sub(r"^[\-\*\u2022]\s*", "", l)
-
-        n = None
-        m = re.match(r"^\[(\d+)\]\s*(.*)$", l)
-        if m:
-            n = _safe_int(m.group(1), 0)
-            l = m.group(2).strip()
-
-        url = ""
-        murl = re.search(r"(https?://\S+)", l)
-        if murl:
-            url = murl.group(1).rstrip(").,;")
-            l_wo_url = (l[:murl.start()] + l[murl.end():]).strip()
-        else:
-            l_wo_url = l
-
-        # Try parse date in parentheses
-        date = ""
-        mdate = re.search(r"\((\d{4}-\d{2}-\d{2})\)", l_wo_url)
-        if mdate:
-            date = mdate.group(1)
-            l_wo_url = (l_wo_url[:mdate.start()] + l_wo_url[mdate.end():]).strip()
-
-        # Split publisher/title by em dash or hyphen
-        publisher = ""
-        title = l_wo_url.strip(" .")
-        if "—" in l_wo_url:
-            parts = [p.strip() for p in l_wo_url.split("—", 1)]
-            publisher = parts[0]
-            title = parts[1] if len(parts) > 1 else title
-        elif " - " in l_wo_url:
-            parts = [p.strip() for p in l_wo_url.split(" - ", 1)]
-            publisher = parts[0]
-            title = parts[1] if len(parts) > 1 else title
-
-        item = {"title": title}
-        if n:
-            item["n"] = n
-        if publisher:
-            item["publisher"] = publisher
-        if date:
-            item["date"] = date
-        if url:
-            item["url"] = url
-
-        out.append(item)
-
-    return out
-
-
 # ---------------------------------------------------------------------------
-# Pass runners
+# Pass runners (real OpenAI paths)
 # ---------------------------------------------------------------------------
 
 def _run_pass_a(
@@ -677,7 +917,7 @@ def _run_single_pass_b_with_web_search(
         model=model,
         messages=[{"role": "user", "content": prompt}],
         tools=[{"type": "web_search"}],
-        json_mode=False,  # cannot enforce with web_search
+        json_mode=False,
         max_completion_tokens=max_out,
     )
 
@@ -697,7 +937,8 @@ def _run_single_pass_b_with_web_search(
 # ---------------------------------------------------------------------------
 
 def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
-    """Generate multi-format scripts.
+    """
+    Generate multi-format scripts.
 
     Supported calls:
       - generate_all_content_two_pass(config, sources=None, client=None, enabled_specs=None)
@@ -706,13 +947,11 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
     # Legacy style: (client, config, pass_a_long_script, sources)
     if len(args) >= 4 and not isinstance(args[0], dict):
         client, config, pass_a_long_script, sources = args[0], args[1], args[2], args[3]
-        # Legacy: treat pass_a_long_script as LONG_SCRIPT and derive non-long outputs.
-        # This keeps older modules working.
         if client is None:
             raise ValueError("OpenAI client is required")
         enabled_specs = kwargs.get("enabled_specs") or []
         _, nonlong_specs = _enabled_specs_from_content_specs(enabled_specs)
-        sources_text = ""  # unknown in legacy path
+        sources_text = ""
         script_text = str(pass_a_long_script or "").strip()
         out = _run_pass_b_from_pass_a(client, config, nonlong_specs, sources_text, script_text)
         return {"content": out.get("content", []), "sources": sources or [], "pass_a_raw_text": ""}
@@ -726,6 +965,16 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
     enabled_specs: List[Dict[str, Any]] = kwargs.get("enabled_specs") or config.get("enabled_specs") or []
     client = kwargs.get("client")
 
+    # -----------------------------------------------------------------------
+    # MOCK MODE: Testing mode + Source Text file present (or created upstream)
+    # -----------------------------------------------------------------------
+    if _is_testing_or_gesting_mode(config):
+        # If source text file exists -> generate mocks based on it.
+        # If missing -> still produce minimal mocks so pipeline can continue.
+        mock = _make_mock_outputs_from_source_text(config, enabled_specs)
+        return mock
+
+    # Real mode: create OpenAI client if needed
     if client is None:
         if OpenAI is None:
             raise ImportError("openai package is required. Install with: pip install openai")
@@ -742,7 +991,6 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
         sources_out, sources_text, script_text, pass_a_raw_text = _run_pass_a(client, config, long_specs)
 
         # Build long content item(s)
-        # If multiple long specs exist, duplicate the same script unless caller provides a different strategy.
         for i, spec in enumerate(long_specs):
             code = str(spec.get("code") or f"L{i+1}")
             content.append({
@@ -759,10 +1007,7 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
 
     else:
         # No Pass A. Generate non-long items directly in a single call.
-        # If the caller supplied sources, we will include them as-is; otherwise, we use web_search.
         if sources_in:
-            # Caller-provided sources path: no web_search, strict JSON mode.
-            # We instruct the model to use provided sources only.
             model = _pick_model_pass_b(config)
 
             req_lines = []
