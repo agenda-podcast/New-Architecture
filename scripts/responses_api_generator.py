@@ -5,7 +5,7 @@ Pass A (gpt-5.2-pro + web_search)
 - Generates long-form scripts (L1..Ln) only.
 - Output is stored as raw text (not JSON) to preserve everything returned.
 
-Pass B (gpt-4.1-nano, no web_search)
+Pass B (gpt-5-nano, no web_search)
 - Summarizes a SOURCE_TEXT into enabled content types (M/S/R) according to the topic config.
 - Output is JSON (content array) suitable for downstream pipeline.
 
@@ -761,7 +761,7 @@ def generate_pass_b_content(
     model = str(config.get("gpt_model_pass_b", "gpt-5-nano"))
 
     # Bound source size (chars) to keep inputs reasonable.
-    source_max_chars = int(os.environ.get("PASS_B_SOURCE_MAX_CHARS", "40000") or "40000")
+    source_max_chars = int(os.environ.get("PASS_B_SOURCE_MAX_CHARS", "125000") or "125000")
     bounded_source = (source_text or "")
     if source_max_chars > 0 and len(bounded_source) > source_max_chars:
         bounded_source = bounded_source[:source_max_chars]
@@ -921,7 +921,7 @@ def generate_pass_b_content(
     def _gen_one(content_type: str, code: str, max_words: int, chunk_text: str, part_idx: int, part_total: int) -> Dict[str, Any]:
         # Token budget per item. Setting a higher max_output_tokens does not increase spend if not used;
         # it prevents incomplete (max_output_tokens) failures.
-        per_item_cap = int(os.environ.get("PASS_B_ITEM_MAX_TOKENS", "4096") or "4096")
+        per_item_cap = int(os.environ.get("PASS_B_ITEM_MAX_TOKENS", "12500") or "12500")
         max_tokens = calculate_max_output_tokens(
             max_words,
             buffer_ratio=float(os.environ.get("PASS_B_ITEM_BUFFER", "1.12") or "1.12"),
@@ -949,7 +949,7 @@ def generate_pass_b_content(
             tools=None,
             json_mode=False,
             max_completion_tokens=max_tokens,
-            reasoning={"effort": os.environ.get("PASS_B_REASONING_EFFORT", "low")},
+            reasoning={"effort": os.environ.get("PASS_B_REASONING_EFFORT", "minimal")},
         )
 
         _persist_item_raw(code, resp, None)
@@ -1040,6 +1040,10 @@ def generate_all_content_two_pass(
     sources: List[Dict[str, Any]] = []
     content: List[Dict[str, Any]] = []
     raw_l_text = ""
+    # Script-only aggregation of Pass A outputs for Pass B input.
+    # Pass B must receive ONLY the dialog/script body (no SOURCES, no CANONICAL_PACK, no JSON wrappers),
+    # otherwise it may summarize metadata instead of the script.
+    pass_a_script_only_text = ""
 
     # Pass A
     if need_pass_a:
@@ -1053,6 +1057,19 @@ def generate_all_content_two_pass(
         )
         content.extend(l_content)
 
+        # Build a script-only source for Pass B.
+        # We prefer the already-extracted per-item script fields (most reliable), and only fall back to
+        # parsing raw text if needed.
+        try:
+            parts: List[str] = []
+            for li in l_content:
+                st = (li.get("script") or "").strip()
+                if st:
+                    parts.append(st)
+            pass_a_script_only_text = "\n\n".join(parts).strip()
+        except Exception:
+            pass_a_script_only_text = ""
+
         # Verify raw L files exist BEFORE moving to Pass B.
         for li in l_content:
             code = li.get("code")
@@ -1064,11 +1081,19 @@ def generate_all_content_two_pass(
 
     # Resolve SOURCE_TEXT for Pass B
     if need_pass_b:
-        if raw_l_text.strip():
-            source_text = raw_l_text
+        if pass_a_script_only_text.strip():
+            source_text = pass_a_script_only_text
+        elif raw_l_text.strip():
+            # Fallback: attempt to extract script-only from the combined raw output.
+            # Note: if multiple L items exist, this may not perfectly separate them, but it will still
+            # remove SOURCES / wrappers when present.
+            extracted, _ = _split_pass_a_sections(raw_l_text)
+            source_text = (extracted or raw_l_text).strip()
         else:
-            # No L output generated: use mock source text file
-            source_text = load_mock_source_text(topic_id)
+            # No L output generated: use mock source text file (and still keep only SCRIPT part if present)
+            raw_mock = load_mock_source_text(topic_id)
+            extracted, _ = _split_pass_a_sections(raw_mock)
+            source_text = (extracted or raw_mock).strip()
 
         # Persist the source text used for Pass B (always) so failures are diagnosable.
         try:
