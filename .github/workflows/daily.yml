@@ -22,6 +22,15 @@ env:
   VIDEO_RENDERER: ${{ github.event.inputs.video_renderer || 'ffmpeg' }}
   BLENDER_TEMPLATES_VERSION: "v1"
 
+  PASS_A_MODEL: gpt-5.2-pro
+  PASS_B_MODEL: gpt-5-nano
+
+  # gpt-5.2-pro supports only: medium/high/xhigh
+  PASS_A_REASONING_EFFORT: medium
+
+  # nano: start with minimal; if your API returns 400, switch to low
+  PASS_B_REASONING_EFFORT: minimal
+
 jobs:
   prepare-matrix:
     name: Prepare Topic Matrix
