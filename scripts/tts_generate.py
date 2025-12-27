@@ -4,13 +4,13 @@ import argparse
 import json
 import sys
 import os
-import re
 import hashlib
 import subprocess
 from pathlib import Path
 from typing import List, Dict, Any
 from datetime import datetime
 import glob
+import re
 
 from config import load_topic_config, get_output_dir, get_repo_root
 from global_config import (
@@ -473,7 +473,7 @@ def tts_chunks_to_audio(dialogue_chunks: List[Dict[str, str]], audio_path: Path,
     # Use chunking strategy if enabled and available
     if use_chunking and TTS_CHUNKER_AVAILABLE:
         print(f"Using chunking strategy ({total_chars} chars)")
-        return _tts_with_chunking(dialogue_chunks, audio_path, config, topic_id)
+        return _tts_with_chunking(dialogue_chunks, audio_path, config)
     elif use_chunking and not TTS_CHUNKER_AVAILABLE:
         # Warn if chunking was requested but unavailable
         print(f"⚠ Warning: Chunking requested but tts_chunker not available")
@@ -510,7 +510,7 @@ def tts_chunks_to_mp3(dialogue_chunks: List[Dict[str, str]], audio_path: Path,
 
 
 def _tts_with_chunking(dialogue_chunks: List[Dict[str, str]], audio_path: Path,
-                       config: Dict[str, Any], topic_id: str) -> bool:
+                       config: Dict[str, Any]) -> bool:
     """
     Generate TTS using advanced chunking strategy.
     
@@ -556,57 +556,29 @@ def _tts_with_chunking(dialogue_chunks: List[Dict[str, str]], audio_path: Path,
     # Convert to AAC
     success = convert_to_aac(temp_wav, audio_path)
 
-    # Generate approximate captions for chunked audio (best-effort).
-    if success and CAPTIONS_ENABLED:
-        try:
-            voice_a_name = str(config.get("voice_a_name", "")).strip()
-            voice_b_name = str(config.get("voice_b_name", "")).strip()
-            known = [n for n in [voice_a_name, voice_b_name] if n]
-
-            duration_s = probe_duration_seconds(audio_path)
-            if duration_s <= 0.01:
-                duration_s = probe_duration_seconds(temp_wav)
-
-            captions = build_captions_from_dialogue_estimate(
-                dialogue_chunks,
-                total_duration_s=duration_s,
-                max_words_per_line=CAPTIONS_WORDS_PER_LINE,
-                target_lines=CAPTIONS_TARGET_LINES,
-                max_lines=CAPTIONS_MAX_LINES,
-                known_speaker_names=known,
-            )
-
-            # Normalize speaker tags to 'A'/'B' when possible (no visible names in text).
-            for c in captions:
-                sp = str(c.get("speaker", "")).strip()
-                if not sp:
-                    continue
-                if sp.upper() in ("A", "B"):
-                    c["speaker"] = sp.upper()
-                elif voice_a_name and sp.lower() == voice_a_name.lower():
-                    c["speaker"] = "A"
-                elif voice_b_name and sp.lower() == voice_b_name.lower():
-                    c["speaker"] = "B"
-
-            srt_path = audio_path.with_suffix(".captions.srt")
-            json_path = audio_path.with_suffix(".captions.json")
-            write_captions_srt(captions, srt_path)
-            json_path.write_text(
-                json.dumps(
-                    {
-                        "version": 1,
-                        "topic_id": topic_id,
-                        "generated_at": datetime.utcnow().isoformat() + "Z",
-                        "captions": captions,
-                    },
-                    ensure_ascii=False,
-                    indent=2,
-                ),
-                encoding="utf-8",
-            )
-            print(f"  ✓ Captions generated: {srt_path.name}")
-        except Exception as e:
-            print(f"  ⚠ Caption generation failed (non-fatal): {e}")
+    # Captions for chunked mode (best-effort).
+    # We allocate the final audio duration across dialogue chunks using word-count weighting.
+    try:
+        if success:
+            total_dur = probe_duration_seconds(audio_path)
+            if total_dur > 0:
+                captions = build_captions_from_dialogue_estimate(
+                    dialogue_chunks=dialogue_chunks,
+                    total_duration_s=total_dur,
+                    gap_ms=500,
+                    max_words_per_line=CAPTIONS_WORDS_PER_LINE,
+                    target_lines=CAPTIONS_TARGET_LINES,
+                    max_lines=CAPTIONS_MAX_LINES,
+                )
+                if captions:
+                    srt_path = audio_path.with_suffix('.captions.srt')
+                    json_path = audio_path.with_suffix('.captions.json')
+                    write_captions_srt(captions, srt_path)
+                    with open(json_path, 'w', encoding='utf-8') as f:
+                        json.dump({'captions': captions, 'dialogue_chunks': dialogue_chunks}, f, indent=2, ensure_ascii=False)
+                    print(f"  ✓ Captions generated (chunked): {srt_path.name}")
+    except Exception as e:
+        print(f"  ⚠ Caption generation failed in chunked mode (non-fatal): {e}")
 
     # Clean up temp file
     if temp_wav.exists():
@@ -760,31 +732,14 @@ def _tts_traditional(dialogue_chunks: List[Dict[str, str]], audio_path: Path,
     # This gives tight sync between caption changes and the spoken audio.
     try:
         if utterances:
-            voice_a_name = str(config.get("voice_a_name", "")).strip()
-            voice_b_name = str(config.get("voice_b_name", "")).strip()
-            known = [n for n in [voice_a_name, voice_b_name] if n]
-
             captions = build_captions_from_utterances(
                 utterances=utterances,
                 gap_ms=gap_ms,
                 max_words_per_line=CAPTIONS_WORDS_PER_LINE,
                 target_lines=CAPTIONS_TARGET_LINES,
                 max_lines=CAPTIONS_MAX_LINES,
-                known_speaker_names=known,
             )
             if captions:
-                # Normalize speaker tags to 'A'/'B' when possible.
-                for c in captions:
-                    sp = str(c.get("speaker", "")).strip()
-                    if not sp:
-                        continue
-                    if sp.upper() in ("A", "B"):
-                        c["speaker"] = sp.upper()
-                    elif voice_a_name and sp.lower() == voice_a_name.lower():
-                        c["speaker"] = "A"
-                    elif voice_b_name and sp.lower() == voice_b_name.lower():
-                        c["speaker"] = "B"
-
                 srt_path = audio_path.with_suffix('.captions.srt')
                 json_path = audio_path.with_suffix('.captions.json')
                 write_captions_srt(captions, srt_path)
@@ -796,58 +751,6 @@ def _tts_traditional(dialogue_chunks: List[Dict[str, str]], audio_path: Path,
 
     # Convert to AAC
     success = convert_to_aac(temp_wav, audio_path)
-
-    # Generate approximate captions for chunked audio (best-effort).
-    if success and CAPTIONS_ENABLED:
-        try:
-            voice_a_name = str(config.get("voice_a_name", "")).strip()
-            voice_b_name = str(config.get("voice_b_name", "")).strip()
-            known = [n for n in [voice_a_name, voice_b_name] if n]
-
-            duration_s = probe_duration_seconds(audio_path)
-            if duration_s <= 0.01:
-                duration_s = probe_duration_seconds(temp_wav)
-
-            captions = build_captions_from_dialogue_estimate(
-                dialogue_chunks,
-                total_duration_s=duration_s,
-                max_words_per_line=CAPTIONS_WORDS_PER_LINE,
-                target_lines=CAPTIONS_TARGET_LINES,
-                max_lines=CAPTIONS_MAX_LINES,
-                known_speaker_names=known,
-            )
-
-            # Normalize speaker tags to 'A'/'B' when possible (no visible names in text).
-            for c in captions:
-                sp = str(c.get("speaker", "")).strip()
-                if not sp:
-                    continue
-                if sp.upper() in ("A", "B"):
-                    c["speaker"] = sp.upper()
-                elif voice_a_name and sp.lower() == voice_a_name.lower():
-                    c["speaker"] = "A"
-                elif voice_b_name and sp.lower() == voice_b_name.lower():
-                    c["speaker"] = "B"
-
-            srt_path = audio_path.with_suffix(".captions.srt")
-            json_path = audio_path.with_suffix(".captions.json")
-            write_captions_srt(captions, srt_path)
-            json_path.write_text(
-                json.dumps(
-                    {
-                        "version": 1,
-                        "topic_id": topic_id,
-                        "generated_at": datetime.utcnow().isoformat() + "Z",
-                        "captions": captions,
-                    },
-                    ensure_ascii=False,
-                    indent=2,
-                ),
-                encoding="utf-8",
-            )
-            print(f"  ✓ Captions generated: {srt_path.name}")
-        except Exception as e:
-            print(f"  ⚠ Caption generation failed (non-fatal): {e}")
 
     # Clean up temp file
     if temp_wav.exists():
@@ -922,192 +825,78 @@ def _render_block_text(block_words: List[str], words_per_line: int, target_lines
     return "\n".join(lines)
 
 
-
-
-_SPEAKER_PREFIX_RE = re.compile(r"^\s*(?P<name>[A-Za-z][A-Za-z0-9_ \-]{0,40})\s*:\s+(?P<rest>.+)$")
-
-
-def strip_visible_speaker_prefix(text: str, known_names: List[str]) -> str:
-    """Remove leading 'Name: ' prefix from visible text when it matches known speakers."""
-    t = (text or "").strip()
-    if not t:
-        return ""
-    m = _SPEAKER_PREFIX_RE.match(t)
-    if not m:
-        return t
-    name = (m.group("name") or "").strip()
-    rest = (m.group("rest") or "").strip()
-    if not rest:
-        return t
-    if not known_names:
-        return t
-    for kn in known_names:
-        if kn and name.lower() == kn.lower():
-            return rest
-    return t
-
 def build_captions_from_utterances(
     utterances: List[Dict[str, Any]],
-    gap_ms: int = 100,
-    max_words_per_line: int = 6,
-    target_lines: int = 2,
-    max_lines: int = 2,
-    known_speaker_names: List[str] | None = None,
+    gap_ms: int = 500,
+    max_words_per_line: int = CAPTIONS_WORDS_PER_LINE,
+    target_lines: int = CAPTIONS_TARGET_LINES,
+    max_lines: int = CAPTIONS_MAX_LINES,
 ) -> List[Dict[str, Any]]:
-    """Build captions from per-utterance timing.
+    """Build tight-sync captions based on per-utterance audio durations.
 
-    Each returned caption segment includes:
-      - start (sec)
-      - end (sec)
-      - text (no speaker names)
-      - speaker (original utterance speaker token, if present)
+    Output caption segments include a `speaker` field (A/B) when available so
+    downstream burn-in can apply gender-based glow without showing names.
     """
+    gap_s = max(0.0, gap_ms / 1000.0)
+    t = 0.0
     captions: List[Dict[str, Any]] = []
-    known = known_speaker_names or []
+    idx = 1
 
     for utt in utterances:
-        text = strip_visible_speaker_prefix(str(utt.get("text", "")), known)
-        words = text.split()
-        if not words:
+        text = (utt.get('text') or '').strip()
+        speaker = (utt.get('speaker') or '').strip()  # expected 'A' or 'B'
+        audio_path = Path(utt.get('audio_path', ''))
+
+        # Advance even if empty (keeps timing stable)
+        dur = probe_duration_seconds(audio_path) if audio_path.exists() else 0.0
+        if dur <= 0:
+            # Conservative fallback: ~2.4 w/s
+            words_tmp = text.split()
+            dur = max(1.2, len(words_tmp) / 2.4) if text else 0.0
+
+        if not text:
+            t += dur + gap_s
             continue
 
-        start = float(utt.get("start", 0.0))
-        end = float(utt.get("end", start))
+        words = text.split()
+        total_words = max(1, len(words))
 
-        if end <= start:
-            # Fallback: estimate minimal duration if timing is invalid
-            end = start + max(0.8, 0.18 * max(1, len(words)))
-
-        # Split into readable blocks
-        blocks = _split_words_into_blocks(
-            words,
-            words_per_line=max_words_per_line,
-            target_lines=target_lines,
-            max_lines=max_lines,
-        )
-
-        # Distribute timing across blocks proportionally by word count
-        total_words = sum(len(b) for b in blocks) or len(words)
-        dur_total = max(0.2, end - start)
-        t0 = start
-
-        for i, block_words in enumerate(blocks):
-            if not block_words:
+        blocks = _split_words_into_blocks(words, max_words_per_line, target_lines, max_lines)
+        for block_words in blocks:
+            block_text = _render_block_text(block_words, max_words_per_line, target_lines, max_lines)
+            if not block_text:
                 continue
-            frac = len(block_words) / total_words
-            seg_dur = dur_total * frac
 
-            seg_start = t0
-            seg_end = seg_start + seg_dur
+            block_word_count = max(1, len(block_words))
+            block_dur = dur * (block_word_count / total_words)
 
-            if i == len(blocks) - 1:
-                seg_end = end
+            start = t
+            end = t + block_dur
+            if end - start < 0.20:
+                end = start + 0.20
 
-            block_text = _render_block_text(
-                block_words,
-                words_per_line=max_words_per_line,
-                target_lines=target_lines,
-                max_lines=max_lines,
-            )
+            cap = {
+                'index': idx,
+                'start': start,
+                'end': end,
+                'text': block_text,
+            }
+            if speaker:
+                cap['speaker'] = speaker
+            captions.append(cap)
 
-            seg: Dict[str, Any] = {"start": seg_start, "end": seg_end, "text": block_text}
-            sp = utt.get("speaker")
-            if sp is not None:
-                seg["speaker"] = sp
-            captions.append(seg)
+            idx += 1
+            t = end
 
-            t0 = seg_end + (gap_ms / 1000.0)
+        # Advance past remaining part of utterance and the gap.
+        if captions:
+            t = max(t, captions[-1]['start'] + dur)
+        else:
+            t += dur
+        t += gap_s
 
     return captions
 
-
-def build_captions_from_dialogue_estimate(
-    dialogue: List[Dict[str, Any]],
-    total_duration_s: float,
-    max_words_per_line: int = 6,
-    target_lines: int = 2,
-    max_lines: int = 2,
-    known_speaker_names: List[str] | None = None,
-) -> List[Dict[str, Any]]:
-    """Build captions with approximate timing from a dialogue list.
-
-    Used for chunked TTS, where we do not have reliable per-utterance timestamps.
-    We allocate time by word-count share across utterances, then apply the same
-    block-splitting logic as the per-utterance caption builder.
-    """
-    caps: List[Dict[str, Any]] = []
-    if not dialogue:
-        return caps
-
-    known = known_speaker_names or []
-
-    utterances: List[Dict[str, Any]] = []
-    for it in dialogue:
-        if not isinstance(it, dict):
-            continue
-        sp = it.get("speaker")
-        raw_text = str(it.get("text", "")).strip()
-        text = strip_visible_speaker_prefix(raw_text, known)
-        if not text:
-            continue
-        utterances.append({"speaker": sp, "text": text})
-
-    if not utterances:
-        return caps
-
-    total_words = 0
-    wcounts: List[int] = []
-    for u in utterances:
-        wc = len(str(u["text"]).split())
-        wc = max(1, wc)
-        wcounts.append(wc)
-        total_words += wc
-
-    total_duration_s = max(1.0, float(total_duration_s))
-    t = 0.0
-
-    for u, wc in zip(utterances, wcounts):
-        share = wc / total_words if total_words else 1.0 / len(utterances)
-        utt_dur = max(0.8, total_duration_s * share)
-
-        words = str(u["text"]).split()
-        blocks = _split_words_into_blocks(
-            words,
-            words_per_line=max_words_per_line,
-            target_lines=target_lines,
-            max_lines=max_lines,
-        )
-        denom = sum(len(b) for b in blocks) or len(words)
-        inner_t0 = t
-
-        for i, b in enumerate(blocks):
-            if not b:
-                continue
-            frac = len(b) / denom
-            seg_dur = utt_dur * frac
-            seg_start = inner_t0
-            seg_end = seg_start + seg_dur
-            if i == len(blocks) - 1:
-                seg_end = t + utt_dur
-
-            block_text = _render_block_text(
-                b,
-                words_per_line=max_words_per_line,
-                target_lines=target_lines,
-                max_lines=max_lines,
-            )
-            seg: Dict[str, Any] = {"start": seg_start, "end": seg_end, "text": block_text}
-            if u.get("speaker") is not None:
-                seg["speaker"] = u.get("speaker")
-            caps.append(seg)
-            inner_t0 = seg_end
-
-        t = t + utt_dur
-
-    if caps:
-        caps[-1]["end"] = max(caps[-1]["end"], total_duration_s)
-
-    return caps
 
 def write_captions_srt(captions: List[Dict[str, Any]], out_path: Path) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1122,6 +911,91 @@ def write_captions_srt(captions: List[Dict[str, Any]], out_path: Path) -> None:
             f.write(f"{start} --> {end}\n")
             f.write(text + "\n\n")
 
+
+def build_captions_from_dialogue_estimate(
+    dialogue_chunks: List[Dict[str, str]],
+    total_duration_s: float,
+    gap_ms: int = 500,
+    max_words_per_line: int = CAPTIONS_WORDS_PER_LINE,
+    target_lines: int = CAPTIONS_TARGET_LINES,
+    max_lines: int = CAPTIONS_MAX_LINES,
+) -> List[Dict[str, Any]]:
+    """Build approximate captions for chunked TTS (single long run).
+
+    We proportionally allocate the *known* final audio duration across dialogue chunks
+    based on word counts, then format each chunk into 1..max_lines blocks.
+
+    Captions include `speaker` (A/B) when available.
+    """
+    gap_s = max(0.0, gap_ms / 1000.0)
+
+    # Filter to non-empty dialogue chunks
+    filtered = []
+    for ch in dialogue_chunks or []:
+        sp = (ch.get('speaker') or '').strip()
+        tx = (ch.get('text') or '').strip()
+        if tx:
+            filtered.append({'speaker': sp, 'text': tx})
+
+    if not filtered or total_duration_s <= 0.0:
+        return []
+
+    # Speech time excludes inter-utterance gaps
+    speech_time = max(0.5, total_duration_s - gap_s * max(0, len(filtered) - 1))
+
+    # Weight by word count (fallback to char count)
+    weights = []
+    for ch in filtered:
+        w = len(ch['text'].split())
+        if w <= 0:
+            w = max(1, len(ch['text']) // 4)
+        weights.append(w)
+    total_w = max(1, sum(weights))
+
+    captions: List[Dict[str, Any]] = []
+    t = 0.0
+    idx = 1
+    for ch, w in zip(filtered, weights):
+        dur = speech_time * (w / total_w)
+
+        # Ensure minimal duration so captions remain readable
+        dur = max(1.0, dur)
+
+        blocks = _split_words_into_blocks(
+            ch['text'].split(),
+            max_words_per_line=max_words_per_line,
+            target_lines=target_lines,
+            max_lines=max_lines,
+        )
+        if not blocks:
+            blocks = [ch['text'].split()]
+
+        # Allocate per block proportionally
+        total_words = max(1, len(ch['text'].split()))
+        for block_words in blocks:
+            block_text = _render_block_text(block_words, max_words_per_line, target_lines, max_lines)
+            if not block_text:
+                continue
+            block_w = max(1, len(block_words))
+            block_dur = dur * (block_w / total_words)
+            start = t
+            end = t + block_dur
+            if end - start < 0.20:
+                end = start + 0.20
+
+            cap = {'index': idx, 'start': start, 'end': end, 'text': block_text}
+            if ch.get('speaker'):
+                cap['speaker'] = ch['speaker']
+            captions.append(cap)
+            idx += 1
+            t = end
+
+        t += gap_s
+
+    # Clamp last end to total duration (avoid overshoot from rounding)
+    if captions:
+        captions[-1]['end'] = min(float(captions[-1]['end']), float(total_duration_s))
+    return captions
 
 def generate_for_topic(topic_id: str, date_str: str = None) -> bool:
     """

@@ -896,28 +896,34 @@ def get_audio_duration(audio_path: Path) -> float:
 
 
 def _find_images_metadata(start_dir: Path) -> Optional[Path]:
-    """Locate images_metadata.json near the images used by the renderer.
+    """Locate images_metadata.json near the rendered assets (best-effort).
 
-    Historically, the renderer may operate on a *preprocessed* images directory that is a sibling of
-    the original images folder (which contains images_metadata.json). We therefore search:
-      - start_dir/images_metadata.json
-      - start_dir/images/images_metadata.json
-      - parents of start_dir (bounded), plus their ./images/images_metadata.json
+    We check:
+      1) start_dir itself
+      2) common subdirs (images/, assets/, _assets/) under start_dir
+      3) parent directories (bounded)
+    This makes title burn-in resilient when images live in nested folders.
     """
+    # Direct + common children
+    candidates: List[Path] = []
+    candidates.append(start_dir / IMAGES_METADATA_FILENAME)
+    for child in ("images", "Images", "assets", "Assets", "_assets"):
+        candidates.append(start_dir / child / IMAGES_METADATA_FILENAME)
+
+    for p in candidates:
+        if p.exists():
+            return p
+
+    # Walk parents (bounded)
     d = start_dir
     for _ in range(6):
-        candidates = [
-            d / IMAGES_METADATA_FILENAME,
-            d / "images" / IMAGES_METADATA_FILENAME,
-            d / "Images" / IMAGES_METADATA_FILENAME,
-        ]
-        for p in candidates:
-            try:
-                if p.exists():
-                    return p
-            except OSError:
-                continue
-
+        p = d / IMAGES_METADATA_FILENAME
+        if p.exists():
+            return p
+        for child in ("images", "Images", "assets", "Assets", "_assets"):
+            p2 = d / child / IMAGES_METADATA_FILENAME
+            if p2.exists():
+                return p2
         if d.parent == d:
             break
         d = d.parent
