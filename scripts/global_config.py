@@ -12,7 +12,7 @@ from pathlib import Path
 # ============================================================================
 
 # Testing Configuration
-TESTING_MODE = False  # When True, use saved mock responses instead of calling OpenAI API
+TESTING_MODE = True  # When True, use saved mock responses instead of calling OpenAI API
 
 # Resolve repo-rooted paths robustly (GitHub Actions may run scripts from ./scripts, so relative paths break)
 REPO_ROOT = Path(os.environ.get('GITHUB_WORKSPACE', Path(__file__).resolve().parents[1])).resolve()
@@ -119,7 +119,7 @@ CONTENT_TYPES = {
 # ============================================================================
 
 # TTS Provider Settings
-TTS_CACHE_ENABLED = False  # Enable caching of TTS outputs
+TTS_CACHE_ENABLED = True  # Enable caching of TTS outputs
 TTS_SAMPLE_RATE = 44100  # Sample rate for audio output (44.1 kHz)
 TTS_AUDIO_CODEC = 'aac'  # Audio codec: AAC
 TTS_AUDIO_BITRATE = '128k'  # Bitrate: 128 kbps stereo
@@ -128,7 +128,7 @@ TTS_AUDIO_BITRATE = '128k'  # Bitrate: 128 kbps stereo
 PIPER_VOICE_DIR = "~/.local/share/piper-tts/voices/"  # Voice model storage location
 
 # TTS Chunking Configuration (for long-form audio generation)
-TTS_USE_CHUNKING = False  # Default: Use single run per content type (False), or use chunking logic (True)
+TTS_USE_CHUNKING = True  # Default: Use single run per content type (False), or use chunking logic (True)
 TTS_MAX_CHARS_PER_CHUNK = 5000  # Maximum characters per chunk (Piper limit ~5000)
 TTS_MAX_SENTENCES_PER_CHUNK = 50  # Maximum sentences per chunk
 TTS_GAP_MS = 500  # Gap between chunks in milliseconds (0.5 seconds)
@@ -179,7 +179,7 @@ GOOGLE_VOICE_MAP = {
 # Images are no longer pre-collected. Video generation uses fallback visuals.
 # Image Display Settings (kept for video rendering fallback)
 IMAGE_TRANSITION_MIN_SEC = 3  # Minimum seconds to display each image
-IMAGE_TRANSITION_MAX_SEC = 8  # Maximum seconds to display each image
+IMAGE_TRANSITION_MAX_SEC = 5  # Maximum seconds to display each image
 # Note: Images cycle through randomly with variable timing (3-8 seconds per image)
 
 # Google Custom Search API Settings
