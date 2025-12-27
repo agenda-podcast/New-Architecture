@@ -9,15 +9,91 @@
       "duration": 0,
       "dialogue": [
         {
+          "speaker": "A",
+          "text": "Paste the full article text(s) here."
+        },
+        {
           "speaker": "B",
-          "text": "From data this week, UK inflation has cooled but remains above the Bank of England’s target, with services and housing inflation still stubborn. The policy path will influence households for months to come."
+          "text": "You can include multiple articles."
+        },
+        {
+          "speaker": "A",
+          "text": "The mock generator will convert this into HOST_A/HOST_B dialogue."
+        },
+        {
+          "speaker": "B",
+          "text": "[MOCK] Continuation segment."
+        },
+        {
+          "speaker": "A",
+          "text": "[MOCK] Continuation segment."
+        },
+        {
+          "speaker": "B",
+          "text": "[MOCK] Continuation segment."
+        },
+        {
+          "speaker": "A",
+          "text": "[MOCK] Continuation segment."
+        },
+        {
+          "speaker": "B",
+          "text": "[MOCK] Continuation segment."
+        },
+        {
+          "speaker": "A",
+          "text": "[MOCK] Continuation segment."
+        },
+        {
+          "speaker": "B",
+          "text": "[MOCK] Continuation segment."
+        },
+        {
+          "speaker": "A",
+          "text": "[MOCK] Continuation segment."
+        },
+        {
+          "speaker": "B",
+          "text": "[MOCK] Continuation segment."
+        },
+        {
+          "speaker": "A",
+          "text": "[MOCK] Continuation segment."
+        },
+        {
+          "speaker": "B",
+          "text": "[MOCK] Continuation segment."
+        },
+        {
+          "speaker": "A",
+          "text": "[MOCK] Continuation segment."
+        },
+        {
+          "speaker": "B",
+          "text": "[MOCK] Continuation segment."
+        },
+        {
+          "speaker": "A",
+          "text": "[MOCK] Continuation segment."
+        },
+        {
+          "speaker": "B",
+          "text": "[MOCK] Continuation segment."
+        },
+        {
+          "speaker": "A",
+          "text": "[MOCK] Continuation segment."
+        },
+        {
+          "speaker": "B",
+          "text": "[MOCK] Continuation segment."
         }
       ]
     }
   ],
   "metadata": {
-    "generated_at": "2025-12-27T06:44:56.218385",
-    "num_sources": 5,
+    "generated_at": "2025-12-27T07:10:43.847348",
+    "num_sources": 2,
     "content_type": "reels",
     "content_code": "R4"
   }

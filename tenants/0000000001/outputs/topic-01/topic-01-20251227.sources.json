@@ -1,37 +1,12 @@
 [
   {
+    "title": "<Title> (YYYY-MM-DD). <URL>",
     "n": 1,
-    "publisher": "The Guardian",
-    "title": "US voters linking climate crisis to rising bills despite Trump's 'green scam' claims",
-    "date": "2025-12-26",
-    "url": "https://www.theguardian.com/us-news/2025/dec/26/us-voters-link-climate-crisis-affordability"
+    "publisher": "<Publisher>"
   },
   {
+    "title": "<Title> (YYYY-MM-DD). <URL>",
     "n": 2,
-    "publisher": "The Guardian",
-    "title": "Shoppers shun UK high streets despite lure of Boxing Day sales",
-    "date": "2025-12-26",
-    "url": "https://www.theguardian.com/business/2025/dec/26/shoppers-shun-uk-high-streets-despite-lure-of-boxing-day-sales"
-  },
-  {
-    "n": 3,
-    "publisher": "The Guardian",
-    "title": "Renewed zeal for Boxing Day sales expected to ring up £3.8bn for retailers",
-    "date": "2025-12-25",
-    "url": "https://www.theguardian.com/business/2025/dec/25/renewed-zeal-for-boxing-day-sales-retailers-consumers"
-  },
-  {
-    "n": 4,
-    "publisher": "The Guardian",
-    "title": "UK economy entering 2026 amid sharp private sector downturn, says CBI",
-    "date": "2025-12-22",
-    "url": "https://www.theguardian.com/business/2025/dec/22/uk-economy-entering-2026-amid-sharp-private-sector-downturn-says-cbi"
-  },
-  {
-    "n": 5,
-    "publisher": "Reuters",
-    "title": "Sterling keeps rising after Bank of England raised bar on rate cuts",
-    "date": "2025-12-22",
-    "url": "https://www.reuters.com/world/uk/sterling-keeps-rising-after-bank-england-raised-bar-rate-cuts-2025-12-22/"
+    "publisher": "<Publisher>"
   }
 ]
