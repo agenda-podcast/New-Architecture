@@ -103,19 +103,6 @@ def get_enabled_content_types(config: Dict[str, Any]) -> List[Dict[str, Any]]:
     return enabled
 
 
-# Deprecated: Single-request prompt generation removed in favor of two-pass architecture
-# The two-pass approach is implemented in responses_api_generator.py:
-# - Pass A (gpt-5.2-pro + web_search): L* scripts (raw text)
-# - Pass B (gpt-4.1-nano): M/S/R scripts summarized from SOURCE_TEXT (usually the Pass A output)
-# This prevents truncation and ensures consistency across all content pieces.
-
-
-# Deprecated: Response parsing functions removed in favor of two-pass architecture
-# The two-pass architecture in responses_api_generator.py handles response parsing
-# internally within each pass (Pass A and Pass B).
-# These legacy parsing functions are no longer needed.
-
-
 def generate_multi_format_scripts(config: Dict[str, Any], sources: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Generate multiple format scripts using TWO-PASS architecture with Responses API.
@@ -176,21 +163,20 @@ def generate_multi_format_scripts(config: Dict[str, Any], sources: List[Dict[str
         print(f"{'='*60}")
         print(f"Topic: {config.get('title', 'Unknown')}")
         print(f"Generating {len(content_specs)} scripts using two passes: {[s['code'] for s in content_specs]}")
-        print(f"Content types enabled: {', '.join([k for k, v in config.get('content_types', {}).items() if v])}")
-        print(f"Pass A (gpt-5.2-pro + web_search): long scripts (L*)")
-        print(f"Pass B (gpt-4.1-nano): M/S/R summaries from Pass A SOURCE_TEXT")
+        enabled_types = sorted({s['type'] for s in content_specs})
+        print(f"Content types enabled: {', '.join(enabled_types)}")
+        print(f"Pass A (gpt-5.2-pro + web_search): canonical pack + optional long SOURCE_TEXT")
+        print(f"Pass B (gpt-5-nano by default): structured M/S/R scripts from CANONICAL_PACK")
         if sources:
             print(f"Note: {len(sources)} pre-collected sources ignored (two-pass uses web_search)")
         print(f"{'='*60}\n")
         
-        # Use two-pass generation
-        # Note: sources parameter is ignored - two-pass uses web_search tool instead
-        content_list = generate_all_content_two_pass(config)
-        
-        # Convert to expected format
-        parsed_data = {
-            "content": content_list
-        }
+        # Two-pass generation (function now accepts config-only call style)
+        two_pass_data = generate_all_content_two_pass(config, sources=sources)
+
+        # Normalized output
+        content_list = two_pass_data.get('content', []) if isinstance(two_pass_data, dict) else (two_pass_data or [])
+        parsed_data = two_pass_data if isinstance(two_pass_data, dict) else {"content": content_list}
         
         # Validate that we got all expected scripts
         received_count = len(content_list)

@@ -14,110 +14,99 @@ import re
 from typing import Dict
 
 # Source of truth should be OpenAI model docs.
-# Keep a conservative buffer for unknowns.
-MODEL_LIMITS: Dict[str, Dict[str, int]] = {
+# Keep these in sync with platform.openai.com/docs/models
+MODEL_MAX_OUTPUT_TOKENS: Dict[str, int] = {
     # GPT-5 family
-    "gpt-5": {"context": 200_000, "max_output": 16_384},
-    "gpt-5.2": {"context": 200_000, "max_output": 16_384},
-    "gpt-5.2-pro": {"context": 200_000, "max_output": 16_384},
-    "gpt-5-pro": {"context": 200_000, "max_output": 16_384},
-    "gpt-5-mini": {"context": 200_000, "max_output": 16_384},
-    "gpt-5-nano": {"context": 200_000, "max_output": 16_384},
-    # GPT-4.x / 4o family (fallbacks)
-    "gpt-4o": {"context": 128_000, "max_output": 16_384},
-    "gpt-4o-mini": {"context": 128_000, "max_output": 16_384},
-    "gpt-4.1": {"context": 128_000, "max_output": 16_384},
-    "gpt-4.1-mini": {"context": 128_000, "max_output": 16_384},
-    "gpt-4.1-nano": {"context": 128_000, "max_output": 16_384},
-    # Safe default
-    "__default__": {"context": 32_000, "max_output": 4_096},
+    "gpt-5": 128_000,
+    "gpt-5-mini": 128_000,
+    "gpt-5-nano": 128_000,
+    "gpt-5.2": 128_000,
+    "gpt-5.2-pro": 128_000,
+    "gpt-5-pro": 272_000,  # larger max output
+    # Chat snapshots (smaller max outputs)
+    "gpt-5-chat-latest": 16_384,
+    "gpt-5.2-chat-latest": 16_384,  # if you use chat-latest snapshots
+    # GPT-4.1 family (non-reasoning)
+    "gpt-4.1": 32_768,
+    "gpt-4.1-mini": 32_768,
+    "gpt-4.1-nano": 32_768,
 }
 
-
-def _normalize_model_name(model: str) -> str:
-    m = (model or "").strip()
-    if not m:
-        return "__default__"
-
-    # strip vendor prefixes if present
-    m = re.sub(r"^(openai/|oai/)", "", m)
-
-    # remove snapshot suffixes (e.g. -2025-xx-xx) or variants
-    # keep base model family
-    for pat in (
-        r"-\d{4}-\d{2}-\d{2}$",
-        r"-\d{8}$",
-    ):
-        m = re.sub(pat, "", m)
-
-    return m
-
+# Context windows (input+output total). Conservative defaults where unknown.
+MODEL_CONTEXT_TOKENS: Dict[str, int] = {
+    "gpt-5": 400_000,
+    "gpt-5-mini": 400_000,
+    "gpt-5-nano": 400_000,
+    "gpt-5.2": 400_000,
+    "gpt-5.2-pro": 400_000,
+    "gpt-5-pro": 400_000,
+    "gpt-5-chat-latest": 128_000,
+    "gpt-5.2-chat-latest": 128_000,
+    "gpt-4.1": 1_047_576,
+    "gpt-4.1-mini": 1_047_576,
+    "gpt-4.1-nano": 1_047_576,
+}
 
 def get_max_output_tokens(model: str) -> int:
-    m = _normalize_model_name(model)
-    return MODEL_LIMITS.get(m, MODEL_LIMITS["__default__"])["max_output"]
-
+    m = (model or "").strip()
+    return int(MODEL_MAX_OUTPUT_TOKENS.get(m, 16_384))
 
 def get_context_window_tokens(model: str) -> int:
-    m = _normalize_model_name(model)
-    return MODEL_LIMITS.get(m, MODEL_LIMITS["__default__"])["context"]
+    m = (model or "").strip()
+    return int(MODEL_CONTEXT_TOKENS.get(m, 128_000))
 
+def default_max_output_tokens(model: str, requested: int | None = None) -> int:
+    """Return an appropriate max output token budget.
 
-def default_max_output_tokens(model: str) -> int:
+    This repository has historically used two calling conventions:
+
+    1) ``default_max_output_tokens(model)`` meaning "use the model maximum".
+    2) ``default_max_output_tokens(model, requested)`` meaning "use requested
+       if provided, otherwise use the model maximum, and always clamp to the
+       model maximum".
+
+    The second form is used by ``openai_utils.py`` and some generators. We keep
+    it to avoid runtime TypeErrors.
     """
-    Sensible default when caller didn't specify max output.
-    Keep below the hard max to reduce truncation risk for multi-step prompts.
-    """
-    mx = get_max_output_tokens(model)
-    return min(mx, 4_096) if mx > 4_096 else mx
-
+    if requested is None:
+        return get_max_output_tokens(model)
+    return clamp_max_output_tokens(model, requested)
 
 def clamp_max_output_tokens(model: str, requested: int) -> int:
-    """
-    Clamp requested max output tokens to the model's hard maximum.
-    """
     mx = get_max_output_tokens(model)
+    if requested is None:
+        return mx
     try:
         r = int(requested)
     except Exception:
-        r = default_max_output_tokens(model)
-
+        r = mx
     if r <= 0:
-        r = default_max_output_tokens(model)
-
+        return mx
     return min(r, mx)
 
 
+# Backwards-compatible alias -------------------------------------------------
+# Earlier revisions of this repository exposed `clamp_output_tokens()`.
+# Some modules (e.g., openai_utils.py, responses_api_generator.py) still
+# import that symbol. Keep both names to avoid runtime import errors.
 def clamp_output_tokens(model: str, requested: int) -> int:
-    """Backward-compatible alias for clamp_max_output_tokens.
-
-    Some modules import clamp_output_tokens; the canonical helper in this
-    codebase is clamp_max_output_tokens. Keep both to avoid breaking older
-    imports.
-    """
+    """Alias for :func:`clamp_max_output_tokens` (kept for compatibility)."""
     return clamp_max_output_tokens(model, requested)
-
 
 def estimate_tokens(text: str) -> int:
     # very rough: ~4 chars/token average in English
     return max(1, int(len(text or "") / 4))
 
-
-def truncate_text_to_fit_context(
-    model: str,
-    prompt: str,
-    reserved_output_tokens: int,
-    safety_margin_tokens: int = 256,
-) -> str:
+def truncate_text_to_fit_context(model: str, prompt: str, max_output_tokens: int) -> str:
     """
-    Truncate input text so that:
-        input_tokens + reserved_output_tokens + safety_margin_tokens <= context_window
-
-    This is an approximation (char-based token estimator). It's meant to prevent
-    obvious overflows, not to be perfect.
+    Ensures `prompt` fits within the model context window leaving room for output.
+    We approximate tokens; this is protective, not exact.
     """
     ctx = get_context_window_tokens(model)
-    in_budget = max(1, ctx - max(0, int(reserved_output_tokens)) - max(0, int(safety_margin_tokens)))
+    out_budget = clamp_max_output_tokens(model, max_output_tokens)
+    # keep a small safety buffer for system/instructions/tool overhead
+    safety = 2_000 if ctx >= 128_000 else 1_000
+    in_budget = max(1_000, ctx - out_budget - safety)
 
     txt = prompt or ""
     if estimate_tokens(txt) <= in_budget:
