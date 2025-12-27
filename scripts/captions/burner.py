@@ -25,7 +25,7 @@ import subprocess
 import tempfile
 import json
 
-from config import load_topic_config
+from config import load_topic_config, get_repo_root
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +101,38 @@ def _escape_filter_path(p: str) -> str:
     # For ffmpeg filters, escape backslashes and single quotes.
     return p.replace("\\", "\\\\").replace("'", r"\'")
 
+def _discover_frame_png() -> Optional[Path]:
+    """Locate a static PNG frame overlay in the repo's assets folder.
+
+    Priority:
+      1) Env: VIDEO_FRAME_PNG / CAPTIONS_FRAME_PNG / FRAME_PNG
+      2) Repo: <repo_root>/assets/frame.png
+      3) Repo: first match in <repo_root>/assets/frame*.png
+    """
+    env_keys = ("VIDEO_FRAME_PNG", "CAPTIONS_FRAME_PNG", "FRAME_PNG")
+    for k in env_keys:
+        v = os.environ.get(k, "").strip()
+        if not v:
+            continue
+        p = Path(v)
+        if p.exists() and p.is_file() and p.suffix.lower() == ".png":
+            return p
+
+    try:
+        assets_dir = get_repo_root() / "assets"
+    except Exception:
+        assets_dir = None
+
+    if not assets_dir or not assets_dir.exists():
+        return None
+
+    direct = assets_dir / "frame.png"
+    if direct.exists() and direct.is_file():
+        return direct
+
+    matches = sorted([p for p in assets_dir.glob("frame*.png") if p.is_file()])
+    return matches[0] if matches else None
+
 
 def _ffmpeg_has_filter(name: str) -> bool:
     try:
@@ -170,6 +202,39 @@ def _load_host_gender_map(topic_id: Optional[str]) -> dict:
     if b_name:
         out[b_name.lower()] = b_gender
     return out
+
+def _load_ab_gender_map(topic_id: Optional[str]) -> dict:
+    """Return mapping {'a': gender, 'b': gender} from topic config."""
+    if not topic_id:
+        return {}
+    try:
+        cfg = load_topic_config(topic_id)
+    except Exception:
+        return {}
+    return {
+        "a": _normalize_gender(cfg.get("voice_a_gender")),
+        "b": _normalize_gender(cfg.get("voice_b_gender")),
+    }
+
+
+def _load_host_name_to_speaker_tag_map(topic_id: Optional[str]) -> dict:
+    """Return case-insensitive mapping of configured host display names -> speaker tag ('A'/'B')."""
+    if not topic_id:
+        return {}
+    try:
+        cfg = load_topic_config(topic_id)
+    except Exception:
+        return {}
+    a_name = str(cfg.get("voice_a_name", "")).strip()
+    b_name = str(cfg.get("voice_b_name", "")).strip()
+    out: dict = {}
+    if a_name:
+        out[a_name.lower()] = "A"
+    if b_name:
+        out[b_name.lower()] = "B"
+    return out
+
+
 
 
 def _pick_glow_color_for_gender(gender: str) -> str:
@@ -359,6 +424,37 @@ class CaptionBurner:
 
         return None, checked
 
+
+    def discover_captions_json(self, video_path: Path, audio_path: Optional[Path]) -> Tuple[Optional[Path], List[Path]]:
+        """Returns: (captions_json_or_none, checked_paths)."""
+        checked: List[Path] = []
+
+        def candidates(base: Path) -> List[Path]:
+            return [
+                base.with_suffix(".captions.json"),
+                Path(str(base) + ".captions.json"),
+            ]
+
+        if audio_path is not None:
+            for c in candidates(Path(str(audio_path))):
+                checked.append(c)
+                try:
+                    if c.exists() and c.stat().st_size > 0:
+                        return c, checked
+                except OSError:
+                    continue
+
+        for c in candidates(video_path):
+            checked.append(c)
+            try:
+                if c.exists() and c.stat().st_size > 0:
+                    return c, checked
+            except OSError:
+                continue
+
+        return None, checked
+
+
     def _load_image_title_segments(self, video_path: Path) -> List[dict]:
         """Load image title timeline sidecar produced by video_render.py.
 
@@ -411,6 +507,7 @@ class CaptionBurner:
         caption_segments: List[dict],
         title_segments: List[dict],
         host_gender_map: dict,
+        ab_gender_map: dict,
     ) -> Path:
         """Build a temporary ASS subtitle file with TikTok-like glow.
 
@@ -425,7 +522,7 @@ class CaptionBurner:
         margin_lr = max(24, int(width * self.config.left_right_margin_fraction))
 
         # Glow colors
-        title_glow = os.environ.get("CAPTIONS_TITLE_GLOW_COLOR", "#C0C0C0").strip()  # silver
+        title_glow = os.environ.get("CAPTIONS_TITLE_GLOW_COLOR", "#00D1FF").strip()  # silver
         glow_alpha = int(float(os.environ.get("CAPTIONS_GLOW_ALPHA_ASS", "0.55")) * 255)
         glow_alpha = max(0, min(255, glow_alpha))
 
@@ -483,14 +580,24 @@ class CaptionBurner:
         lines.append("[Events]")
         lines.append("Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text")
 
-        def cap_style_for_text(raw_text: str) -> str:
-            speaker, _ = self._split_speaker(raw_text, host_gender_map)
-            if not speaker:
-                return "CapGlowNeutral"
-            g = host_gender_map.get(speaker.lower(), "unknown")
-            if g == "male":
+        def cap_style_for_segment(seg: dict) -> str:
+            # 1) Prefer explicit speaker tags ('A'/'B') from captions.json
+            sp = str(seg.get("speaker", "")).strip().lower()
+            gender = "unknown"
+            if sp in {"a", "b"}:
+                gender = ab_gender_map.get(sp, "unknown")
+            else:
+                # 2) Try speaker name (from captions.json or text prefix)
+                speaker_name = seg.get("speaker_name")
+                raw_for_infer = str(seg.get("_raw", seg.get("text", "")))
+                if not speaker_name:
+                    speaker_name, _rest = self._split_speaker(raw_for_infer, host_gender_map)
+                if speaker_name:
+                    gender = host_gender_map.get(str(speaker_name).lower(), "unknown")
+
+            if gender == "male":
                 return "CapGlowMale"
-            if g == "female":
+            if gender == "female":
                 return "CapGlowFemale"
             return "CapGlowNeutral"
 
@@ -509,7 +616,7 @@ class CaptionBurner:
             end = _ass_time(seg["end"])
             raw = str(seg["text"]) 
             text = _ass_escape(raw)
-            glow_style = cap_style_for_text(raw)
+            glow_style = cap_style_for_segment(seg)
             lines.append(f"Dialogue: 0,{start},{end},{glow_style},,0,0,0,,{text}")
             lines.append(f"Dialogue: 1,{start},{end},CapMain,,0,0,0,,{text}")
 
@@ -606,15 +713,19 @@ class CaptionBurner:
         if output_path is None:
             output_path = video_path
 
-        captions_srt, checked = self.discover_captions_srt(video_path=video_path, audio_path=audio_path)
+        captions_srt, checked_srt = self.discover_captions_srt(video_path=video_path, audio_path=audio_path)
+        captions_json, checked_json = self.discover_captions_json(video_path=video_path, audio_path=audio_path)
         title_segments = self._load_image_title_segments(video_path)
 
-        if captions_srt is None and not title_segments:
+        if captions_srt is None and captions_json is None and not title_segments:
+            checked = (checked_srt or []) + (checked_json or [])
             looked_for = ", ".join(p.name for p in checked) if checked else "(none)"
             print(f"  ⓘ No captions/titles to burn; skipping post-process overlays. Looked for captions: {looked_for}")
             return True
 
-        if captions_srt is not None:
+        if captions_json is not None:
+            print(f"  Captions detected: {captions_json.name} (preset={self.config.style_preset})")
+        elif captions_srt is not None:
             print(f"  Captions detected: {captions_srt.name} (preset={self.config.style_preset})")
         if title_segments:
             print(f"  Image title overlay segments: {len(title_segments)}")
@@ -647,14 +758,63 @@ class CaptionBurner:
                 if preset == "tiktok":
                     topic_id = _infer_topic_id_from_path(video_path)
                     host_gender_map = _load_host_gender_map(topic_id)
+                    ab_gender_map = _load_ab_gender_map(topic_id)
 
+                    # Prefer speaker-tagged JSON captions when available.
                     caption_segments: List[dict] = []
-                    if captions_srt is not None:
-                        caption_segments = _parse_srt_simple(captions_srt)
+                    if captions_json is not None:
+                        try:
+                            payload = json.loads(captions_json.read_text(encoding="utf-8", errors="replace"))
+                            caps = payload.get("captions", []) if isinstance(payload, dict) else []
+                            for c in caps:
+                                if not isinstance(c, dict):
+                                    continue
+                                try:
+                                    start = float(c.get("start", 0.0))
+                                    end = float(c.get("end", 0.0))
+                                except Exception:
+                                    continue
+                                text = str(c.get("text", "")).strip()
+                                if not text or end <= start:
+                                    continue
+                                seg: dict = {"start": start, "end": end, "text": text}
+                                sp = str(c.get("speaker", "")).strip().upper()
+                                if sp in ("A", "B"):
+                                    seg["speaker"] = sp
+                                caption_segments.append(seg)
+                        except Exception:
+                            caption_segments = []
 
-                    ass_path = self._build_ass_file(width=width, height=height, caption_segments=caption_segments, title_segments=title_segments, host_gender_map=host_gender_map)
-                    vf = f"subtitles=filename='{_escape_filter_path(str(ass_path))}':charenc=UTF-8"
-                    print("  ⓘ Using subtitles filter (libass) with generated ASS (TikTok glow + titles)")
+                    # Fallback to SRT if JSON captions are absent.
+                    if not caption_segments and captions_srt is not None:
+                        caption_segments = _parse_srt_simple(captions_srt)
+                        hide_names = os.environ.get("CAPTIONS_HIDE_SPEAKER_NAMES", "true").strip().lower() in ("1", "true", "yes", "on")
+                        name_map = _load_host_name_to_speaker_tag_map(topic_id)
+                        cleaned: List[dict] = []
+                        for seg in caption_segments:
+                            raw = str(seg.get("text", "")).strip()
+                            speaker, rest = self._split_speaker(raw, host_gender_map)
+                            out_seg = dict(seg)
+                            out_seg["_raw"] = raw
+                            if hide_names and rest:
+                                out_seg["text"] = rest
+                            if speaker:
+                                out_seg["speaker_name"] = speaker
+                                tag = name_map.get(str(speaker).lower())
+                                if tag:
+                                    out_seg["speaker"] = tag
+                            cleaned.append(out_seg)
+                        caption_segments = cleaned
+
+                    ass_path = self._build_ass_file(
+                        width=width,
+                        height=height,
+                        caption_segments=caption_segments,
+                        title_segments=title_segments,
+                        host_gender_map=host_gender_map,
+                        ab_gender_map=ab_gender_map,
+                    )
+                    vf = f"subtitles=filename='{_escape_filter_path(str(ass_path))}'"
                 else:
                     # Boxed/plain via libass subtitles filter
                     if captions_srt is None:
@@ -684,22 +844,52 @@ class CaptionBurner:
                     print("  ⓘ Using drawtext (plain) for burn-in")
                     vf = self._build_drawtext_tiktok_vf(segments, width, height)  # reuse tiktok as best plain; still readable
 
-            cmd = [
-                "ffmpeg",
-                "-y",
-                "-hide_banner",
-                "-loglevel", "error",
-                "-i", str(video_path),
-                "-vf", vf,
-                "-r", str(int(fps)),
-                "-c:v", "libx264",
-                "-pix_fmt", "yuv420p",
-                "-movflags", "+faststart",
-                "-map", "0:v:0",
-                "-map", "0:a?",
-                "-c:a", "copy",
-                str(tmp_out),
-            ]
+            frame_png = _discover_frame_png()
+
+            if frame_png is not None:
+                # Overlay a static PNG frame (no motion, no transitions).
+                filter_complex = (
+                    f"[0:v]{vf}[v0];"
+                    f"[1:v]scale={width}:{height},format=rgba[frm];"
+                    f"[v0][frm]overlay=0:0:format=auto,format=yuv420p[v]"
+                )
+
+                cmd = [
+                    "ffmpeg",
+                    "-y",
+                    "-hide_banner",
+                    "-loglevel", "error",
+                    "-i", str(video_path),
+                    "-loop", "1",
+                    "-i", str(frame_png),
+                    "-filter_complex", filter_complex,
+                    "-map", "[v]",
+                    "-map", "0:a?",
+                    "-r", str(int(fps)),
+                    "-c:v", "libx264",
+                    "-pix_fmt", "yuv420p",
+                    "-movflags", "+faststart",
+                    "-c:a", "copy",
+                    "-shortest",
+                    str(tmp_out),
+                ]
+            else:
+                cmd = [
+                    "ffmpeg",
+                    "-y",
+                    "-hide_banner",
+                    "-loglevel", "error",
+                    "-i", str(video_path),
+                    "-vf", vf,
+                    "-r", str(int(fps)),
+                    "-c:v", "libx264",
+                    "-pix_fmt", "yuv420p",
+                    "-movflags", "+faststart",
+                    "-map", "0:v:0",
+                    "-map", "0:a?",
+                    "-c:a", "copy",
+                    str(tmp_out),
+                ]
             r = subprocess.run(cmd, capture_output=True, text=True, check=False)
             if r.returncode != 0:
                 print(f"  ⚠ Caption burn-in failed (non-fatal): ffmpeg exit {r.returncode}")

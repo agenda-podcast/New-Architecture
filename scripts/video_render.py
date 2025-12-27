@@ -896,12 +896,28 @@ def get_audio_duration(audio_path: Path) -> float:
 
 
 def _find_images_metadata(start_dir: Path) -> Optional[Path]:
-    """Locate images_metadata.json in this directory or parents (bounded)."""
+    """Locate images_metadata.json near the images used by the renderer.
+
+    Historically, the renderer may operate on a *preprocessed* images directory that is a sibling of
+    the original images folder (which contains images_metadata.json). We therefore search:
+      - start_dir/images_metadata.json
+      - start_dir/images/images_metadata.json
+      - parents of start_dir (bounded), plus their ./images/images_metadata.json
+    """
     d = start_dir
-    for _ in range(4):
-        p = d / IMAGES_METADATA_FILENAME
-        if p.exists():
-            return p
+    for _ in range(6):
+        candidates = [
+            d / IMAGES_METADATA_FILENAME,
+            d / "images" / IMAGES_METADATA_FILENAME,
+            d / "Images" / IMAGES_METADATA_FILENAME,
+        ]
+        for p in candidates:
+            try:
+                if p.exists():
+                    return p
+            except OSError:
+                continue
+
         if d.parent == d:
             break
         d = d.parent
