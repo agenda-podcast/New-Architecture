@@ -1,0 +1,24 @@
+{
+  "title": "Global cost of living and rising prices - R2",
+  "duration_sec": 56,
+  "segments": [
+    {
+      "chapter": 1,
+      "title": "Reels",
+      "start_time": 0,
+      "duration": 0,
+      "dialogue": [
+        {
+          "speaker": "B",
+          "text": "Boxing Day shopping trends in the UK show households adapting—fewer trips to stores, more online bargains, and a focus on essentials. What does that tell us about consumer resilience and prices ahead?"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-12-27T06:44:56.217404",
+    "num_sources": 5,
+    "content_type": "reels",
+    "content_code": "R2"
+  }
+}

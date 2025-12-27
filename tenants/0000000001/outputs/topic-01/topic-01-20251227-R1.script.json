@@ -1,0 +1,24 @@
+{
+  "title": "Global cost of living and rising prices - R1",
+  "duration_sec": 56,
+  "segments": [
+    {
+      "chapter": 1,
+      "title": "Reels",
+      "start_time": 0,
+      "duration": 0,
+      "dialogue": [
+        {
+          "speaker": "A",
+          "text": "Quick snapshot from December 27, 2025: costs are rising in both the US and UK, driven largely by housing, energy, and food. Wages aren’t keeping pace yet, and households are feeling the pinch. We’ll unpack what that means for families this winter and into 2026."
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-12-27T06:44:56.216912",
+    "num_sources": 5,
+    "content_type": "reels",
+    "content_code": "R1"
+  }
+}

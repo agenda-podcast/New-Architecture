@@ -1,0 +1,24 @@
+{
+  "title": "Global cost of living and rising prices - R7",
+  "duration_sec": 56,
+  "segments": [
+    {
+      "chapter": 1,
+      "title": "Reels",
+      "start_time": 0,
+      "duration": 0,
+      "dialogue": [
+        {
+          "speaker": "A",
+          "text": "Practical steps for listeners: track energy usage, compare rent and utility options, coupon and price-shop for essentials, and build a flexible monthly budget that accommodates price volatility."
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-12-27T06:44:56.219903",
+    "num_sources": 5,
+    "content_type": "reels",
+    "content_code": "R7"
+  }
+}

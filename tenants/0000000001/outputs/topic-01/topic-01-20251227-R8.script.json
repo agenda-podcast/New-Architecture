@@ -1,0 +1,24 @@
+{
+  "title": "Global cost of living and rising prices - R8",
+  "duration_sec": 56,
+  "segments": [
+    {
+      "chapter": 1,
+      "title": "Reels",
+      "start_time": 0,
+      "duration": 0,
+      "dialogue": [
+        {
+          "speaker": "B",
+          "text": "The takeaway: rising costs aren’t going away tomorrow, but informed choices and targeted policy can soften the blow. We’ll keep you posted on new data and what it means for households in the US and UK."
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-12-27T06:44:56.220858",
+    "num_sources": 5,
+    "content_type": "reels",
+    "content_code": "R8"
+  }
+}

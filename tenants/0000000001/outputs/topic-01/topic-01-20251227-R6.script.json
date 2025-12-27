@@ -1,0 +1,24 @@
+{
+  "title": "Global cost of living and rising prices - R6",
+  "duration_sec": 56,
+  "segments": [
+    {
+      "chapter": 1,
+      "title": "Reels",
+      "start_time": 0,
+      "duration": 0,
+      "dialogue": [
+        {
+          "speaker": "B",
+          "text": "Policy options to watch: targeted energy subsidies, housing relief, and measures aimed at easing shelter costs. It’s not a silver bullet, but a mix of supports could help families bridge the gap as prices normalize slowly."
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-12-27T06:44:56.219355",
+    "num_sources": 5,
+    "content_type": "reels",
+    "content_code": "R6"
+  }
+}

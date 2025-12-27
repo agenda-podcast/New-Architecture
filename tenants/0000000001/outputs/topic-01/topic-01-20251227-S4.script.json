@@ -1,0 +1,28 @@
+{
+  "title": "Global cost of living and rising prices - S4",
+  "duration_sec": 140,
+  "segments": [
+    {
+      "chapter": 1,
+      "title": "Short",
+      "start_time": 0,
+      "duration": 0,
+      "dialogue": [
+        {
+          "speaker": "A",
+          "text": "As of December 27, 2025, the evidence points to a persistent squeeze on living standards, with UK households feeling the impact of energy and housing costs and US households balancing rent, groceries, and bills. The path forward will hinge on targeted relief for essentials and gradual wage growth aligned with price trends. We’ll close with concrete, actionable steps for listeners in both countries and a quick read on what to watch next in the inflation story."
+        },
+        {
+          "speaker": "B",
+          "text": "And we’ll stay sharp on Box­ing Day–style signals: what shoppers are doing, what discounting means for budgets, and how to separate short-term moves from longer-term affordability."
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-12-27T06:44:56.216267",
+    "num_sources": 5,
+    "content_type": "short",
+    "content_code": "S4"
+  }
+}

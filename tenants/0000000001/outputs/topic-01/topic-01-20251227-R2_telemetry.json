@@ -1,0 +1,19 @@
+{
+  "total_chunks": 1,
+  "successful_chunks": 1,
+  "failed_chunks": 0,
+  "total_time_sec": 4.838113307952881,
+  "output_file": "/home/runner/work/New-Architecture/New-Architecture/tenants/0000000001/outputs/topic-01/topic-01-20251227-R2.wav",
+  "output_size_mb": 0.9612331390380859,
+  "chunks": [
+    {
+      "chunk_id": 0,
+      "text_length": 200,
+      "speaker": "B",
+      "attempts": 1,
+      "success": true,
+      "error": null,
+      "duration_sec": 4.771636724472046
+    }
+  ]
+}

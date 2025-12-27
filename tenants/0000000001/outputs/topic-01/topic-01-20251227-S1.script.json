@@ -1,0 +1,28 @@
+{
+  "title": "Global cost of living and rising prices - S1",
+  "duration_sec": 140,
+  "segments": [
+    {
+      "chapter": 1,
+      "title": "Short",
+      "start_time": 0,
+      "duration": 0,
+      "dialogue": [
+        {
+          "speaker": "A",
+          "text": "Today is December 27, 2025. I’m Gary Thompson, reporting from South Brooklyn, as households in the US and the UK contend with a stubborn cost of living. Prices for housing, food, energy, and everyday services continue to outpace wages, even as governments press ahead with policy tweaks. I’m joined by Margaret, and we’ll unpack what’s driving costs, what policymakers are trying, and what working families can realistically expect in the months ahead."
+        },
+        {
+          "speaker": "B",
+          "text": "I’m Margaret Butcher. We’ll ground this in real-life stakes—what people are paying more for this week, Boxing Day shifts in UK shopping, and what the data says about inflation trends as of today. Let’s start with the big picture and then zoom into the US and UK realities."
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-12-27T06:44:56.214490",
+    "num_sources": 5,
+    "content_type": "short",
+    "content_code": "S1"
+  }
+}

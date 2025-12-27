@@ -1,0 +1,24 @@
+{
+  "title": "Global cost of living and rising prices - R3",
+  "duration_sec": 56,
+  "segments": [
+    {
+      "chapter": 1,
+      "title": "Reels",
+      "start_time": 0,
+      "duration": 0,
+      "dialogue": [
+        {
+          "speaker": "A",
+          "text": "In the US, shelter costs and energy bills remain a meaningful share of family budgets. The trend isn’t just a spike; it’s a continuing pressure point that will shape how families allocate limited dollars."
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-12-27T06:44:56.217883",
+    "num_sources": 5,
+    "content_type": "reels",
+    "content_code": "R3"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "total_chunks": 2,
+  "successful_chunks": 2,
+  "failed_chunks": 0,
+  "total_time_sec": 15.510466814041138,
+  "output_file": "/home/runner/work/New-Architecture/New-Architecture/tenants/0000000001/outputs/topic-01/topic-01-20251227-S1.wav",
+  "output_size_mb": 3.429891586303711,
+  "chunks": [
+    {
+      "chunk_id": 0,
+      "text_length": 452,
+      "speaker": "A",
+      "attempts": 1,
+      "success": true,
+      "error": null,
+      "duration_sec": 15.419886350631714
+    },
+    {
+      "chunk_id": 1,
+      "text_length": 272,
+      "speaker": "B",
+      "attempts": 1,
+      "success": true,
+      "error": null,
+      "duration_sec": 11.069863557815552
+    }
+  ]
+}
