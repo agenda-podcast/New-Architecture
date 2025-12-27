@@ -115,9 +115,65 @@ def _extract_first_json_object(text: str) -> Dict[str, Any]:
 
 
 def _resolve_hosts(config: Dict[str, Any]) -> Dict[str, str]:
+    """
+    Robust host resolver.
+
+    Supports config["roles"] in multiple shapes:
+    1) dict:
+       {
+         "host_a": {"name": "...", "bio": "..."},
+         "host_b": {"name": "...", "bio": "..."}
+       }
+    2) dict with uppercase keys:
+       {"HOST_A": {...}, "HOST_B": {...}}
+    3) list:
+       [
+         {"role": "host_a", "name": "...", "bio": "..."},
+         {"role": "host_b", "name": "...", "bio": "..."}
+       ]
+       or simply [ {...}, {...} ] (first is A, second is B)
+    4) anything else -> fallback defaults
+    """
     roles = config.get("roles") or {}
-    host_a = roles.get("host_a") or roles.get("HOST_A") or {}
-    host_b = roles.get("host_b") or roles.get("HOST_B") or {}
+
+    # Normalize roles if it's a list (your current failing case)
+    if isinstance(roles, list):
+        host_a: Dict[str, Any] = {}
+        host_b: Dict[str, Any] = {}
+
+        # Try to identify by explicit labels inside dicts
+        for item in roles:
+            if not isinstance(item, dict):
+                continue
+            key = (
+                item.get("role")
+                or item.get("id")
+                or item.get("code")
+                or item.get("key")
+                or item.get("name")
+                or ""
+            )
+            k = str(key).strip().lower()
+
+            if k in ("host_a", "host a", "a", "hosta", "primary", "main"):
+                host_a = item
+            elif k in ("host_b", "host b", "b", "hostb", "cohost", "co-host", "secondary"):
+                host_b = item
+
+        # If still missing, fall back to list order
+        if not host_a and len(roles) >= 1 and isinstance(roles[0], dict):
+            host_a = roles[0]
+        if not host_b and len(roles) >= 2 and isinstance(roles[1], dict):
+            host_b = roles[1]
+
+        roles = {"host_a": host_a, "host_b": host_b}
+
+    # If roles is not a dict by now, reset to empty
+    if not isinstance(roles, dict):
+        roles = {}
+
+    host_a_obj = roles.get("host_a") or roles.get("HOST_A") or {}
+    host_b_obj = roles.get("host_b") or roles.get("HOST_B") or {}
 
     def _pick(obj: Any, key: str, fallback: str) -> str:
         if isinstance(obj, dict):
@@ -127,10 +183,10 @@ def _resolve_hosts(config: Dict[str, Any]) -> Dict[str, str]:
         return fallback
 
     return {
-        "host_a_name": _pick(host_a, "name", "HOST_A"),
-        "host_a_bio": _pick(host_a, "bio", "Primary host"),
-        "host_b_name": _pick(host_b, "name", "HOST_B"),
-        "host_b_bio": _pick(host_b, "bio", "Co-host"),
+        "host_a_name": _pick(host_a_obj, "name", "HOST_A"),
+        "host_a_bio": _pick(host_a_obj, "bio", "Primary host"),
+        "host_b_name": _pick(host_b_obj, "name", "HOST_B"),
+        "host_b_bio": _pick(host_b_obj, "bio", "Co-host"),
     }
 
 
