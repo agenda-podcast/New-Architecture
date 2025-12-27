@@ -2,9 +2,9 @@
   "total_chunks": 20,
   "successful_chunks": 20,
   "failed_chunks": 0,
-  "total_time_sec": 5.600237607955933,
+  "total_time_sec": 5.690225601196289,
   "output_file": "/home/runner/work/New-Architecture/New-Architecture/tenants/0000000001/outputs/topic-01/topic-01-20251227-R3.wav",
-  "output_size_mb": 3.0508556365966797,
+  "output_size_mb": 2.9287853240966797,
   "chunks": [
     {
       "chunk_id": 0,
@@ -13,7 +13,7 @@
       "attempts": 1,
       "success": true,
       "error": null,
-      "duration_sec": 4.828751564025879
+      "duration_sec": 4.911107063293457
     },
     {
       "chunk_id": 1,
@@ -22,7 +22,7 @@
       "attempts": 1,
       "success": true,
       "error": null,
-      "duration_sec": 4.874144554138184
+      "duration_sec": 4.6578826904296875
     },
     {
       "chunk_id": 2,
@@ -31,7 +31,7 @@
       "attempts": 1,
       "success": true,
       "error": null,
-      "duration_sec": 5.418438196182251
+      "duration_sec": 5.503441572189331
     },
     {
       "chunk_id": 3,
@@ -40,7 +40,7 @@
       "attempts": 1,
       "success": true,
       "error": null,
-      "duration_sec": 4.469661474227905
+      "duration_sec": 4.6035966873168945
     },
     {
       "chunk_id": 4,
