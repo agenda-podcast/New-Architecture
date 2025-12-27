@@ -1,56 +1,4 @@
-Reasoning
-Empty reasoning item
-Web Search
-Searched the web
-Reasoning
-Empty reasoning item
-Web Search
-Searched the web
-Reasoning
-Empty reasoning item
-Web Search
-Searched the web
-Reasoning
-Empty reasoning item
-Web Search
-Searched the web
-Reasoning
-Empty reasoning item
-Web Search
-Searched the web
-Reasoning
-Empty reasoning item
-Web Search
-Searched the web
-Reasoning
-Empty reasoning item
-Web Search
-Searched the web
-Reasoning
-Empty reasoning item
-Web Search
-Searched the web
-Reasoning
-Empty reasoning item
-Web Search
-Searched the web
-Reasoning
-Empty reasoning item
-Web Search
-Searched the web
-Reasoning
-Empty reasoning item
-Web Search
-Searched the web
-Reasoning
-Empty reasoning item
-Web Search
-Searched the web
-Reasoning
-Empty reasoning item
-assistant
 SOURCES:
-
 https://www.reuters.com/world/asia-pacific/core-inflation-japans-capital-slows-december-stays-above-boj-target-2025-12-25/
 https://www.reuters.com/business/energy/oil-edges-up-strong-us-economic-growth-supply-risks-2025-12-24/
 https://www.reuters.com/world/europe/major-central-banks-deliver-biggest-easing-push-over-decade-2025-2025-12-23/
@@ -58,6 +6,7 @@ https://www.reuters.com/sustainability/sustainable-finance-reporting/ecb-wage-tr
 https://ec.europa.eu/eurostat/web/products-euro-indicators/w/2-17122025-ap
 https://www.eia.gov/petroleum/gasdiesel/
 https://www.fao.org/statistics/events/events-detail/fao-food-price-index-and-commodity-price-indices.-december-2025-update/en
+
 SCRIPT:
 HOST_A: This is Gary Thompson. It’s Friday, December 26, 2025. And today we’re talking about the global cost of living—why it still feels like everything is getting more expensive, even when some inflation headlines sound calmer.
 
