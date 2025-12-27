@@ -1,26 +1,27 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
-"""Two-pass script generation using the OpenAI Responses API.
+"""
+Two-pass script generation using the OpenAI Responses API.
 
 This module is used by ``multi_format_generator.py``.
 
-The repository went through several refactors, and different files expect
-different call signatures. To keep the pipeline stable, we support both:
+Updated behavior (Dec 2025):
+- Pass A is ONLY used to generate long-form scripts (L*). It outputs plain text (no JSON):
+    SOURCES:
+    - ...
+    SCRIPT:
+    HOST_A: ...
+    HOST_B: ...
 
-1) New architecture (called by multi_format_generator):
+- Pass A is SKIPPED when any of the following is true:
+    1) Topic content_types.long.enabled == False
+    2) Testing / "gesting" mode is enabled (global_config.TESTING_MODE, or config.testing_mode / gisting_mode / gesting_mode)
+    3) A test data source file is configured (config.test_data_source_file / config.sources_file / config.data_source_file etc.) and exists
 
-    generate_all_content_two_pass(config, sources=None, client=None) -> dict
-      Returns: {"content": [ {code,type,script,...}, ... ], "sources": [...], "canonical_pack": {...} }
+- Pass B returns a SINGLE JSON object with *all* requested non-long items (M/S/R, etc.) in one response.
+  Pass B generates only summarized/derived pieces per item of each content type.
 
-2) Legacy compatibility (older callers):
-
-    generate_all_content_two_pass(client, config, pass_a_long_script, sources) -> dict
-      Returns: {"content": [ ... ]}  (Pass-B only)
-
-Pass A uses a reasoning model with the web_search tool to produce a structured
-"canonical pack" plus optional long-form scripts (L*). Pass B produces the
-remaining scripts (M/S/R) STRICTLY from the canonical pack, with JSON output.
+- Pass A is never re-requested. Whatever comes back (even if incomplete) is treated as completed and saved upstream.
 """
 
 from __future__ import annotations
@@ -29,14 +30,15 @@ import json
 import logging
 import os
 import re
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 try:
+    # Optional in some CI/test environments
     from openai import OpenAI
-except ImportError:  # pragma: no cover
-    OpenAI = None
+except Exception:  # pragma: no cover
+    OpenAI = None  # type: ignore
 
-_CODE_PREFIX = {"long": "L", "medium": "M", "short": "S", "reels": "R"}
 from model_limits import clamp_output_tokens, default_max_output_tokens
 from openai_utils import create_openai_completion, extract_completion_text
 
@@ -44,174 +46,219 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Model selection
+# Small utilities
 # ---------------------------------------------------------------------------
 
-DEFAULT_PASS_A_MODEL = "gpt-5.2-pro"
-DEFAULT_PASS_B_MODEL = "gpt-5-nano"
-
-
-def _pick_model_pass_a(config: Dict[str, Any]) -> str:
-    return os.getenv("PASS_A_MODEL") or config.get("gpt_model_pass_a") or config.get("gpt_model") or DEFAULT_PASS_A_MODEL
-
-
-def _pick_model_pass_b(config: Dict[str, Any]) -> str:
-    return os.getenv("PASS_B_MODEL") or config.get("gpt_model_pass_b") or DEFAULT_PASS_B_MODEL
-
-
-def _normalize_reasoning_effort_for_model(model: str, requested: str) -> str:
-    """Prevent 400s from invalid reasoning.effort values.
-
-    In this repo's architecture notes, gpt-5.2-pro is treated as requiring
-    medium/high/xhigh; using minimal/low can 400.
-    """
-    m = (model or "").strip().lower()
-    r = (requested or "").strip().lower() or "medium"
-
-    if m == "gpt-5.2-pro":
-        if r not in ("medium", "high", "xhigh"):
-            logger.warning("gpt-5.2-pro does not support reasoning.effort='%s'. Using 'medium'.", r)
-            return "medium"
-        return r
-
-    # For other models we pass through; if unsupported, the API will error.
-    return r
-
-
-def _pass_a_reasoning(config: Dict[str, Any], model: str) -> Dict[str, str]:
-    requested = os.getenv("PASS_A_REASONING_EFFORT") or str(config.get("pass_a_reasoning_effort") or "medium")
-    return {"effort": _normalize_reasoning_effort_for_model(model, requested)}
-
-
-def _pass_b_reasoning(config: Dict[str, Any], model: str) -> Dict[str, str]:
-    requested = os.getenv("PASS_B_REASONING_EFFORT") or str(config.get("pass_b_reasoning_effort") or "minimal")
-    return {"effort": _normalize_reasoning_effort_for_model(model, requested)}
-
-
-# ---------------------------------------------------------------------------
-# Client / JSON helpers
-# ---------------------------------------------------------------------------
-
-def _get_openai_client(explicit_client: Any | None = None) -> Any:
-    if explicit_client is not None:
-        return explicit_client
-
-    api_key = os.getenv("GPT_KEY") or os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("GPT_KEY or OPENAI_API_KEY environment variable is required")
-    if OpenAI is None:
-        raise ImportError("openai package is required. Install with: pip install openai")
-    return OpenAI(api_key=api_key)
-
-
-def _extract_first_json_object(text: str) -> Dict[str, Any]:
-    """Extract the first JSON object found in `text`.
-
-    Pass A uses web_search, so we cannot force strict JSON via SDK flags.
-    We therefore parse "best effort".
-    """
-    if not text:
-        raise ValueError("Empty model output; expected JSON")
-
-    # Try direct parse first
+def _safe_int(v: Any, default: int = 0) -> int:
     try:
-        return json.loads(text)
-    except Exception:
-        pass
-
-    # Find a JSON object block
-    start = text.find("{")
-    end = text.rfind("}")
-    if start == -1 or end == -1 or end <= start:
-        raise ValueError("Unable to locate JSON object in model output")
-
-    candidate = text[start : end + 1]
-    # Strip code fences if present
-    candidate = re.sub(r"^```(json)?\s*", "", candidate.strip(), flags=re.IGNORECASE)
-    candidate = re.sub(r"\s*```$", "", candidate.strip())
-    return json.loads(candidate)
-
-
-def _safe_int(x: Any, default: int) -> int:
-    try:
-        return int(x)
+        return int(v)
     except Exception:
         return default
 
 
-def _clean_bio(text: str) -> str:
-    # Light cleanup to avoid template artifacts.
-    return re.sub(r"\s+", " ", (text or "").strip())
+def _truthy(v: Any) -> bool:
+    if isinstance(v, bool):
+        return v
+    if v is None:
+        return False
+    s = str(v).strip().lower()
+    return s in ("1", "true", "yes", "y", "on", "enabled")
+
+
+def _normalize_ws(s: str) -> str:
+    return re.sub(r"[ \t]+\n", "\n", (s or "").strip())
+
+
+def _extract_first_json_object(text: str) -> Dict[str, Any]:
+    """
+    Best-effort extraction of the first JSON object from a string.
+    Used when we cannot rely on strict JSON mode (e.g. web_search present).
+    """
+    if not isinstance(text, str):
+        raise ValueError("Expected string text for JSON extraction")
+
+    t = text.strip()
+    if t.startswith("{") and t.endswith("}"):
+        return json.loads(t)
+
+    # Scan for balanced braces
+    start = t.find("{")
+    if start < 0:
+        raise ValueError("No JSON object start '{' found")
+
+    depth = 0
+    in_str = False
+    esc = False
+    for i in range(start, len(t)):
+        ch = t[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        else:
+            if ch == '"':
+                in_str = True
+                continue
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    candidate = t[start : i + 1]
+                    return json.loads(candidate)
+
+    raise ValueError("Could not find a complete JSON object in output")
+
+
+def _resolve_hosts(config: Dict[str, Any]) -> Dict[str, str]:
+    roles = config.get("roles") or {}
+    host_a = roles.get("host_a") or roles.get("HOST_A") or {}
+    host_b = roles.get("host_b") or roles.get("HOST_B") or {}
+
+    def _pick(obj: Any, key: str, fallback: str) -> str:
+        if isinstance(obj, dict):
+            v = obj.get(key)
+            if v:
+                return str(v).strip()
+        return fallback
+
+    return {
+        "host_a_name": _pick(host_a, "name", "HOST_A"),
+        "host_a_bio": _pick(host_a, "bio", "Primary host"),
+        "host_b_name": _pick(host_b, "name", "HOST_B"),
+        "host_b_bio": _pick(host_b, "bio", "Co-host"),
+    }
+
+
+def _enabled_specs_from_content_specs(content_specs: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Split enabled specs into (long_specs, nonlong_specs)."""
+    long_specs: List[Dict[str, Any]] = []
+    nonlong_specs: List[Dict[str, Any]] = []
+    for s in content_specs or []:
+        t = str(s.get("type") or "").strip().lower()
+        if t == "long":
+            long_specs.append(s)
+        else:
+            nonlong_specs.append(s)
+    return long_specs, nonlong_specs
+
+
+def _has_existing_test_data_source_file(config: Dict[str, Any]) -> bool:
+    """
+    Detect whether a test data source file is configured and exists.
+    We support multiple key names to tolerate config drift.
+    """
+    candidates = [
+        config.get("test_data_source_file"),
+        config.get("test_sources_file"),
+        config.get("sources_file"),
+        config.get("data_source_file"),
+        config.get("data_source_path"),
+        config.get("test_data_path"),
+    ]
+    for c in candidates:
+        if not c:
+            continue
+        p = Path(str(c))
+        if p.is_file():
+            return True
+    return False
+
+
+def _is_testing_or_gesting_mode(config: Dict[str, Any]) -> bool:
+    # 1) topic-level flags
+    if _truthy(config.get("testing_mode")):
+        return True
+    if _truthy(config.get("gesting_mode")):
+        return True
+    if _truthy(config.get("gisting_mode")):
+        return True
+
+    # 2) environment flags
+    if _truthy(os.getenv("TESTING_MODE")):
+        return True
+    if _truthy(os.getenv("GESTING_MODE")):
+        return True
+    if _truthy(os.getenv("GISTING_MODE")):
+        return True
+
+    # 3) global_config constant (if present)
+    try:
+        import global_config  # local module
+        if _truthy(getattr(global_config, "TESTING_MODE", False)):
+            return True
+    except Exception:
+        pass
+
+    return False
+
+
+def _should_run_pass_a(config: Dict[str, Any], content_specs: List[Dict[str, Any]]) -> bool:
+    """
+    Pass A is only needed for long content, and must be suppressed by the user rules.
+    """
+    long_specs, _ = _enabled_specs_from_content_specs(content_specs)
+
+    # Rule 1: if long is not requested, don't run Pass A.
+    if not long_specs:
+        return False
+
+    # Rule 2: if testing/gesting mode, don't run Pass A.
+    if _is_testing_or_gesting_mode(config):
+        return False
+
+    # Rule 3: if a test data source file exists, don't run Pass A.
+    if _has_existing_test_data_source_file(config):
+        return False
+
+    return True
 
 
 # ---------------------------------------------------------------------------
 # Prompt builders
 # ---------------------------------------------------------------------------
 
-def _resolve_hosts(config: Dict[str, Any]) -> Dict[str, str]:
-    host_a_name = str(config.get("voice_a_name") or "Host A").strip()
-    host_b_name = str(config.get("voice_b_name") or "Host B").strip()
-    host_a_bio = _clean_bio(str(config.get("voice_a_bio") or ""))
-    host_b_bio = _clean_bio(str(config.get("voice_b_bio") or ""))
-    # Replace template variables if present
-    host_b_bio = host_b_bio.replace("{{HOST_A}}", host_a_name).replace("HOST_A", host_a_name)
-    return {
-        "host_a_name": host_a_name,
-        "host_b_name": host_b_name,
-        "host_a_bio": host_a_bio,
-        "host_b_bio": host_b_bio,
-    }
+def _pick_model_pass_a(config: Dict[str, Any]) -> str:
+    return (os.getenv("PASS_A_MODEL") or config.get("gpt_model_pass_a") or "gpt-5.2-pro").strip()
 
 
-def _desired_pass_a_words(enabled_specs: List[Dict[str, Any]]) -> int:
-    """Pick a reasonable Pass A word budget.
+def _pick_model_pass_b(config: Dict[str, Any]) -> str:
+    return (os.getenv("PASS_B_MODEL") or config.get("gpt_model_pass_b") or "gpt-5-nano").strip()
 
-    - If long content is enabled, use that max_words.
-    - Otherwise generate a compact but information-rich pack for summarization.
+
+def _build_pass_a_prompt(config: Dict[str, Any], long_specs: List[Dict[str, Any]]) -> str:
     """
-    long_specs = [s for s in enabled_specs if s.get("type") == "long"]
-    if long_specs:
-        return max(_safe_int(s.get("max_words"), 8000) for s in long_specs)
-
-    # When long is disabled, produce something big enough to anchor S/R.
-    nonlong_max = 0
-    for s in enabled_specs:
-        nonlong_max = max(nonlong_max, _safe_int(s.get("max_words"), 400))
-    return max(1500, min(6000, nonlong_max * 6))
-
-
-def _build_pass_a_prompt(config: Dict[str, Any], enabled_specs: List[Dict[str, Any]]) -> str:
+    Pass A prompt: ONLY "SOURCES" and "SCRIPT" in plain text. No JSON.
+    """
     hosts = _resolve_hosts(config)
 
     topic = str(config.get("title") or config.get("topic") or "").strip() or "(untitled topic)"
     desc = str(config.get("description") or "").strip()
-
     freshness_hours = _safe_int(config.get("freshness_hours"), 24)
     freshness_window = f"last {freshness_hours} hours"
+
     regions = config.get("search_regions") or []
     region_txt = ", ".join([str(r).upper() for r in regions]) if regions else "GLOBAL"
+
     queries = config.get("queries") or []
     query_txt = "\n".join([f"- {q}" for q in queries]) if queries else "- (use your judgment)"
 
-    l_words = _desired_pass_a_words(enabled_specs)
-
-    # If the topic config explicitly allows rumors, respect it; default to False.
-    rumors_allowed = bool(config.get("rumors_allowed", False))
+    # Word target: take max target_words among long specs.
+    target_words = 9000
+    for s in long_specs:
+        target_words = max(target_words, _safe_int(s.get("target_words") or s.get("max_words"), 9000))
 
     return f"""You are a newsroom producer and dialogue scriptwriter for an English-language news podcast.
-You MUST use the web_search tool before writing to verify the latest developments and to avoid any 'knowledge cutoff' disclaimers. Never say you cannot browse.
-If sources within the window are limited, say: "sources within the window are limited" and use the most recent credible sources.
-
-Historical Context & Analysis:
-- Use web_search for RECENT news within the freshness window (breaking news, latest developments, fresh quotes)
-- Use your EXISTING KNOWLEDGE for historical context, background information, and deeper analysis
-- Combine both: Frame recent news with historical patterns, precedents, and context you already know
+You MUST use the web_search tool before writing to verify the latest news and to avoid any "knowledge cutoff" disclaimers.
 
 Topic: {topic}
 Topic description: {desc}
 Freshness window: {freshness_window}
-Region: {region_txt}
-Rumors allowed: {str(rumors_allowed).lower()}
+Region focus: {region_txt}
 
 Host personas:
 - HOST_A ({hosts['host_a_name']}): {hosts['host_a_bio']}
@@ -220,53 +267,42 @@ Host personas:
 Search guidance (use as web_search queries; adjust as needed):
 {query_txt}
 
-Your job in Pass A:
-1) Use web_search to gather and cross-check facts from multiple reputable sources.
-2) Produce a CANONICAL_PACK that can be used to generate consistent summaries.
-3) Optionally produce a long "SOURCE_TEXT" (about {l_words} words) in HOST_A/HOST_B dialogue format that reflects:
-   - Recent verified developments
-   - Historical context and analysis
-   - Clear transitions and structure
+OUTPUT FORMAT (STRICT — no markdown, no JSON):
+SOURCES:
+- [1] <Publisher> — <Title> (<YYYY-MM-DD>). <URL>
+- [2] ...
+(Include 6–12 high-quality sources. Prefer primary/official where possible.)
 
-OUTPUT FORMAT (single JSON object):
-{{
-  "sources": [{{"title": "...", "url": "...", "publisher": "...", "date": "YYYY-MM-DD"}}],
-  "canonical_pack": {{
-    "timeline": "...",
-    "key_facts": "...",
-    "key_players": "...",
-    "claims_evidence": "...",
-    "beats_outline": "...",
-    "punchlines": "...",
-    "historical_context": "..."
-  }},
-  "source_text": "HOST_A: ...\\nHOST_B: ...\\n...",
-  "long_content": [{{"code": "L1", "type": "long", "script": "HOST_A: ...\\nHOST_B: ..."}}]
-}}
+SCRIPT:
+Write ONE long dialogue script (~{target_words} words) between HOST_A and HOST_B.
+- Use concrete dates.
+- Clearly distinguish verified facts vs claims.
+- Keep it engaging but grounded.
+- No bullet lists inside the script; write as spoken dialogue with speaker tags.
 
-Rules:
-- Keep all factual claims grounded in sources from web_search.
-- Use concrete dates when possible.
-- The JSON must be valid.
+Return ONLY the two sections above: SOURCES and SCRIPT.
 """
 
 
-def _build_pass_b_prompt(
+def _build_pass_b_prompt_from_pass_a(
     config: Dict[str, Any],
-    enabled_specs: List[Dict[str, Any]],
-    canonical_pack: Dict[str, Any],
-    source_text: str,
+    nonlong_specs: List[Dict[str, Any]],
+    pass_a_sources_text: str,
+    pass_a_script_text: str,
 ) -> str:
+    """
+    Pass B prompt when Pass A ran: derive summaries from Pass A script only.
+    Must return ONE JSON object with ALL items.
+    """
     hosts = _resolve_hosts(config)
+    topic = str(config.get("title") or config.get("topic") or "").strip() or "(untitled topic)"
 
-    # Build a deterministic list of requested outputs.
-    # Each spec has {type, code, max_words}.
-    req_lines = []
-    for s in enabled_specs:
+    req_lines: List[str] = []
+    for s in nonlong_specs:
         c = str(s.get("code") or "").strip()
         t = str(s.get("type") or "").strip()
-        mw = _safe_int(s.get("max_words"), 300)
-        if not c or t == "long":
+        mw = _safe_int(s.get("target_words") or s.get("max_words"), 300)
+        if not c:
             continue
         req_lines.append(f"- {c} ({t}): max_words={mw}")
 
@@ -275,59 +311,242 @@ def _build_pass_b_prompt(
     return f"""You are Pass B of a two-pass pipeline.
 
 You will be given:
-1) CANONICAL_PACK (facts, timeline, players, evidence, historical context)
-2) SOURCE_TEXT (dialogue-style anchor text)
+1) SOURCES (as text)
+2) LONG_SCRIPT (dialogue)
 
 Your task:
-- Generate the requested scripts ONLY from CANONICAL_PACK and SOURCE_TEXT.
-- Do not add new facts, quotes, or numbers not already present.
-- Keep tone consistent with the host personas.
-- Output MUST be valid JSON.
+- Create summarized/derived scripts for each requested item below.
+- Do NOT introduce new facts. Use ONLY what is supported by LONG_SCRIPT and SOURCES.
+- Return ALL items in ONE response as STRICT JSON (no markdown).
 
-Hosts:
-- HOST_A is {hosts['host_a_name']}
-- HOST_B is {hosts['host_b_name']}
+Topic: {topic}
 
-Requested outputs:
+Requested items:
 {req_txt}
 
-Formatting rules for each script:
-- Dialogue must use HOST_A: and HOST_B: prefixes.
-- No markdown.
-- Respect max_words.
+SOURCES (text, for attribution / grounding):
+{pass_a_sources_text}
 
-INPUTS:
-CANONICAL_PACK:
-{json.dumps(canonical_pack, ensure_ascii=False)}
+LONG_SCRIPT (text, for summarization/derivation):
+{pass_a_script_text}
 
-SOURCE_TEXT:
-{source_text}
-
-OUTPUT JSON schema:
+JSON OUTPUT SCHEMA (STRICT):
 {{
   "content": [
-    {{"code": "S1", "type": "short", "script": "HOST_A: ...\\nHOST_B: ..."}},
-    ...
+    {{
+      "code": "M1",
+      "type": "medium",
+      "script": "HOST_A: ...\\nHOST_B: ...",
+      "max_words": 1200
+    }}
   ]
 }}
+
+Rules:
+- Use speaker tags HOST_A and HOST_B (do NOT replace with names).
+- Each 'script' must be standalone (it must make sense without the long script).
+- Keep each script within max_words.
+- Return ONLY the JSON object.
+"""
+
+
+def _build_single_pass_b_prompt_with_web_search(config: Dict[str, Any], nonlong_specs: List[Dict[str, Any]]) -> str:
+    """
+    Single-pass generation (no Pass A). Uses web_search and returns all requested items in one JSON response.
+    """
+    hosts = _resolve_hosts(config)
+
+    topic = str(config.get("title") or config.get("topic") or "").strip() or "(untitled topic)"
+    desc = str(config.get("description") or "").strip()
+    freshness_hours = _safe_int(config.get("freshness_hours"), 24)
+    freshness_window = f"last {freshness_hours} hours"
+
+    regions = config.get("search_regions") or []
+    region_txt = ", ".join([str(r).upper() for r in regions]) if regions else "GLOBAL"
+
+    queries = config.get("queries") or []
+    query_txt = "\n".join([f"- {q}" for q in queries]) if queries else "- (use your judgment)"
+
+    req_lines: List[str] = []
+    for s in nonlong_specs:
+        c = str(s.get("code") or "").strip()
+        t = str(s.get("type") or "").strip()
+        mw = _safe_int(s.get("target_words") or s.get("max_words"), 300)
+        if not c:
+            continue
+        req_lines.append(f"- {c} ({t}): max_words={mw}")
+    req_txt = "\n".join(req_lines) if req_lines else "- (no outputs requested)"
+
+    return f"""You are a newsroom producer and dialogue scriptwriter for an English-language news podcast.
+You MUST use the web_search tool before writing to verify the latest news and to avoid any "knowledge cutoff" disclaimers.
+
+Topic: {topic}
+Topic description: {desc}
+Freshness window: {freshness_window}
+Region focus: {region_txt}
+
+Host personas:
+- HOST_A ({hosts['host_a_name']}): {hosts['host_a_bio']}
+- HOST_B ({hosts['host_b_name']}): {hosts['host_b_bio']}
+
+Search guidance (use as web_search queries; adjust as needed):
+{query_txt}
+
+Your task:
+1) Use web_search to gather and cross-check facts from multiple reputable sources.
+2) Produce the requested summarized scripts below.
+3) Return ALL items in ONE response as STRICT JSON (no markdown).
+
+Requested items:
+{req_txt}
+
+JSON OUTPUT SCHEMA (STRICT):
+{{
+  "sources": [
+    {{
+      "n": 1,
+      "publisher": "Publisher",
+      "title": "Title",
+      "date": "YYYY-MM-DD",
+      "url": "https://..."
+    }}
+  ],
+  "content": [
+    {{
+      "code": "S1",
+      "type": "short",
+      "script": "HOST_A: ...\\nHOST_B: ...",
+      "max_words": 350
+    }}
+  ]
+}}
+
+Rules:
+- Use speaker tags HOST_A and HOST_B (do NOT replace with names).
+- Keep each script within max_words.
+- Use concrete dates.
+- Return ONLY the JSON object.
 """
 
 
 # ---------------------------------------------------------------------------
-# Two-pass execution
+# Parsing helpers for Pass A output
+# ---------------------------------------------------------------------------
+
+def _parse_pass_a_text(pass_a_text: str) -> Tuple[str, str]:
+    """
+    Extract (sources_text, script_text) from Pass A plain text.
+    """
+    t = (pass_a_text or "").strip()
+    if not t:
+        return "", ""
+
+    # Normalize common variants
+    t = t.replace("\r\n", "\n").replace("\r", "\n")
+
+    # Find SOURCES and SCRIPT blocks
+    m_sources = re.search(r"(?im)^\s*sources\s*:\s*$", t)
+    m_script = re.search(r"(?im)^\s*script\s*:\s*$", t)
+
+    if not m_sources or not m_script:
+        # Fallback: treat the whole thing as script
+        return "", t.strip()
+
+    sources_start = m_sources.end()
+    script_start = m_script.end()
+
+    if m_sources.start() < m_script.start():
+        sources_text = t[sources_start : m_script.start()].strip()
+        script_text = t[script_start :].strip()
+    else:
+        # weird ordering; fallback
+        sources_text = ""
+        script_text = t[script_start :].strip()
+
+    return _normalize_ws(sources_text), _normalize_ws(script_text)
+
+
+def _sources_text_to_list(sources_text: str) -> List[Dict[str, Any]]:
+    """
+    Best-effort parse of sources lines into a structured list.
+    Accepts lines like:
+      - [1] Publisher — Title (YYYY-MM-DD). URL
+    """
+    out: List[Dict[str, Any]] = []
+    if not sources_text:
+        return out
+
+    for line in sources_text.splitlines():
+        l = line.strip()
+        if not l or l.startswith("#"):
+            continue
+
+        # Remove leading bullets
+        l = re.sub(r"^[\-\*\u2022]\s*", "", l)
+
+        n = None
+        m = re.match(r"^\[(\d+)\]\s*(.*)$", l)
+        if m:
+            n = _safe_int(m.group(1), 0)
+            l = m.group(2).strip()
+
+        url = ""
+        murl = re.search(r"(https?://\S+)", l)
+        if murl:
+            url = murl.group(1).rstrip(").,;")
+            l_wo_url = (l[:murl.start()] + l[murl.end():]).strip()
+        else:
+            l_wo_url = l
+
+        # Try parse date in parentheses
+        date = ""
+        mdate = re.search(r"\((\d{4}-\d{2}-\d{2})\)", l_wo_url)
+        if mdate:
+            date = mdate.group(1)
+            l_wo_url = (l_wo_url[:mdate.start()] + l_wo_url[mdate.end():]).strip()
+
+        # Split publisher/title by em dash or hyphen
+        publisher = ""
+        title = l_wo_url.strip(" .")
+        if "—" in l_wo_url:
+            parts = [p.strip() for p in l_wo_url.split("—", 1)]
+            publisher = parts[0]
+            title = parts[1] if len(parts) > 1 else title
+        elif " - " in l_wo_url:
+            parts = [p.strip() for p in l_wo_url.split(" - ", 1)]
+            publisher = parts[0]
+            title = parts[1] if len(parts) > 1 else title
+
+        item = {"title": title}
+        if n:
+            item["n"] = n
+        if publisher:
+            item["publisher"] = publisher
+        if date:
+            item["date"] = date
+        if url:
+            item["url"] = url
+
+        out.append(item)
+
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Pass runners
 # ---------------------------------------------------------------------------
 
 def _run_pass_a(
     client: Any,
     config: Dict[str, Any],
-    enabled_specs: List[Dict[str, Any]],
-) -> Tuple[List[Dict[str, Any]], Dict[str, Any], str, List[Dict[str, Any]]]:
-    """Run Pass A. Returns (sources, canonical_pack, source_text, long_content)."""
-
+    long_specs: List[Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], str, str, str]:
+    """
+    Run Pass A. Returns: (sources_list, sources_text, script_text, raw_text)
+    """
     model = _pick_model_pass_a(config)
-    prompt = _build_pass_a_prompt(config, enabled_specs)
+    prompt = _build_pass_a_prompt(config, long_specs)
 
-    # Output budget: let the caller request large outputs, but clamp to model.
     requested_out = _safe_int(config.get("pass_a_max_output_tokens"), default_max_output_tokens(model))
     max_out = clamp_output_tokens(model, requested_out)
 
@@ -336,38 +555,30 @@ def _run_pass_a(
         model=model,
         messages=[{"role": "user", "content": prompt}],
         tools=[{"type": "web_search"}],
-        json_mode=False,  # web_search + strict JSON mode can be incompatible in some SDKs
+        json_mode=False,
         max_completion_tokens=max_out,
-        reasoning=_pass_a_reasoning(config, model),
     )
 
-    txt = extract_completion_text(resp, model)
-    data = _extract_first_json_object(txt)
+    raw_text = extract_completion_text(resp, model)
+    raw_text = raw_text.strip() if isinstance(raw_text, str) else ""
+    sources_text, script_text = _parse_pass_a_text(raw_text)
+    sources_list = _sources_text_to_list(sources_text)
 
-    sources = data.get("sources") or []
-    canonical_pack = data.get("canonical_pack") or {}
-    source_text = str(data.get("source_text") or "").strip()
-    long_content = data.get("long_content") or []
-
-    if not isinstance(sources, list):
-        sources = []
-    if not isinstance(canonical_pack, dict):
-        canonical_pack = {}
-    if not isinstance(long_content, list):
-        long_content = []
-
-    return sources, canonical_pack, source_text, long_content
+    return sources_list, sources_text, script_text, raw_text
 
 
-def _run_pass_b(
+def _run_pass_b_from_pass_a(
     client: Any,
     config: Dict[str, Any],
-    enabled_specs: List[Dict[str, Any]],
-    canonical_pack: Dict[str, Any],
-    source_text: str,
+    nonlong_specs: List[Dict[str, Any]],
+    sources_text: str,
+    script_text: str,
 ) -> Dict[str, Any]:
+    """
+    Pass B derived from Pass A (no web_search). Strict JSON mode.
+    """
     model = _pick_model_pass_b(config)
-    prompt = _build_pass_b_prompt(config, enabled_specs, canonical_pack, source_text)
+    prompt = _build_pass_b_prompt_from_pass_a(config, nonlong_specs, sources_text, script_text)
 
     requested_out = _safe_int(config.get("pass_b_max_output_tokens"), default_max_output_tokens(model))
     max_out = clamp_output_tokens(model, requested_out)
@@ -379,11 +590,9 @@ def _run_pass_b(
         tools=None,
         json_mode=True,
         max_completion_tokens=max_out,
-        reasoning=_pass_b_reasoning(config, model),
     )
 
     txt = extract_completion_text(resp, model)
-    # With json_mode=True, this should be strict JSON.
     data = json.loads(txt) if isinstance(txt, str) else {}
     if not isinstance(data, dict):
         raise ValueError("Pass B output is not a JSON object")
@@ -392,78 +601,39 @@ def _run_pass_b(
     return data
 
 
-def _pass_b_only(
+def _run_single_pass_b_with_web_search(
     client: Any,
     config: Dict[str, Any],
-    pass_a_long_script: str,
-    sources: List[Dict[str, Any]],
+    nonlong_specs: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    """Legacy: generate M/S/R from an existing pass_a_long_script + sources."""
-    # Minimal canonical pack: just wrap the long script in SOURCE_TEXT.
-    canonical_pack = {
-        "timeline": "",
-        "key_facts": "",
-        "key_players": "",
-        "claims_evidence": "",
-        "beats_outline": "",
-        "punchlines": "",
-        "historical_context": "",
-    }
+    """
+    Single-pass: use web_search and produce all non-long items in one JSON response.
+    JSON mode cannot be enforced when web_search is present; we parse best-effort.
+    """
+    model = _pick_model_pass_b(config)
+    prompt = _build_single_pass_b_prompt_with_web_search(config, nonlong_specs)
 
-    enabled_specs = _enabled_specs_from_config(config)
-    source_text = _build_source_text(pass_a_long_script, sources)
-    return _run_pass_b(client, config, enabled_specs, canonical_pack, source_text)
+    requested_out = _safe_int(config.get("pass_b_max_output_tokens"), default_max_output_tokens(model))
+    max_out = clamp_output_tokens(model, requested_out)
 
-
-def _build_source_text(pass_a_long_script: str, sources: List[Dict[str, Any]]) -> str:
-    srcs = []
-    for s in sources or []:
-        title = (s.get("title") or "").strip()
-        url = (s.get("url") or "").strip()
-        if title and url:
-            srcs.append(f"- {title}\n  {url}")
-        elif url:
-            srcs.append(f"- {url}")
-    src_block = "\n".join(srcs)
-    return (
-        "=== LONG SCRIPT (PASS A) ===\n"
-        f"{pass_a_long_script}\n\n"
-        "=== SOURCES ===\n"
-        f"{src_block}\n"
+    resp = create_openai_completion(
+        client=client,
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        tools=[{"type": "web_search"}],
+        json_mode=False,  # cannot enforce with web_search
+        max_completion_tokens=max_out,
     )
 
-
-def _enabled_specs_from_config(config: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Convert topic config 'content_types' into a flat list of script specs.
-
-    Expected config shape (current repo):
-      content_types: {
-        "short": {"enabled": true, "items": 4, "max_words": 350},
-        ...
-      }
-    """
-    out: List[Dict[str, Any]] = []
-    ct_cfg = config.get("content_types") or {}
-    if not isinstance(ct_cfg, dict):
-        return out
-
-    for ct_name, spec in ct_cfg.items():
-        if not isinstance(spec, dict):
-            continue
-        if not spec.get("enabled", False):
-            continue
-        items = _safe_int(spec.get("items"), 1)
-        max_words = _safe_int(spec.get("max_words"), 400)
-        prefix = _CODE_PREFIX.get(str(ct_name).strip().lower())
-        if not prefix:
-            continue
-        for i in range(items):
-            out.append({
-                "type": ct_name,
-                "code": f"{prefix}{i + 1}",
-                "max_words": max_words,
-            })
-    return out
+    txt = extract_completion_text(resp, model) or ""
+    data = _extract_first_json_object(txt)
+    if not isinstance(data, dict):
+        raise ValueError("Single-pass output is not a JSON object")
+    if "content" not in data or not isinstance(data.get("content"), list):
+        raise ValueError("Single-pass output JSON missing 'content' list")
+    if "sources" in data and not isinstance(data.get("sources"), list):
+        data["sources"] = []
+    return data
 
 
 # ---------------------------------------------------------------------------
@@ -471,51 +641,124 @@ def _enabled_specs_from_config(config: Dict[str, Any]) -> List[Dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
-    """Generate multi-format scripts with a two-pass architecture.
+    """Generate multi-format scripts.
 
     Supported calls:
-      - generate_all_content_two_pass(config, sources=None, client=None)
-      - generate_all_content_two_pass(client, config, pass_a_long_script, sources)
+      - generate_all_content_two_pass(config, sources=None, client=None, enabled_specs=None)
+      - generate_all_content_two_pass(client, config, pass_a_long_script, sources)  (legacy, Pass-B only)
     """
-
     # Legacy style: (client, config, pass_a_long_script, sources)
     if len(args) >= 4 and not isinstance(args[0], dict):
         client, config, pass_a_long_script, sources = args[0], args[1], args[2], args[3]
-        return _pass_b_only(client, config, pass_a_long_script, sources)
+        # Legacy: treat pass_a_long_script as LONG_SCRIPT and derive non-long outputs.
+        # This keeps older modules working.
+        if client is None:
+            raise ValueError("OpenAI client is required")
+        enabled_specs = kwargs.get("enabled_specs") or []
+        _, nonlong_specs = _enabled_specs_from_content_specs(enabled_specs)
+        sources_text = ""  # unknown in legacy path
+        script_text = str(pass_a_long_script or "").strip()
+        out = _run_pass_b_from_pass_a(client, config, nonlong_specs, sources_text, script_text)
+        return {"content": out.get("content", []), "sources": sources or [], "pass_a_raw_text": ""}
 
     # New style: (config, ...)
     if not args or not isinstance(args[0], dict):
-        raise TypeError("generate_all_content_two_pass expected config dict or legacy (client, config, pass_a_long_script, sources)")
+        raise TypeError("generate_all_content_two_pass expected first argument to be config dict")
 
     config: Dict[str, Any] = args[0]
-    sources: List[Dict[str, Any]] = kwargs.get("sources") or (args[1] if len(args) > 1 else [])
-    client = _get_openai_client(kwargs.get("client"))
+    sources_in: List[Dict[str, Any]] = kwargs.get("sources") or config.get("sources") or []
+    enabled_specs: List[Dict[str, Any]] = kwargs.get("enabled_specs") or config.get("enabled_specs") or []
+    client = kwargs.get("client")
 
-    enabled_specs = _enabled_specs_from_config(config)
-    if not enabled_specs:
-        return {"content": [], "sources": [], "canonical_pack": {}}
+    if client is None:
+        if OpenAI is None:
+            raise ImportError("openai package is required. Install with: pip install openai")
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY") or os.getenv("GPT_KEY"))
 
-    sources_out, canonical_pack, source_text, long_content = _run_pass_a(client, config, enabled_specs)
+    long_specs, nonlong_specs = _enabled_specs_from_content_specs(enabled_specs)
 
-    # If Pass A didn't return a usable SOURCE_TEXT, fall back to concatenating long content.
-    if not source_text.strip() and long_content:
-        source_text = "\n\n".join([str(x.get("script") or "") for x in long_content if isinstance(x, dict)])
+    pass_a_raw_text = ""
+    sources_out: List[Dict[str, Any]] = []
+    content: List[Dict[str, Any]] = []
 
-    pass_b_data = _run_pass_b(client, config, enabled_specs, canonical_pack, source_text)
-    content = pass_b_data.get("content", [])
+    if _should_run_pass_a(config, enabled_specs):
+        # Pass A: long script only (plain text). Treat incomplete as completed.
+        sources_out, sources_text, script_text, pass_a_raw_text = _run_pass_a(client, config, long_specs)
 
-    # Merge long content (if any) into final content list.
-    if isinstance(long_content, list) and long_content:
-        # Ensure required keys exist
-        for item in long_content:
-            if isinstance(item, dict) and "code" in item and "script" in item:
-                item.setdefault("type", "long")
-        content = long_content + content
+        # Build long content item(s)
+        # If multiple long specs exist, duplicate the same script unless caller provides a different strategy.
+        for i, spec in enumerate(long_specs):
+            code = str(spec.get("code") or f"L{i+1}")
+            content.append({
+                "code": code,
+                "type": "long",
+                "script": script_text,
+                "max_words": _safe_int(spec.get("target_words") or spec.get("max_words"), 9000),
+            })
+
+        # Pass B: generate all non-long items derived from the long script + sources.
+        if nonlong_specs:
+            out_b = _run_pass_b_from_pass_a(client, config, nonlong_specs, sources_text, script_text)
+            content.extend(out_b.get("content", []))
+
+    else:
+        # No Pass A. Generate non-long items directly in a single call.
+        # If the caller supplied sources, we will include them as-is; otherwise, we use web_search.
+        if sources_in:
+            # Caller-provided sources path: no web_search, strict JSON mode.
+            # We instruct the model to use provided sources only.
+            model = _pick_model_pass_b(config)
+
+            req_lines = []
+            for s in nonlong_specs:
+                c = str(s.get("code") or "").strip()
+                t = str(s.get("type") or "").strip()
+                mw = _safe_int(s.get("target_words") or s.get("max_words"), 300)
+                if c:
+                    req_lines.append(f"- {c} ({t}): max_words={mw}")
+            req_txt = "\n".join(req_lines) if req_lines else "- (no outputs requested)"
+
+            prompt = f"""You are a newsroom producer and dialogue scriptwriter for an English-language news podcast.
+
+You will be given SOURCE_ITEMS (pre-collected). Do NOT use web_search.
+Use only SOURCE_ITEMS for facts.
+
+Requested items:
+{req_txt}
+
+SOURCE_ITEMS (JSON):
+{json.dumps(sources_in, ensure_ascii=False)}
+
+Return STRICT JSON only:
+{{"content":[{{"code":"S1","type":"short","script":"HOST_A:...\\nHOST_B:...","max_words":350}}]}}
+"""
+
+            requested_out = _safe_int(config.get("pass_b_max_output_tokens"), default_max_output_tokens(model))
+            max_out = clamp_output_tokens(model, requested_out)
+
+            resp = create_openai_completion(
+                client=client,
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                tools=None,
+                json_mode=True,
+                max_completion_tokens=max_out,
+            )
+            txt = extract_completion_text(resp, model)
+            out_b = json.loads(txt) if isinstance(txt, str) else {}
+            if not isinstance(out_b, dict) or "content" not in out_b or not isinstance(out_b.get("content"), list):
+                raise ValueError("Single-pass (sources provided) output JSON missing 'content' list")
+            sources_out = sources_in
+            content.extend(out_b.get("content", []))
+        else:
+            out_b = _run_single_pass_b_with_web_search(client, config, nonlong_specs)
+            sources_out = out_b.get("sources", []) or []
+            content.extend(out_b.get("content", []))
 
     return {
         "content": content,
         "sources": sources_out,
-        "canonical_pack": canonical_pack,
+        "pass_a_raw_text": pass_a_raw_text,
     }
 
 
