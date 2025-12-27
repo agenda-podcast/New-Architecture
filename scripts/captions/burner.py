@@ -180,6 +180,14 @@ def _repo_root_from_here() -> Path:
 
 
 def _discover_frame_png(repo_root: Path) -> Optional[Path]:
+    """Discover an optional static PNG frame to overlay.
+
+    Search order:
+      1) Explicit env override: VIDEO_FRAME_PNG / FRAME_PNG (absolute or repo-root relative)
+      2) repo_root/assets/frame.png
+      3) repo_root/Assets/frame.png
+      4) first match of frame*.png / Frame*.png in assets/ or Assets/
+    """
     # Explicit override
     for envk in ("VIDEO_FRAME_PNG", "FRAME_PNG"):
         v = (os.environ.get(envk) or "").strip()
@@ -189,6 +197,21 @@ def _discover_frame_png(repo_root: Path) -> Optional[Path]:
                 p = (repo_root / p).resolve()
             if p.exists() and p.is_file():
                 return p
+
+    for folder in (repo_root / "assets", repo_root / "Assets"):
+        if not folder.exists():
+            continue
+
+        preferred = folder / "frame.png"
+        if preferred.exists():
+            return preferred
+
+        candidates = sorted(folder.glob("frame*.png")) + sorted(folder.glob("Frame*.png"))
+        if candidates:
+            return candidates[0]
+
+    return None
+
 
     assets = repo_root / "assets"
     if not assets.exists():

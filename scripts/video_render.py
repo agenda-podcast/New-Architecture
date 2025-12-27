@@ -931,27 +931,104 @@ def _find_images_metadata(start_dir: Path) -> Optional[Path]:
 
 
 def _load_image_title_map(images: List[Path]) -> Dict[str, str]:
-    """Map filename -> cleaned Google-visible title."""
+    """Map a variety of image filenames to cleaned titles.
+
+    The pipeline may render from:
+      - original downloaded images (names match images_metadata.json)
+      - processed composites (processed/ composite_*.jpg)
+      - symlinked/materialized images (00001.jpg -> processed/original)
+
+    We therefore:
+      1) Load the base metadata map: original filename -> title
+      2) If a prepared-images manifest is present, extend the map so composite out_file -> title(source_name)
+      3) Extend the map so any symlink/materialized filename -> title(resolved filename)
+    """
     if not images:
         return {}
-    meta_path = _find_images_metadata(images[0].parent)
+
+    # Locate images_metadata.json (usually under <topic>/images/).
+    meta_path = _find_images_metadata(images[0].parent) or _find_images_metadata(images[0].resolve().parent)
     if not meta_path:
         return {}
+
     try:
         with open(meta_path, "r", encoding="utf-8") as f:
             data = json.load(f)
         items = data.get("images", []) if isinstance(data, dict) else []
-        out: Dict[str, str] = {}
+        base: Dict[str, str] = {}
         for it in items:
             if not isinstance(it, dict):
                 continue
             fn = str(it.get("filename", "")).strip()
             title = str(it.get("title_clean") or it.get("title") or "").strip()
             if fn and title:
-                out[fn] = title
+                base[fn] = title
+
+        if not base:
+            return {}
+
+        out: Dict[str, str] = dict(base)
+
+        # Try to load prepared-images manifest(s) to map processed out_file back to source_name.
+        def _load_manifest_map(dir_path: Path) -> Dict[str, str]:
+            m: Dict[str, str] = {}
+            try:
+                for mf in sorted(dir_path.glob("manifest_*x*.json")):
+                    try:
+                        d = json.loads(mf.read_text(encoding="utf-8"))
+                        for e in d.get("entries", []) if isinstance(d, dict) else []:
+                            if not isinstance(e, dict):
+                                continue
+                            out_file = e.get("out_file")
+                            src_name = e.get("source_name")
+                            if out_file and src_name:
+                                m[str(out_file)] = str(src_name)
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+            return m
+
+        manifest_out_to_src: Dict[str, str] = {}
+        dirs = set()
+        for img in images:
+            try:
+                dirs.add(img.resolve().parent)
+            except Exception:
+                dirs.add(img.parent)
+        # Also consider parent dirs (e.g., processed/ -> <res>/).
+        for d in list(dirs):
+            try:
+                dirs.add(d.parent)
+            except Exception:
+                pass
+
+        for d in dirs:
+            mm = _load_manifest_map(Path(d))
+            if mm:
+                manifest_out_to_src.update(mm)
+
+        # Extend mapping for processed out_files (e.g., composite_00001.jpg).
+        for out_file, src_name in manifest_out_to_src.items():
+            title = base.get(src_name)
+            if title and out_file not in out:
+                out[out_file] = title
+
+        # Extend mapping for symlink/materialized filenames (e.g., 00001.jpg).
+        for img in images:
+            try:
+                resolved_name = img.resolve().name
+            except Exception:
+                resolved_name = img.name
+            title = out.get(resolved_name) or out.get(img.name)
+            if title:
+                out[img.name] = title
+                out[resolved_name] = title
+
         return out
     except Exception:
         return {}
+
 
 
 def _write_image_titles_sidecar(video_out: Path, segments: List[Dict[str, Any]]) -> None:
@@ -2851,6 +2928,50 @@ def render_multi_format_for_topic(topic_id: str, date_str: str,
                         # Update video_path to reflect the actual Blender output path (.blender.mp4)
                         video_path = get_blender_output_path(video_path)
                         print(f"  ✓ Rendered with Blender")
+
+                        # Ensure an image-title timeline sidecar exists for the Blender output,
+                        # so post-processing can burn top-of-screen titles deterministically.
+                        try:
+                            per_img = float(os.environ.get("BLENDER_IMAGE_DURATION_SEC", "5.0"))
+                            title_map = _load_image_title_map(materialized_images)
+                            segs: List[Dict[str, Any]] = []
+                            t0 = 0.0
+                            for idx_img, img in enumerate(materialized_images):
+                                start = t0
+                                end = min(audio_duration, t0 + per_img)
+                                if end <= start:
+                                    break
+
+                                title = title_map.get(Path(img).name, "").strip()
+                                if not title:
+                                    try:
+                                        title = title_map.get(Path(img).resolve().name, "").strip()
+                                    except Exception:
+                                        title = ""
+
+                                if title:
+                                    segs.append(
+                                        {
+                                            "start": round(float(start), 3),
+                                            "end": round(float(end), 3),
+                                            "text": title,
+                                            "filename": Path(img).name,
+                                            "index": int(idx_img),
+                                        }
+                                    )
+                                t0 += per_img
+                                if t0 >= audio_duration:
+                                    break
+
+                            _write_image_titles_sidecar(video_path, segs)
+                        except Exception:
+                            pass
+
+                        # Burn captions/titles/frame overlays for Blender output (in-place).
+                        if not maybe_burn_captions(audio_path=audio_path, video_path=video_path):
+                            print("  ✗ Overlay burn-in failed for Blender output")
+                            rendered = False
+
                 except Exception as e:
                     print(f"  ✗ Blender rendering failed: {e}")
                     rendered = False
