@@ -788,8 +788,20 @@ def _format_srt_time(seconds: float) -> str:
     return f"{hh:02d}:{mm:02d}:{ss:02d},{ms:03d}"
 
 
-def _split_words_into_blocks(words: List[str], words_per_line: int, target_lines: int, max_lines: int) -> List[List[str]]:
-    """Split words into caption blocks; each block is up to (words_per_line * max_lines) words."""
+def _split_words_into_blocks(
+    words: List[str],
+    words_per_line: int | None = None,
+    target_lines: int = 2,
+    max_lines: int = 2,
+    # Backward-compatibility: some callers used `max_words_per_line=`.
+    max_words_per_line: int | None = None,
+) -> List[List[str]]:
+    """Split words into caption blocks.
+
+    Backward compatible with earlier call sites that passed `max_words_per_line=`.
+    """
+    if words_per_line is None:
+        words_per_line = int(max_words_per_line) if max_words_per_line is not None else int(CAPTIONS_WORDS_PER_LINE)
     if not words:
         return []
     max_words_per_block = max(1, words_per_line * max_lines)

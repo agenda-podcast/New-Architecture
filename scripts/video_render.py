@@ -329,6 +329,7 @@ def render_slideshow_ffmpeg_effects(
     fps: int,
     content_type: str = 'long',
     seed: str = None,
+    enable_overlays: bool = True,
     topic_id: Optional[str] = None,
     repo_root: Optional[Path] = None
 ) -> bool:
@@ -473,7 +474,10 @@ def render_slideshow_ffmpeg_effects(
         ass_path: Optional[Path] = None
         frame_path: Optional[Path] = None
         try:
-            if ENABLE_BURN_IN_CAPTIONS:
+            # Overlays are applied inside the *same* ffmpeg encode when enabled.
+            # Use the function argument (enable_overlays) rather than global flags to
+            # avoid unexpected behavior when callers explicitly disable overlays.
+            if enable_overlays:
                 caption_segments = _load_caption_segments_for_audio(audio_path)
                 if caption_segments or title_segments:
                     ass_path = build_overlays_ass_from_segments(
@@ -702,7 +706,8 @@ def render_slideshow_ffmpeg_effects(
 
         if frame_idx is not None:
             overlay_chain.append(f"[{frame_idx}:v]scale={width}:{height}[fr]")
-            overlay_chain.append(f"{base_label}[fr]overlay=0:0:format=auto[vout]")
+            # Ensure the looped frame input cannot extend the output beyond the base timeline.
+            overlay_chain.append(f"{base_label}[fr]overlay=0:0:format=auto:shortest=1[vout]")
             map_label = '[vout]'
         else:
             map_label = base_label
