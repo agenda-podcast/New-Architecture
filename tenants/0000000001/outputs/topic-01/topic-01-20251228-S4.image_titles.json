@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 2.915,
+      "text": "New York City Comptroller: Low-Paying Job Wages Haven't Kept Up ...",
+      "filename": "00001.webp",
+      "index": 0
+    },
+    {
+      "start": 2.915,
+      "end": 5.979,
+      "text": "Venezuela protests: Maduro boosts minimum wage by 60% - BBC News",
+      "filename": "00002.jpg",
+      "index": 1
+    },
+    {
+      "start": 5.979,
+      "end": 10.491,
+      "text": "Recession risk forces BOJ to row back on inflation goal | Reuters",
+      "filename": "00003.jpg",
+      "index": 2
+    },
+    {
+      "start": 10.491,
+      "end": 13.389,
+      "text": "Wage increase versus inflation fight heats up - ABC listen",
+      "filename": "00004.jpg",
+      "index": 3
+    },
+    {
+      "start": 13.389,
+      "end": 16.264,
+      "text": "Pay after inflation rises at fastest rate since 2021",
+      "filename": "00005.jpg",
+      "index": 4
+    },
+    {
+      "start": 16.264,
+      "end": 18.835,
+      "text": "Alarm Bells Start Ringing for U.K. Economy - Bloomberg",
+      "filename": "00006.webp",
+      "index": 5
+    },
+    {
+      "start": 18.835,
+      "end": 21.529,
+      "text": "Fed Shouldn't Raises Rates Just to Keep Wages in Check - Bloomberg",
+      "filename": "00007.webp",
+      "index": 6
+    },
+    {
+      "start": 21.529,
+      "end": 24.66,
+      "text": "Wage growth slows as UK job market begins to stall",
+      "filename": "00008.jpg",
+      "index": 7
+    },
+    {
+      "start": 24.66,
+      "end": 27.269,
+      "text": "Inflation is cooling but prices aren't going to fall. Here's why ...",
+      "filename": "00009.jpg",
+      "index": 8
+    },
+    {
+      "start": 27.269,
+      "end": 31.652,
+      "text": "Report warns the cost-of-living crisis may overshadow climate ...",
+      "filename": "00010.jpg",
+      "index": 9
+    },
+    {
+      "start": 31.652,
+      "end": 31.752,
+      "text": "JD Vance asks for patience in Pennsylvania on US cost of living ...",
+      "filename": "00011.jpg",
+      "index": 10
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "topic_id": "topic-01",
+  "date": "20251228",
+  "resolutions": {
+    "1080x1920": {
+      "source_images": 50,
+      "prepared_images": 50,
+      "processed_dir": "/home/runner/work/New-Architecture/New-Architecture/tenants/0000000001/outputs/topic-01/_prepared_images/1080x1920/processed"
+    }
+  }
+}

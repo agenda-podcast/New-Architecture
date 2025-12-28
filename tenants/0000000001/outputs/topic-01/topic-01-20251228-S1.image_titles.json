@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 4.666,
+      "text": "Food price rises slow to lowest in more than a year",
+      "filename": "00001.jpg",
+      "index": 0
+    },
+    {
+      "start": 4.666,
+      "end": 8.645,
+      "text": "UK inflation unexpectedly jumps to 3.6% as food prices rise again ...",
+      "filename": "00002.jpg",
+      "index": 1
+    },
+    {
+      "start": 8.645,
+      "end": 12.896,
+      "text": "Inflation slowed to 1.7% in July, despite rising food prices",
+      "filename": "00003.jpg",
+      "index": 2
+    },
+    {
+      "start": 12.896,
+      "end": 15.614,
+      "text": "World food prices rise for third straight month in May, UN says ...",
+      "filename": "00004.jpg",
+      "index": 3
+    },
+    {
+      "start": 15.614,
+      "end": 20.438,
+      "text": "How to weather rising grocery prices: Tips from a P.E.I. dietitian ...",
+      "filename": "00005.jpg",
+      "index": 4
+    },
+    {
+      "start": 20.438,
+      "end": 23.222,
+      "text": "Is the 30% rule for rent still relevant? Here's what experts think ...",
+      "filename": "00006.jpg",
+      "index": 5
+    },
+    {
+      "start": 23.222,
+      "end": 27.427,
+      "text": "Cost of Living Is Really All About Housing - Bloomberg",
+      "filename": "00007.webp",
+      "index": 6
+    },
+    {
+      "start": 27.427,
+      "end": 31.26,
+      "text": "Do You Need to Own a House? Many Older Americans Decide They Don't ...",
+      "filename": "00008.jpg",
+      "index": 7
+    },
+    {
+      "start": 31.26,
+      "end": 32.063,
+      "text": "India home prices to climb faster than inflation this year, rents ...",
+      "filename": "00009.jpg",
+      "index": 8
+    }
+  ]
+}

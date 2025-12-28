@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 1.854,
+      "text": "Venezuela protests: Maduro boosts minimum wage by 60% - BBC News",
+      "filename": "00001.jpg",
+      "index": 0
+    },
+    {
+      "start": 1.854,
+      "end": 4.107,
+      "text": "Recession risk forces BOJ to row back on inflation goal | Reuters",
+      "filename": "00002.jpg",
+      "index": 1
+    },
+    {
+      "start": 4.107,
+      "end": 6.16,
+      "text": "Wage increase versus inflation fight heats up - ABC listen",
+      "filename": "00003.jpg",
+      "index": 2
+    },
+    {
+      "start": 6.16,
+      "end": 8.287,
+      "text": "Pay after inflation rises at fastest rate since 2021",
+      "filename": "00004.jpg",
+      "index": 3
+    },
+    {
+      "start": 8.287,
+      "end": 9.994,
+      "text": "Alarm Bells Start Ringing for U.K. Economy - Bloomberg",
+      "filename": "00005.webp",
+      "index": 4
+    },
+    {
+      "start": 9.994,
+      "end": 12.097,
+      "text": "Fed Shouldn't Raises Rates Just to Keep Wages in Check - Bloomberg",
+      "filename": "00006.webp",
+      "index": 5
+    },
+    {
+      "start": 12.097,
+      "end": 14.377,
+      "text": "Wage growth slows as UK job market begins to stall",
+      "filename": "00007.jpg",
+      "index": 6
+    },
+    {
+      "start": 14.377,
+      "end": 16.91,
+      "text": "Inflation is cooling but prices aren't going to fall. Here's why ...",
+      "filename": "00008.jpg",
+      "index": 7
+    },
+    {
+      "start": 16.91,
+      "end": 19.016,
+      "text": "Report warns the cost-of-living crisis may overshadow climate ...",
+      "filename": "00009.jpg",
+      "index": 8
+    },
+    {
+      "start": 19.016,
+      "end": 21.863,
+      "text": "JD Vance asks for patience in Pennsylvania on US cost of living ...",
+      "filename": "00010.jpg",
+      "index": 9
+    },
+    {
+      "start": 21.863,
+      "end": 23.439,
+      "text": "Thousands protest in Portugal over cost-of-living crisis | Reuters",
+      "filename": "00011.jpg",
+      "index": 10
+    },
+    {
+      "start": 23.439,
+      "end": 26.191,
+      "text": "Global retailers seek new ways to lure in shoppers as spending ...",
+      "filename": "00012.jpg",
+      "index": 11
+    },
+    {
+      "start": 26.191,
+      "end": 27.871,
+      "text": "Affordability,' and the repercussions of the increasing global ...",
+      "filename": "00013.jpg",
+      "index": 12
+    },
+    {
+      "start": 27.871,
+      "end": 29.404,
+      "text": "Insight: Private label ousting big brands as cost of living crisis ...",
+      "filename": "00014.jpg",
+      "index": 13
+    },
+    {
+      "start": 29.404,
+      "end": 29.504,
+      "text": "Trump's popularity dips as Americans sweat cost of living, Reuters ...",
+      "filename": "00015.jpg",
+      "index": 14
+    }
+  ]
+}
