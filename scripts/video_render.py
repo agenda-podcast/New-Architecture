@@ -42,7 +42,7 @@ from global_config import (
     ENABLE_VIDEO_GENERATION, ENABLE_VIDEO_AUDIO_MUX,
     ENABLE_FFMPEG_EFFECTS, FFMPEG_EFFECTS_CONFIG,
     VIDEO_CODEC, VIDEO_CODEC_PROFILE, VIDEO_BITRATE_SETTINGS,
-    TTS_AUDIO_BITRATE, VIDEO_KEYFRAME_INTERVAL_SEC,
+    TTS_AUDIO_CODEC, TTS_AUDIO_BITRATE, VIDEO_KEYFRAME_INTERVAL_SEC,
     ENABLE_BURN_IN_CAPTIONS, CAPTIONS_BOTTOM_MARGIN_FRACTION
 )
 
@@ -721,7 +721,9 @@ def render_slideshow_ffmpeg_effects(
         # Map video (and audio)
         ffmpeg_cmd.extend(['-map', map_label])
         if audio_idx is not None:
-            ffmpeg_cmd.extend(['-map', f'{audio_idx}:a:0', '-c:a', AUDIO_CODEC, '-b:a', AUDIO_BITRATE, '-shortest'])
+            # Single-pass encode: audio is muxed and encoded alongside video.
+            # Use the global TTS audio settings to ensure consistent output.
+            ffmpeg_cmd.extend(['-map', f'{audio_idx}:a:0', '-c:a', TTS_AUDIO_CODEC, '-b:a', TTS_AUDIO_BITRATE, '-shortest'])
         
         # Video encoding settings
         # Determine video format
@@ -2538,9 +2540,8 @@ def create_video_from_images(background_images: List[Path], audio_path: Optional
         except:
             print(f"  ✓ Video created: {output_path.name}")
 
-        # Captions burn-in is a dedicated subflow.
-        if not maybe_burn_captions(audio_path=audio_path, video_path=output_path):
-            return False
+        # Single-pass FFmpeg effects mode burns overlays during the encode.
+        # Do not run any post-render burn-in step here.
         
         # Cleanup temporary files
         concat_file.unlink()
