@@ -27,59 +27,59 @@ from typing import Dict, Iterable
 # Context window (prompt + output, plus any reasoning tokens) in tokens.
 MODEL_CONTEXT_TOKENS: Dict[str, int] = {
     # GPT-5 family (Responses API)
-    "gpt-5.2-pro": 400000,
-    "gpt-5.2": 400000,
-    "gpt-5.1": 400000,
-    "gpt-5-pro": 400000,
-    "gpt-5": 400000,
-    "gpt-5-mini": 400000,
-    "gpt-5-nano": 400000,
-    "gpt-5.1-codex": 400000,
-    "gpt-5.1-codex-max": 400000,
-    "gpt-5-codex": 400000,
+    "gpt-5.2-pro": 400_000,
+    "gpt-5.2": 400_000,
+    "gpt-5.1": 400_000,
+    "gpt-5-pro": 400_000,
+    "gpt-5": 400_000,
+    "gpt-5-mini": 400_000,
+    "gpt-5-nano": 400_000,
+    "gpt-5.1-codex": 400_000,
+    "gpt-5.1-codex-max": 400_000,
+    "gpt-5-codex": 400_000,
 
     # GPT-4.1 family
-    "gpt-4.1": 1047576,
-    "gpt-4.1-mini": 1047576,
-    "gpt-4.1-nano": 1047576,
+    "gpt-4.1": 1_047_576,
+    "gpt-4.1-mini": 1_047_576,
+    "gpt-4.1-nano": 1_047_576,
 
     # GPT-4o family
-    "gpt-4o": 128000,
-    "gpt-4o-mini": 128000,
+    "gpt-4o": 128_000,
+    "gpt-4o-mini": 128_000,
 
     # Legacy chat models
-    "gpt-4-turbo": 128000,
-    "gpt-4": 8192,
-    "gpt-3.5-turbo": 16385,
+    "gpt-4-turbo": 128_000,
+    "gpt-4": 8_192,
+    "gpt-3.5-turbo": 16_385,
 }
 
 # Max *visible* output tokens the API will allow you to request for the model.
 MODEL_MAX_OUTPUT_TOKENS: Dict[str, int] = {
     # GPT-5 family
-    "gpt-5-pro": 272000,
-    "gpt-5.2-pro": 128000,
-    "gpt-5.2": 128000,
-    "gpt-5.1": 128000,
-    "gpt-5": 128000,
-    "gpt-5-mini": 128000,
-    "gpt-5-nano": 128000,
-    "gpt-5.1-codex": 128000,
-    "gpt-5.1-codex-max": 128000,
-    "gpt-5-codex": 128000,
+    "gpt-5-pro": 272_000,
+    "gpt-5.2-pro": 128_000,
+    "gpt-5.2": 128_000,
+    "gpt-5.1": 128_000,
+    "gpt-5": 128_000,
+    "gpt-5-mini": 128_000,
+    "gpt-5-nano": 128_000,
+    "gpt-5.1-codex": 128_000,
+    "gpt-5.1-codex-max": 128_000,
+    "gpt-5-codex": 128_000,
 
     # GPT-4.1 family
-    "gpt-4.1": 32768,
-    "gpt-4.1-mini": 32768,
-    "gpt-4.1-nano": 32768,
+    "gpt-4.1": 32_768,
+    "gpt-4.1-mini": 32_768,
+    "gpt-4.1-nano": 32_768,
 
     # GPT-4o family
-    "gpt-4o": 16384,
-    "gpt-4o-mini": 16384,
+    "gpt-4o": 16_384,
+    "gpt-4o-mini": 16_384,
 
     # Legacy chat models
-    "gpt-4-turbo": 4096,
-    "gpt-4": 8192,
-    "gpt-3.5-turbo": 4096,
+    "gpt-4-turbo": 4_096,
+    "gpt-4": 8_192,
+    "gpt-3.5-turbo": 4_096,
 }
 
 

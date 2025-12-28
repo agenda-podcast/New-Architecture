@@ -18,6 +18,7 @@ IMPORTANT:
 from __future__ import annotations
 
 import logging
+import traceback
 from typing import Dict, Any, List
 
 logging.basicConfig(level=logging.INFO)
@@ -30,7 +31,10 @@ try:
     from responses_api_generator import generate_all_content_two_pass
     TWO_PASS_AVAILABLE = True
 except Exception as e:
+    _two_pass_import_error = str(e)
+    _two_pass_import_tb = traceback.format_exc()
     logger.warning(f"Two-pass generator not available: {e}")
+    logger.warning(_two_pass_import_tb)
     TWO_PASS_AVAILABLE = False
     generate_all_content_two_pass = None  # type: ignore
 
@@ -106,7 +110,7 @@ def generate_multi_format_scripts(config: Dict[str, Any], sources: List[Dict[str
 
         if not TWO_PASS_AVAILABLE or generate_all_content_two_pass is None:
             raise ImportError(
-                "responses_api_generator.py is not available. Ensure dependencies are installed and imports succeed."
+                f"responses_api_generator.py is not available. Import error: {globals().get('_two_pass_import_error', 'unknown')}"
             )
 
         content_specs = get_enabled_content_types(config)

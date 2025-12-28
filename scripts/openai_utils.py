@@ -13,34 +13,6 @@ import logging
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
-from dataclasses import dataclass
-from time import sleep
-import random
-
-@dataclass
-class StreamedResponse:
-    """Lightweight compatibility wrapper for streamed Responses API output.
-
-    Downstream code expects `output_text` and may look at `status`.
-    """
-    output_text: str
-    status: str = "completed"
-    response_id: str | None = None
-    raw_events: list | None = None
-
-    def model_dump_json(self, *args, **kwargs) -> str:
-        # Best-effort JSON representation (primarily for debugging artifacts).
-        return json.dumps(
-            {
-                "id": self.response_id,
-                "status": self.status,
-                "output_text": self.output_text,
-                "raw_events": self.raw_events if self.raw_events is not None else None,
-            },
-            ensure_ascii=False,
-            indent=kwargs.get("indent", None),
-        )
-
 
 try:
     from openai import OpenAI
@@ -54,6 +26,32 @@ from model_limits import default_max_output_tokens, clamp_output_tokens
 TOKEN_LIMIT_WARNING_THRESHOLD = 0.95  # Warn when using >95% of max tokens
 ERROR_CONTEXT_MESSAGE_COUNT = 3  # Number of recent messages to log on error
 LOG_PREVIEW_LENGTH = 500  # Maximum characters to preview in logs
+
+
+class StreamedResponse:
+    """Lightweight stand-in for a Responses API object when using stream=True.
+
+    Downstream code expects `.output_text` and sometimes `.model_dump_json()`.
+    We provide minimal compatibility so the pipeline can remain unchanged.
+    """
+
+    def __init__(self, output_text: str, status: str = "completed", response_id: str | None = None):
+        self.output_text = output_text or ""
+        self.status = status
+        self.id = response_id
+        self.incomplete_details = None
+        self.usage = None
+
+    def model_dump(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "status": self.status,
+            "output_text": self.output_text,
+        }
+
+    def model_dump_json(self, indent: int = 2) -> str:
+        return json.dumps(self.model_dump(), indent=indent)
+
 
 
 def _validate_params_for_endpoint(endpoint_type: str, params: Dict[str, Any]) -> None:
@@ -224,58 +222,56 @@ def create_openai_completion(
         if tools:
             logger.info(f"Tools: {tools}")
 
-        
-# Streaming is strongly recommended for very large outputs; it reduces the risk of
-# upstream proxies closing an idle connection while the model is still generating.
-# It is still a single request to the API; results are delivered incrementally.
-stream_pref = kwargs.pop("stream", None)
-env_stream = str(os.getenv("OPENAI_STREAM_RESPONSES", "true")).strip().lower() in ("1","true","yes","y")
-if stream_pref is None:
-    # Default: stream when large outputs are requested, or when explicitly enabled via env.
-    requested_for_stream = params.get("max_output_tokens")
-    stream = env_stream or (isinstance(requested_for_stream, int) and requested_for_stream >= 4096)
-else:
-    stream = bool(stream_pref)
+        _validate_params_for_endpoint("responses", params)
 
-_validate_params_for_endpoint("responses", params)
-if stream:
-    params["stream"] = True
-    # Stream events and assemble output_text.
-    # We keep a small rolling buffer of events for debugging.
-    events_kept: list = []
-    out_parts: list[str] = []
-    response_id: str | None = None
-    try:
-        stream_iter = client.responses.create(**params)
-        for ev in stream_iter:
-            etype = getattr(ev, "type", None)
-            if etype is None and isinstance(ev, dict):
-                etype = ev.get("type")
-            if etype == "response.created":
-                rid = getattr(ev, "response", None)
-                if rid is None and isinstance(ev, dict):
-                    rid = ev.get("response")
-                # Some SDK versions include response.id inside the event
-                try:
-                    response_id = getattr(rid, "id", None) if rid is not None else response_id
-                except Exception:
-                    pass
-            elif etype == "response.output_text.delta":
-                delta = getattr(ev, "delta", None)
-                if delta is None and isinstance(ev, dict):
-                    delta = ev.get("delta")
-                if isinstance(delta, str) and delta:
-                    out_parts.append(delta)
-            # keep only last 200 events to avoid memory blow-ups
-            if len(events_kept) < 200:
-                events_kept.append(ev)
-        response = StreamedResponse(output_text="".join(out_parts), status="completed", response_id=response_id, raw_events=None)
-    except Exception as e:
-        # If streaming fails mid-flight, surface a clear error (callers may retry at a higher level).
-        logger.error("Streaming Responses API request failed: %s", str(e))
-        raise
-else:
-    response = client.responses.create(**params)
+        # Streaming is strongly recommended for very large outputs; it reduces the risk of
+        # upstream proxies closing an idle connection while the model is still generating.
+        # It is still a single request to the API; results are delivered incrementally.
+        stream_pref = params.pop("stream", None)
+        env_stream = str(os.getenv("OPENAI_STREAM_RESPONSES", "true")).strip().lower() in ("1", "true", "yes", "y")
+        requested_for_stream = params.get("max_output_tokens")
+        if stream_pref is None:
+            # Default: stream when large outputs are requested, or when explicitly enabled via env.
+            stream = env_stream or (isinstance(requested_for_stream, int) and requested_for_stream >= 4096)
+        else:
+            stream = bool(stream_pref)
+
+        if stream:
+            params_stream = dict(params)
+            params_stream["stream"] = True
+
+            out_parts: List[str] = []
+            response_id: Optional[str] = None
+
+            try:
+                stream_iter = client.responses.create(**params_stream)
+                for ev in stream_iter:
+                    etype = getattr(ev, "type", None)
+                    if etype is None and isinstance(ev, dict):
+                        etype = ev.get("type")
+
+                    if etype == "response.created":
+                        rid = getattr(ev, "response", None)
+                        if rid is None and isinstance(ev, dict):
+                            rid = ev.get("response")
+                        try:
+                            response_id = getattr(rid, "id", None) if rid is not None else response_id
+                        except Exception:
+                            pass
+
+                    elif etype == "response.output_text.delta":
+                        delta = getattr(ev, "delta", None)
+                        if delta is None and isinstance(ev, dict):
+                            delta = ev.get("delta")
+                        if isinstance(delta, str) and delta:
+                            out_parts.append(delta)
+
+                response = StreamedResponse(output_text="".join(out_parts), status="completed", response_id=response_id)
+            except Exception as e:
+                logger.exception("Streaming Responses API request failed: %s", str(e))
+                raise
+        else:
+            response = client.responses.create(**params)
 
         # Persist the full Responses API payload (including tool calls/results) for later analysis
         if output_file:
