@@ -28,7 +28,7 @@ import random
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from image_preprocess_cache import restore_images_cache_from_release, publish_images_cache_to_release, get_tenant_id
-from captions_subflow import maybe_burn_captions
+from captions.burner import build_overlays_ass_from_segments
 from datetime import datetime
 
 import yaml
@@ -38,9 +38,8 @@ from global_config import (
     VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FPS,
     IMAGES_SUBDIR, ENABLE_IMAGE_CLEANUP,
     CONTENT_TYPES, get_video_resolution_for_code,
-    ALLOWED_IMAGE_EXTENSIONS, VIDEO_RENDERER,
+    ALLOWED_IMAGE_EXTENSIONS,
     ENABLE_VIDEO_GENERATION, ENABLE_VIDEO_AUDIO_MUX,
-    ENABLE_SOCIAL_EFFECTS, SOCIAL_EFFECTS_STYLE,
     ENABLE_FFMPEG_EFFECTS, FFMPEG_EFFECTS_CONFIG,
     VIDEO_CODEC, VIDEO_CODEC_PROFILE, VIDEO_BITRATE_SETTINGS,
     TTS_AUDIO_BITRATE, VIDEO_KEYFRAME_INTERVAL_SEC,
@@ -322,13 +321,16 @@ def estimate_ffmpeg_effects_slot_count(
 
 def render_slideshow_ffmpeg_effects(
     images: List[Path],
+    audio_path: Optional[Path],
     output_path: Path,
     duration: float,
     width: int,
     height: int,
     fps: int,
     content_type: str = 'long',
-    seed: str = None
+    seed: str = None,
+    topic_id: Optional[str] = None,
+    repo_root: Optional[Path] = None
 ) -> bool:
     """
     Render slideshow with FFmpeg effects (Ken Burns + xfade transitions).
@@ -442,19 +444,18 @@ def render_slideshow_ffmpeg_effects(
             print("  ✗ Failed to build slideshow schedule")
             return False
 
-        # Write image-title timeline sidecar for post-processing overlays.
-        # This intentionally happens outside the slideshow filtergraph so titles do not move
-        # with Ken Burns / pan-zoom.
+        # Build image-title segments. These are rendered as ASS subtitles so they remain
+        # static on screen (no motion along with Ken Burns / pan-zoom).
+        title_segments: List[Dict[str, Any]] = []
         try:
             title_map = _load_image_title_map([Path(s['image']) for s in schedule])
-            segs: List[Dict[str, Any]] = []
             t0 = 0.0
             for idx, it in enumerate(schedule):
                 img_p = Path(it['image'])
                 title = title_map.get(img_p.name, "").strip()
                 still_dur = float(it.get('still_duration', 0.0) or 0.0)
                 if title and still_dur > 0:
-                    segs.append(
+                    title_segments.append(
                         {
                             "start": round(t0, 3),
                             "end": round(min(duration, t0 + still_dur), 3),
@@ -464,9 +465,28 @@ def render_slideshow_ffmpeg_effects(
                         }
                     )
                 t0 += still_dur
-            _write_image_titles_sidecar(output_path, segs)
+            _write_image_titles_sidecar(output_path, title_segments)
         except Exception:
-            pass
+            title_segments = []
+
+        # Build ASS overlays (titles + captions) ahead of the single ffmpeg encode.
+        ass_path: Optional[Path] = None
+        frame_path: Optional[Path] = None
+        try:
+            if ENABLE_BURN_IN_CAPTIONS:
+                caption_segments = _load_caption_segments_for_audio(audio_path)
+                if caption_segments or title_segments:
+                    ass_path = build_overlays_ass_from_segments(
+                        video_path=output_path,
+                        width=width,
+                        height=height,
+                        caption_segments=caption_segments,
+                        title_segments=title_segments,
+                    )
+            frame_path = _discover_frame_png(repo_root or Path(__file__).resolve().parent.parent)
+        except Exception:
+            ass_path = None
+            frame_path = None
         
         print(f"  Building FFmpeg effects slideshow:")
         print(f"    Images: {len(schedule)} slots from {len(images)} source images")
@@ -651,19 +671,52 @@ def render_slideshow_ffmpeg_effects(
             else:
                 output_map = '[out]'
         
-        # Build FFmpeg command
+        # Build FFmpeg command (single-pass encode: base slideshow + overlays + audio)
         ffmpeg_cmd = ['ffmpeg', '-y']
         
-        # Add input files
+        # Add image inputs
         for item in schedule:
             ffmpeg_cmd.extend(['-loop', '1', '-i', str(item['image'])])
+
+        # Add audio input (if present)
+        audio_idx = None
+        if ENABLE_VIDEO_AUDIO_MUX and audio_path:
+            audio_idx = len(schedule)
+            ffmpeg_cmd.extend(['-i', str(audio_path)])
+
+        # Add static frame overlay (if present)
+        frame_idx = None
+        if frame_path and frame_path.exists():
+            frame_idx = len(schedule) + (1 if audio_idx is not None else 0)
+            ffmpeg_cmd.extend(['-loop', '1', '-i', str(frame_path)])
         
-        # Add filter_complex
+        # Compose the final filtergraph: base slideshow -> ASS subtitles -> frame overlay
         filter_complex_str = ';'.join(filter_complex)
-        ffmpeg_cmd.extend(['-filter_complex', filter_complex_str])
-        
-        # Map output
-        ffmpeg_cmd.extend(['-map', output_map])
+        overlay_chain = []
+
+        base_label = output_map
+        if ass_path:
+            esc_ass = _escape_filter_path(str(ass_path))
+            overlay_chain.append(f"{base_label}subtitles=filename='{esc_ass}':charenc=UTF-8[vsub]")
+            base_label = '[vsub]'
+
+        if frame_idx is not None:
+            overlay_chain.append(f"[{frame_idx}:v]scale={width}:{height}[fr]")
+            overlay_chain.append(f"{base_label}[fr]overlay=0:0:format=auto[vout]")
+            map_label = '[vout]'
+        else:
+            map_label = base_label
+
+        full_filter = filter_complex_str
+        if overlay_chain:
+            full_filter = full_filter + ';' + ';'.join(overlay_chain)
+
+        ffmpeg_cmd.extend(['-filter_complex', full_filter])
+
+        # Map video (and audio)
+        ffmpeg_cmd.extend(['-map', map_label])
+        if audio_idx is not None:
+            ffmpeg_cmd.extend(['-map', f'{audio_idx}:a:0', '-c:a', AUDIO_CODEC, '-b:a', AUDIO_BITRATE, '-shortest'])
         
         # Video encoding settings
         # Determine video format
@@ -706,12 +759,14 @@ def render_slideshow_ffmpeg_effects(
         # Execute FFmpeg command
         print(f"  Executing FFmpeg filtergraph rendering...")
         try:
+            timeout_env = os.environ.get('FFMPEG_TIMEOUT_SEC', '').strip()
+            timeout = int(timeout_env) if timeout_env.isdigit() else None
             result = subprocess.run(
                 ffmpeg_cmd,
                 capture_output=True,
                 text=True,
                 check=True,
-                timeout=600  # 10 minute timeout
+                timeout=timeout
             )
             print(f"  ✓ FFmpeg rendering completed")
         except subprocess.CalledProcessError as e:
@@ -723,7 +778,7 @@ def render_slideshow_ffmpeg_effects(
                     print(f"    {line}")
             return False
         except subprocess.TimeoutExpired:
-            print(f"  ✗ FFmpeg rendering timed out (10 minutes)")
+            print(f"  ✗ FFmpeg rendering timed out")
             return False
         
         # Validate output using ffprobe
@@ -931,114 +986,27 @@ def _find_images_metadata(start_dir: Path) -> Optional[Path]:
 
 
 def _load_image_title_map(images: List[Path]) -> Dict[str, str]:
-    """Map prepared image filenames -> cleaned titles.
-
-    Important: in portrait renders, most source images are undersized and get transformed into
-    cached composites under _prepared_images/<WxH>/processed/composite_XXXXX.jpg. Those filenames
-    do NOT exist in images_metadata.json, so a naïve filename->title mapping returns empty and
-    produces an empty <video>.image_titles.json.
-
-    This function therefore builds a robust mapping that covers:
-      1) original source filenames (e.g., image_000.jpg) -> title
-      2) prepared composites via manifest mapping (processed/manifest_<WxH>.json):
-            out_file (e.g., composite_00012.jpg) -> title for source_name
-      3) fallback: composite_XXXXX.* -> title for source index if it can be inferred
-    """
+    """Map filename -> cleaned Google-visible title."""
     if not images:
         return {}
-
-    # Locate the canonical metadata for the topic's images folder.
     meta_path = _find_images_metadata(images[0].parent)
     if not meta_path:
         return {}
-
-    def _clean_title(t: str) -> str:
-        return (t or "").strip()
-
-    def _extract_int(s: str) -> Optional[int]:
-        m = re.search(r"(\d+)(?!.*\d)", s)
-        return int(m.group(1)) if m else None
-
     try:
-        data = json.loads(meta_path.read_text(encoding="utf-8", errors="ignore"))
+        with open(meta_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        items = data.get("images", []) if isinstance(data, dict) else []
+        out: Dict[str, str] = {}
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            fn = str(it.get("filename", "")).strip()
+            title = str(it.get("title_clean") or it.get("title") or "").strip()
+            if fn and title:
+                out[fn] = title
+        return out
     except Exception:
         return {}
-
-    items = data.get("images", []) if isinstance(data, dict) else []
-    if not isinstance(items, list) or not items:
-        return {}
-
-    # Source filename -> title
-    title_by_source: Dict[str, str] = {}
-    # Numeric index (best-effort) -> title (for composite_XXXXX fallback)
-    title_by_index: Dict[int, str] = {}
-
-    for it in items:
-        if not isinstance(it, dict):
-            continue
-        src_fn = str(it.get("filename", "")).strip()
-        title = _clean_title(str(it.get("title_clean") or it.get("title") or ""))
-        if src_fn and title:
-            title_by_source[src_fn] = title
-            idx = _extract_int(Path(src_fn).stem)
-            if idx is not None:
-                title_by_index[idx] = title
-
-    out: Dict[str, str] = dict(title_by_source)
-
-    # 1) Manifest mapping (preferred, exact):
-    #    processed/manifest_<WxH>.json contains entries {source_name, out_file} for composites.
-    try:
-        processed_dir = images[0].parent
-        manifest_candidates: List[Path] = []
-        if processed_dir.name.lower() == "processed":
-            manifest_candidates = sorted(processed_dir.glob("manifest_*.json"))
-        else:
-            # Sometimes schedule points at the parent dir; search nearby.
-            manifest_candidates = sorted((processed_dir / "processed").glob("manifest_*.json")) +                                  sorted(processed_dir.glob("manifest_*.json"))
-
-        for mp in manifest_candidates:
-            try:
-                mdata = json.loads(mp.read_text(encoding="utf-8", errors="ignore"))
-            except Exception:
-                continue
-            entries = mdata.get("entries", []) if isinstance(mdata, dict) else []
-            if not isinstance(entries, list):
-                continue
-            for e in entries:
-                if not isinstance(e, dict):
-                    continue
-                src_name = str(e.get("source_name", "")).strip()
-                out_file = str(e.get("out_file", "")).strip()
-                mode = str(e.get("mode", "")).strip()
-                if mode != "composite" or not out_file or not src_name:
-                    continue
-                t = title_by_source.get(src_name, "")
-                if t:
-                    out[out_file] = t
-            # If we parsed at least one manifest, we can stop.
-            if len(out) > len(title_by_source):
-                break
-    except Exception:
-        pass
-
-    # 2) Fallback: composite_XXXXX.* -> infer index
-    try:
-        for p in images:
-            nm = p.name
-            if nm in out:
-                continue
-            if nm.lower().startswith("composite_"):
-                idx = _extract_int(Path(nm).stem)
-                if idx is not None:
-                    # composite index usually matches source position; try direct
-                    t = title_by_index.get(idx, "")
-                    if t:
-                        out[nm] = t
-    except Exception:
-        pass
-
-    return out
 
 
 def _write_image_titles_sidecar(video_out: Path, segments: List[Dict[str, Any]]) -> None:
@@ -1087,6 +1055,69 @@ def _parse_srt_simple(srt_text: str):
         if cap_text:
             entries.append((start, end, cap_text))
     return entries
+
+
+def _load_caption_segments_for_audio(audio_path: Optional[Path]) -> List[Dict[str, Any]]:
+    """Load caption segments (with optional speaker tokens) from the audio sidecars.
+
+    Supported inputs (checked in order):
+      - <audio>.captions.json
+      - <audio>.captions.srt
+    """
+    if not audio_path:
+        return []
+    try:
+        json_path = audio_path.with_suffix('.captions.json')
+        if json_path.exists():
+            data = json.loads(json_path.read_text(encoding='utf-8'))
+            if isinstance(data, dict):
+                segs = data.get('segments') or data.get('captions') or data.get('items') or data.get('data') or []
+            elif isinstance(data, list):
+                segs = data
+            else:
+                segs = []
+
+            out: List[Dict[str, Any]] = []
+            for s in segs:
+                if not isinstance(s, dict):
+                    continue
+                start = s.get('start') if s.get('start') is not None else s.get('s')
+                end = s.get('end') if s.get('end') is not None else s.get('e')
+                text = s.get('text') or s.get('caption') or s.get('t') or ''
+                speaker = s.get('speaker') or s.get('spk')
+                if start is None or end is None or not str(text).strip():
+                    continue
+                out.append({'start': float(start), 'end': float(end), 'text': str(text).strip(), 'speaker': speaker})
+            return out
+
+        srt_path = audio_path.with_suffix('.captions.srt')
+        if srt_path.exists():
+            entries = _parse_srt_simple(srt_path.read_text(encoding='utf-8', errors='ignore'))
+            return [{'start': a, 'end': b, 'text': t} for (a, b, t) in entries]
+    except Exception:
+        return []
+    return []
+
+
+def _discover_frame_png(repo_root: Path) -> Optional[Path]:
+    """Discover a static PNG frame overlay from the repository assets folder."""
+    if not repo_root:
+        return None
+    for assets_name in ('assets', 'Assets'):
+        assets_dir = repo_root / assets_name
+        if not assets_dir.exists():
+            continue
+        for cand in (assets_dir / 'frame.png', assets_dir / 'Frame.png'):
+            if cand.exists():
+                return cand
+        # fallback: any frame*.png
+        try:
+            matches = sorted(assets_dir.glob('frame*.png'))
+            if matches:
+                return matches[0]
+        except Exception:
+            pass
+    return None
 
 def _escape_drawtext_text(s: str) -> str:
     """Escape text for FFmpeg drawtext filter."""
@@ -1273,38 +1304,20 @@ def burn_in_captions_if_present(
                 pass
 
 
-def check_renderer_available(renderer_type: str = None) -> tuple[bool, str]:
+def check_renderer_available(renderer_type: str = 'ffmpeg') -> tuple[bool, str]:
     """
     Check if the specified video renderer is available.
     
     Args:
-        renderer_type: 'blender' or 'ffmpeg' (default: use VIDEO_RENDERER from config)
+        renderer_type: must be 'ffmpeg' (Blender rendering is not supported)
         
     Returns:
         Tuple of (available: bool, path: str or error_msg: str)
     """
-    if renderer_type is None:
-        renderer_type = VIDEO_RENDERER
-    
-    if renderer_type == 'blender':
-        blender_paths = [
-            '../blender-4.5.0-linux-x64/blender',  # Relative from scripts/ directory
-            './blender-4.5.0-linux-x64/blender',   # Relative from repo root
-            'blender',
-            '/usr/bin/blender',
-            '/usr/local/bin/blender',
-        ]
-        for path in blender_paths:
-            try:
-                result = subprocess.run([path, '--version'],
-                                      capture_output=True, text=True, timeout=5)
-                if result.returncode == 0:
-                    return True, path
-            except (FileNotFoundError, subprocess.TimeoutExpired):
-                continue
-        return False, "Blender not found in any standard location"
-    
-    elif renderer_type == 'ffmpeg':
+    if renderer_type != 'ffmpeg':
+        return False, "Unsupported renderer: only 'ffmpeg' is supported"
+
+    if renderer_type == 'ffmpeg':
         try:
             result = subprocess.run(['ffmpeg', '-version'],
                                   capture_output=True, text=True, timeout=5)
@@ -1819,6 +1832,12 @@ def process_images_for_video(
                     out_file = e.get("out_file")
                     if not out_file:
                         return False
+                    # Backward-compat: older manifests used 'composite_#####' output names.
+                    # We now preserve the original filename for composite outputs so title
+                    # lookups can reliably match images_metadata.json. Force a re-process
+                    # when we detect the legacy naming.
+                    if str(out_file).startswith("composite_"):
+                        return False
                     outp = processed_dir / out_file
                     if not outp.exists() or outp.stat().st_size == 0:
                         return False
@@ -1871,7 +1890,10 @@ def process_images_for_video(
             status = "using original (dimensions unknown)"
         elif img_width < target_width or img_height < target_height:
             undersized_count += 1
-            composite_path = processed_dir / f'composite_{i:05d}{img_path.suffix}'
+            # Preserve the original filename for the processed composite so that
+            # title lookups (images_metadata.json) continue to match even after
+            # preprocessing.
+            composite_path = processed_dir / img_path.name
 
             # Reuse cache if the composite exists and is newer than the source.
             try:
@@ -2259,8 +2281,8 @@ def create_video_from_images(background_images: List[Path], audio_path: Optional
         
         # Try FFmpeg effects mode if enabled (Ken Burns + xfade transitions)
         effects_success = False
-        if ENABLE_FFMPEG_EFFECTS and VIDEO_RENDERER == 'ffmpeg':
-            print(f"  Attempting FFmpeg effects mode (Ken Burns + xfade)...")
+        if ENABLE_FFMPEG_EFFECTS:
+            print(f"  Attempting FFmpeg effects mode (single-pass encode with overlays)...")
             
             # Infer content type from content code
             content_type = infer_content_type_from_code(content_code) if content_code else 'long'
@@ -2268,8 +2290,7 @@ def create_video_from_images(background_images: List[Path], audio_path: Optional
             # Generate seed for deterministic output
             seed = output_path.stem if output_path else None
             
-            # Try rendering with effects
-            # Note: This creates video-only output, audio muxing happens separately
+            # Try rendering with effects (single-pass: video + audio + frame + subtitles)
             effects_success = render_slideshow_ffmpeg_effects(
                 images=background_images,
                 output_path=output_path,
@@ -2278,49 +2299,15 @@ def create_video_from_images(background_images: List[Path], audio_path: Optional
                 height=video_height,
                 fps=fps,
                 content_type=content_type,
-                seed=seed
+                seed=seed,
+                audio_path=audio_path,
+                enable_overlays=bool(ENABLE_BURN_IN_CAPTIONS),
+                repo_root=repo_root,
             )
             
             if effects_success:
                 print(f"  ✓ FFmpeg effects mode succeeded")
-                
-                # If audio muxing is enabled and we have an audio file, mux it now
-                if ENABLE_VIDEO_AUDIO_MUX and audio_path:
-                    print(f"  Muxing audio with FFmpeg...")
-                    mux_temp_output = output_path.parent / f"{output_path.stem}.mux.mp4"
-                    
-                    try:
-                        mux_cmd = [
-                            'ffmpeg', '-y',
-                            '-hide_banner',
-                            '-loglevel', 'error',
-                            '-i', str(output_path),
-                            '-i', str(audio_path),
-                            '-map', '0:v:0',
-                            '-map', '1:a:0',
-                            '-c:v', 'copy',
-                            '-c:a', 'copy',
-                            '-shortest',
-                            '-movflags', '+faststart',
-                            str(mux_temp_output)
-                        ]
-                        subprocess.run(mux_cmd, capture_output=True, text=True, check=True)
-                        os.replace(str(mux_temp_output), str(output_path))
-                        print(f"  ✓ Audio mux complete")
-                    except Exception as e:
-                        print(f"  ✗ Audio mux failed: {e}")
-                        # Clean up temp file
-                        if mux_temp_output.exists():
-                            mux_temp_output.unlink()
-                        effects_success = False
-                
-                if effects_success:
-                    # Captions burn-in is a dedicated subflow.
-                    if not maybe_burn_captions(audio_path=audio_path, video_path=output_path):
-                        return False
-
-                    # Success - skip legacy concat mode
-                    return True
+                return True
             else:
                 print(f"  ⓘ FFmpeg effects mode failed or unavailable, falling back to legacy concat mode")
         
@@ -2406,48 +2393,98 @@ def create_video_from_images(background_images: List[Path], audio_path: Optional
             f"pad={video_width}:{video_height}:(ow-iw)/2:(oh-ih)/2"
         )
         
-        # Build FFmpeg command based on whether audio muxing is enabled
-        ffmpeg_cmd = [
-            'ffmpeg',
-            '-f', 'concat',
-            '-safe', '0',
-            '-i', str(concat_file),
-        ]
-        
-        # Add audio input only if muxing is enabled (validation already done at function start)
-        if ENABLE_VIDEO_AUDIO_MUX:
+        # Build FFmpeg command (single-pass encode: slideshow + ASS overlays + static frame + audio)
+        ffmpeg_cmd = ['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error']
+        ffmpeg_cmd.extend(['-f', 'concat', '-safe', '0', '-i', str(concat_file)])
+
+        audio_idx = None
+        if ENABLE_VIDEO_AUDIO_MUX and audio_path:
+            audio_idx = 1
             ffmpeg_cmd.extend(['-i', str(audio_path)])
-        
-        # Add video filters and encoding options
+
+        # Resolve repo_root so we can find assets/frame.png (supports both assets/ and Assets/)
+        repo_root = Path(__file__).resolve().parent.parent
+        frame_path = _discover_frame_png(repo_root)
+        frame_idx = None
+        if frame_path and frame_path.exists():
+            frame_idx = 2 if audio_idx is not None else 1
+            ffmpeg_cmd.extend(['-loop', '1', '-i', str(frame_path)])
+
+        # ASS overlays
+        ass_path = None
+        if ENABLE_BURN_IN_CAPTIONS and (audio_path is not None):
+            caption_segments = _load_caption_segments_for_audio(audio_path)
+            # Rebuild title segments deterministically from the image schedule
+            try:
+                title_map = _load_image_title_map([img for img, _ in image_durations])
+                title_segments: List[Dict[str, Any]] = []
+                t0 = 0.0
+                for idx, (img, dur) in enumerate(image_durations):
+                    title = title_map.get(Path(img).name, '').strip()
+                    d = float(dur or 0.0)
+                    if title and d > 0:
+                        title_segments.append({
+                            'start': round(t0, 3),
+                            'end': round(min(audio_duration, t0 + d), 3),
+                            'text': title,
+                            'filename': Path(img).name,
+                            'index': idx,
+                        })
+                    t0 += d
+            except Exception:
+                title_segments = []
+
+            if caption_segments or title_segments:
+                try:
+                    ass_path = build_overlays_ass_from_segments(
+                        video_path=output_path,
+                        width=video_width,
+                        height=video_height,
+                        caption_segments=caption_segments,
+                        title_segments=title_segments,
+                        hide_speaker_names=True,
+                    )
+                except Exception:
+                    ass_path = None
+
+        # Build filter_complex (scale/pad -> subtitles -> overlay frame)
+        base_label = '[v0]'
+        fc_parts = [f"[0:v]{scale_filter}{base_label}"]
+        if ass_path:
+            esc_ass = _escape_filter_path(str(ass_path))
+            fc_parts.append(f"{base_label}subtitles=filename='{esc_ass}':charenc=UTF-8[vsub]")
+            base_label = '[vsub]'
+
+        if frame_idx is not None:
+            fc_parts.append(f"[{frame_idx}:v]scale={video_width}:{video_height}[fr]")
+            fc_parts.append(f"{base_label}[fr]overlay=0:0:format=auto[vout]")
+            map_label = '[vout]'
+        else:
+            map_label = base_label
+
+        ffmpeg_cmd.extend(['-filter_complex', ';'.join(fc_parts)])
+        ffmpeg_cmd.extend(['-map', map_label])
+
+        # Video encoding
         ffmpeg_cmd.extend([
-            '-vf', scale_filter,
             '-c:v', VIDEO_CODEC,
             '-profile:v', VIDEO_CODEC_PROFILE,
             '-b:v', bitrate_config['bitrate'],
             '-maxrate', bitrate_config['maxrate'],
             '-bufsize', bitrate_config['bufsize'],
-            '-g', str(keyframe_interval_frames),  # Keyframe interval
-        ])
-        
-        # Add audio encoding options only if muxing is enabled
-        if ENABLE_VIDEO_AUDIO_MUX:
-            ffmpeg_cmd.extend([
-                '-c:a', 'aac',
-                '-b:a', TTS_AUDIO_BITRATE,
-                '-shortest',
-            ])
-        else:
-            # For video-only, use exact duration from concat file
-            ffmpeg_cmd.extend([
-                '-t', str(audio_duration),
-            ])
-        
-        # Add final output options
-        ffmpeg_cmd.extend([
+            '-g', str(keyframe_interval_frames),
             '-pix_fmt', 'yuv420p',
             '-r', str(fps),
-            '-y', str(output_path)
+            '-movflags', '+faststart',
         ])
+
+        # Audio encoding / mux
+        if ENABLE_VIDEO_AUDIO_MUX and audio_path:
+            ffmpeg_cmd.extend(['-map', f"{audio_idx}:a:0", '-c:a', 'aac', '-b:a', TTS_AUDIO_BITRATE, '-shortest'])
+        else:
+            ffmpeg_cmd.extend(['-t', str(audio_duration)])
+
+        ffmpeg_cmd.extend([str(output_path)])
         
         print(f"  Executing FFmpeg command...")
         print(f"    Input: {len(image_durations)} image slots from {concat_file}")
@@ -2553,7 +2590,7 @@ def render_multi_format_for_topic(topic_id: str, date_str: str,
     4. Clean up images after all videos complete
     """
     print(f"Rendering multi-format videos for {topic_id}...")
-    print(f"Video Renderer: {VIDEO_RENDERER}")
+    print("Video Renderer: ffmpeg (single-pass encode)")
     print(f"Video Generation: {'Enabled' if ENABLE_VIDEO_GENERATION else 'Disabled'}")
     print(f"Video-Audio Muxing: {'Enabled' if ENABLE_VIDEO_AUDIO_MUX else 'Disabled (video-only mode)'}")
     
@@ -2563,26 +2600,14 @@ def render_multi_format_for_topic(topic_id: str, date_str: str,
         print("Skipping video rendering")
         return True
     
-    # Pre-flight check: Verify renderer is available
-    available, result = check_renderer_available(VIDEO_RENDERER)
+    # Pre-flight check: Verify FFmpeg is available
+    available, result = check_renderer_available('ffmpeg')
     if not available:
-        print(f"\n✗ ERROR: Video renderer '{VIDEO_RENDERER}' is not available")
+        print("\n✗ ERROR: FFmpeg is not available")
         print(f"  {result}")
-        
-        # Try fallback to FFmpeg if primary renderer was Blender
-        if VIDEO_RENDERER == 'blender':
-            print(f"\n  Checking FFmpeg as fallback...")
-            ffmpeg_available, ffmpeg_result = check_renderer_available('ffmpeg')
-            if ffmpeg_available:
-                print(f"  ✓ FFmpeg is available as fallback: {ffmpeg_result}")
-            else:
-                print(f"  ✗ FFmpeg fallback also unavailable: {ffmpeg_result}")
-                print(f"\n  FATAL: No video renderer available. Cannot proceed with video rendering.")
-                print(f"  Please install FFmpeg: sudo apt-get install ffmpeg")
-                return False
-        else:
-            print(f"\n  FATAL: No video renderer available. Cannot proceed with video rendering.")
-            return False
+        print("\n  FATAL: No video renderer available. Cannot proceed with video rendering.")
+        print("  Please install FFmpeg: sudo apt-get install ffmpeg")
+        return False
     else:
         print(f"  ✓ Renderer available: {result}")
     
@@ -2651,42 +2676,19 @@ def render_multi_format_for_topic(topic_id: str, date_str: str,
     print(f"✓ Using {len(image_files)} images directly for video rendering")
     
     # Allocate images consecutively across videos.
-    # For FFmpeg effects mode, we allocate based on the *actual* slot count per video
+    # In effects mode we allocate based on the *actual* slot count per video
     # (duration + still range + transition duration). This avoids hardcoding a fixed
     # number of images per video and prevents unnecessary image repetition.
     image_cursor = 0
     fallback_images_per_video = max(1, math.ceil(len(image_files) / max(1, len(audio_files))))
-    if VIDEO_RENDERER == 'ffmpeg' and ENABLE_FFMPEG_EFFECTS:
+    if ENABLE_FFMPEG_EFFECTS:
         print("Image allocation: dynamic (per-video slot count; consecutive rotation across renders)")
     else:
         print(f"Image allocation: {fallback_images_per_video} images per video (consecutive slices)")
-    
-    # Load video template configuration
+
+    # FFmpeg-only pipeline: no Blender templates.
     repo_root = Path(__file__).parent.parent
-    tpl_cfg = load_video_template_config(repo_root)
-    
-    # Initialize template selector if templates are available
-    templates_dir = repo_root / "templates"
-    inventory_path = templates_dir / "inventory.yml"
-    selector = None
-    
-    if inventory_path.exists():
-        try:
-            # Import template selector
-            import sys
-            blender_dir = Path(__file__).parent / 'blender'
-            if str(blender_dir) not in sys.path:
-                sys.path.insert(0, str(blender_dir))
-            from template_selector import TemplateSelector
-            
-            selector = TemplateSelector(templates_dir=templates_dir, inventory_path=inventory_path)
-            print(f"✓ Template selector initialized")
-        except Exception as e:
-            print(f"⚠ Warning: Could not initialize template selector: {e}")
-            selector = None
-    else:
-        print(f"⚠ Warning: Template inventory not found at {inventory_path}")
-    
+
     # Initialize rotation counters per content type
     rotation_idx = {}  # content_type -> int
     
@@ -2802,7 +2804,7 @@ def render_multi_format_for_topic(topic_id: str, date_str: str,
             content_type_map = {'L': 'long', 'M': 'medium', 'S': 'short', 'R': 'reels'}
             ct_for_alloc = content_type_map.get(code_prefix, 'long')
 
-            if VIDEO_RENDERER == 'ffmpeg' and ENABLE_FFMPEG_EFFECTS:
+            if ENABLE_FFMPEG_EFFECTS:
                 effects_cfg = load_ffmpeg_effects_config() or {}
                 needed_images = estimate_ffmpeg_effects_slot_count(
                     duration=float(audio_duration),
@@ -2860,176 +2862,28 @@ def render_multi_format_for_topic(topic_id: str, date_str: str,
             content_type_map = {'L': 'long', 'M': 'medium', 'S': 'short', 'R': 'reels'}
             content_type = content_type_map.get(code_prefix, 'long')
             
-            # Select template for this video based on content type
-            template_path = None
-            
-            # Blender templates are only relevant when VIDEO_RENDERER is Blender.
-            # When using FFmpeg, skip template selection/validation to avoid misleading warnings.
-            if VIDEO_RENDERER == 'blender' and selector and ENABLE_SOCIAL_EFFECTS:
-                try:
-                    # Get content type settings from config
-                    selection_cfg = tpl_cfg.get("selection", {})
-                    by_content_type = selection_cfg.get("by_content_type", {}) or {}
-                    content_settings = by_content_type.get(content_type, {})
-                    
-                    strategy = content_settings.get("strategy") or selection_cfg.get("default_strategy", "sequential")
-                    candidates = content_settings.get("candidates") or []
-                    
-                    if candidates:
-                        # Initialize rotation counter for this content type if needed
-                        rotation_idx.setdefault(content_type, 0)
-                        
-                        if strategy == "sequential":
-                            # Sequential selection: rotate through candidates
-                            current_position = rotation_idx[content_type]
-                            tpl_id = candidates[current_position % len(candidates)]
-                            rotation_idx[content_type] += 1
-                            print(f"  Template selection (sequential): {tpl_id} (position {current_position + 1} in {content_type} rotation)")
-                        else:
-                            # Weighted or auto: use existing selector's stable randomized choice
-                            seed_input = f"{topic_id}-{date_str}-{code}"
-                            seed = hashlib.sha256(seed_input.encode()).hexdigest()[:12]
-                            tpl = selector.select_template(seed=seed, style="auto")
-                            tpl_id = tpl["id"] if tpl else None
-                            print(f"  Template selection (weighted/auto): {tpl_id}")
-                        
-                        # Validate and get template path
-                        if tpl_id and selector.validate_template(tpl_id):
-                            template_path = selector.get_template_path(tpl_id)
-                            print(f"  ✓ Template validated: {template_path}")
-                        else:
-                            print(f"  ⚠ Template validation failed: {tpl_id}")
-                    else:
-                        print(f"  ⓘ No template candidates configured for content type '{content_type}'")
-                    
-                    # Apply fallback if no template selected
-                    if template_path is None:
-                        fallback_none = selection_cfg.get("fallback_to_none", True)
-                        fallback_id = selection_cfg.get("fallback_template_id", "minimal")
-                        
-                        if not fallback_none and selector.validate_template(fallback_id):
-                            template_path = selector.get_template_path(fallback_id)
-                            print(f"  Using fallback template: {fallback_id}")
-                        else:
-                            print(f"  No template will be used (fallback_to_none={fallback_none})")
-                            
-                except Exception as e:
-                    print(f"  ⚠ Template selection error: {e}")
-                    template_path = None
-            elif VIDEO_RENDERER != 'blender':
-                print(f"  Template selection skipped (renderer={VIDEO_RENDERER})")
-            elif not ENABLE_SOCIAL_EFFECTS:
-                print(f"  Social effects disabled (ENABLE_SOCIAL_EFFECTS=False)")
-            else:
-                print(f"  Template selector not available")
-            
-            # Choose renderer based on configuration
-            rendered = False
-            renderer_used = None
-            
-            if VIDEO_RENDERER == 'blender':
-                # Try Blender first
-                print(f"  Attempting Blender renderer...")
-                try:
-                    rendered = render_with_blender(video_images_dir, audio_path, video_path, content_type,
-                                                   seed=None, audio_duration=audio_duration, template_path=template_path)
-                    if rendered:
-                        renderer_used = 'blender'
-                        # Update video_path to reflect the actual Blender output path (.blender.mp4)
-                        video_path = get_blender_output_path(video_path)
-                        print(f"  ✓ Rendered with Blender")
-                except Exception as e:
-                    print(f"  ✗ Blender rendering failed: {e}")
-                    rendered = False
-                
-                # Fallback to FFmpeg if Blender fails
-                if not rendered:
-                    # Guard: Check if a good video already exists before overwriting
-                    blender_video_path = get_blender_output_path(video_path)
-                    
-                    # Check both output paths for existing good video
-                    blender_guard_size = get_safe_file_size(blender_video_path)
-                    final_guard_size = get_safe_file_size(video_path)
-                    
-                    if blender_guard_size and blender_guard_size > MIN_FALLBACK_GUARD_SIZE_BYTES:
-                        print(f"  ⚠ Blender output already exists ({blender_guard_size / (1024*1024):.2f} MB)")
-                        print(f"  ⓘ Skipping FFmpeg fallback to avoid overwriting good video")
-                        rendered = True
-                        renderer_used = 'blender'
-                        video_path = blender_video_path
-                    elif final_guard_size and final_guard_size > MIN_FALLBACK_GUARD_SIZE_BYTES:
-                        print(f"  ⚠ Final output already exists ({final_guard_size / (1024*1024):.2f} MB)")
-                        print(f"  ⓘ Skipping FFmpeg fallback to avoid overwriting good video")
-                        rendered = True
-                        renderer_used = 'blender'
-                    else:
-                        print(f"  Falling back to FFmpeg renderer...")
-                        video_config = config.copy()
-                        video_config['video_width'] = video_width
-                        video_config['video_height'] = video_height
-                        
-                        try:
-                            # Pass video_duration for video-only mode, audio_path for muxing mode
-                            rendered = create_video_from_images(
-                                processed_images, 
-                                audio_path if ENABLE_VIDEO_AUDIO_MUX else None,
-                                video_path, 
-                                video_config, 
-                                chapters, 
-                                content_code=code, 
-                                script_path=None,
-                                video_duration=audio_duration
-                            )
-                            if rendered:
-                                renderer_used = 'ffmpeg'
-                                print(f"  ✓ Rendered with FFmpeg (fallback)")
-                        except Exception as e:
-                            print(f"  ✗ FFmpeg rendering failed: {e}")
-                            rendered = False
-            
-            elif VIDEO_RENDERER == 'ffmpeg':
-                # Use FFmpeg directly (no Blender attempt)
-                print(f"  Attempting FFmpeg renderer...")
-                video_config = config.copy()
-                video_config['video_width'] = video_width
-                video_config['video_height'] = video_height
-                
-                try:
-                    # Pass video_duration for video-only mode, audio_path for muxing mode
-                    rendered = create_video_from_images(
-                        processed_images, 
-                        audio_path if ENABLE_VIDEO_AUDIO_MUX else None,
-                        video_path, 
-                        video_config, 
-                        chapters, 
-                        content_code=code, 
-                        script_path=None,
-                        video_duration=audio_duration
-                    )
-                    if rendered:
-                        renderer_used = 'ffmpeg'
-                        print(f"  ✓ Rendered with FFmpeg")
-                except Exception as e:
-                    print(f"  ✗ FFmpeg rendering failed: {e}")
-                    rendered = False
-            
+            # FFmpeg-only single-pass renderer
+            print(f"  Rendering with FFmpeg...")
+            video_config = config.copy()
+            video_config['video_width'] = video_width
+            video_config['video_height'] = video_height
+
+            rendered = create_video_from_images(
+                processed_images,
+                audio_path if ENABLE_VIDEO_AUDIO_MUX else None,
+                video_path,
+                video_config,
+                chapters,
+                content_code=code,
+                script_path=None,
+                video_duration=audio_duration,
+            )
+
             if rendered:
-                # Validate Blender output if available and Blender was used
-                if renderer_used == 'blender':
-                    try:
-                        from output_validator import validate_video_output
-                        is_valid, report = validate_video_output(video_path, content_type)
-                        if not is_valid:
-                            print(f"  ⚠ Warning: Output validation failed")
-                            for error in report.get('errors', []):
-                                print(f"    - {error}")
-                    except ImportError:
-                        pass  # Validator not available, skip validation
-                
-                print(f"  ✓ Generated: {video_path.name} (using {renderer_used})")
+                print(f"  ✓ Generated: {video_path.name}")
                 success_count += 1
             else:
-                print(f"  ✗ Failed to render video with any available renderer")
+                print(f"  ✗ Failed to render video")
                 fail_count += 1
                 
         except Exception as e:

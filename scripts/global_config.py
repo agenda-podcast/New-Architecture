@@ -229,23 +229,11 @@ VIDEO_BITRATE_SETTINGS = {
     }
 }
 
-# Video Renderer Selection
-# Options: 'ffmpeg' (legacy, direct FFmpeg composition) or 'blender' (Blender VSE with FFmpeg encoder)
-# Can be overridden with VIDEO_RENDERER environment variable
 import os
-VIDEO_RENDERER = os.environ.get('VIDEO_RENDERER', 'blender')  # Default to FFmpeg for backward compatibility
-# Set VIDEO_RENDERER='blender' environment variable to use Blender 4.5 LTS rendering pipeline
 
-# Social Media Visual Effects (Blender templates)
-# Controls whether to apply social media style visual effects using Blender templates
-ENABLE_SOCIAL_EFFECTS = os.environ.get('ENABLE_SOCIAL_EFFECTS', 'true').lower() in ('true', '1', 'yes')
-# Template selection style options:
-#   'auto' - Weighted random selection (60% safe, 30% cinematic, 10% experimental)
-#   'none' - Minimal template with no effects
-#   'safe' - Professional, subtle effects (clean grade, minimal grain, subtle vignette)
-#   'cinematic' - Film-quality effects (noir, golden hour, vintage film, teal & orange)
-#   'experimental' - Bold, artistic effects (neon glow, glitch, high contrast)
-SOCIAL_EFFECTS_STYLE = os.environ.get('SOCIAL_EFFECTS_STYLE', 'auto')
+# Video Renderer
+# FFmpeg-only pipeline. Blender rendering is intentionally not supported.
+VIDEO_RENDERER = 'ffmpeg'
 
 # FFmpeg Effects Configuration
 # Controls whether to use FFmpeg effects mode (Ken Burns + xfade transitions)
@@ -280,7 +268,7 @@ VIDEO_TIMER_COLOR = "white"
 
 # File Naming Patterns
 SCRIPT_TXT_PATTERN = "{topic}-{date}-{code}.txt"
-SCRIPT_JSON_PATTERN = "{topic}-{date}-{code}.captions.json"
+SCRIPT_JSON_PATTERN = "{topic}-{date}-{code}.json"
 CHAPTERS_JSON_PATTERN = "{topic}-{date}-{code}.chapters.json"
 FFMETA_PATTERN = "{topic}-{date}-{code}.ffmeta"
 AUDIO_PATTERN = "{topic}-{date}-{code}.m4a"

@@ -40,7 +40,6 @@ from typing import Optional, List, Tuple, Dict, Any
 import json
 import os
 import re
-import textwrap
 import subprocess
 import tempfile
 
@@ -219,6 +218,8 @@ def _strip_speaker_prefix(text: str, known_names: List[str], hide: bool) -> str:
         return m.group(2).strip()
 
     # Name: ...
+    # Requirement: no speaker names should be visible in burned captions.
+    # We therefore strip a "prefix:" when it looks like a speaker label.
     m = re.match(r"^\s*([^:\n]{1,48})\s*:\s+(.+)$", t)
     if not m:
         return t
@@ -227,10 +228,20 @@ def _strip_speaker_prefix(text: str, known_names: List[str], hide: bool) -> str:
     if not rest:
         return t
 
+    # Always strip explicit A:/B: and known host names.
     for kn in known_names:
         if kn and name.lower() == kn.lower():
             return rest
-    # If not a known name, keep as-is (avoid removing legitimate colon use).
+
+    # Heuristic: strip short, name-like prefixes (1–3 tokens, alphabetic-ish).
+    tokens = [x for x in re.split(r"\s+", name) if x]
+    if 1 <= len(tokens) <= 3 and len(name) <= 24:
+        if re.fullmatch(r"[A-Za-z][A-Za-z\s\-\.']{0,23}", name):
+            return rest
+        if name.isupper() and re.fullmatch(r"[A-Z\s\-\.']{1,24}", name):
+            return rest
+
+    # Otherwise keep as-is (e.g., "Note:", "Q:").
     return t
 
 
@@ -424,12 +435,12 @@ class CaptionBurner:
         hide_speaker_names: bool,
     ) -> Path:
         """Build a temporary ASS file with TikTok-style glow."""
-        font_size = max(24, int(height * self.config.font_size_fraction))
-        # Titles are intentionally smaller to avoid clipping and to maintain TikTok-style readability.
-        title_font_size = max(18, int(font_size * 0.50))
+        # Separate sizing for titles vs captions. Titles should be smaller (avoid clipping on mobile).
+        caption_font_size = max(24, int(height * self.config.font_size_fraction))
+        title_font_size = max(20, int(caption_font_size * 0.50))
 
         margin_v_bottom = max(24, int(height * self.config.bottom_margin_fraction))
-        margin_v_top = max(32, int(height * 0.14))  # keep fully inside top ~20% and avoid clipping
+        margin_v_top = max(24, int(height * 0.10))  # inside top ~20%
         margin_lr = max(24, int(width * self.config.left_right_margin_fraction))
 
         # Glow parameters
@@ -454,10 +465,10 @@ class CaptionBurner:
         female_outline = _ass_color_rgba(_pick_glow_color_for_gender("female"), glow_aa)
         neutral_outline = _ass_color_rgba(_pick_glow_color_for_gender("unknown"), glow_aa)
 
-        def style_line(name: str, primary: str, outline: str, outline_sz: int, shadow_sz: int, alignment: int, margin_v: int, fs: int) -> str:
+        def style_line(name: str, font_sz: int, primary: str, outline: str, outline_sz: int, shadow_sz: int, alignment: int, margin_v: int) -> str:
             # BorderStyle=1, outline+shadow enabled
             return (
-                f"Style: {name},DejaVu Sans,{fs},{primary},&H00000000,{outline},&H00000000,"
+                f"Style: {name},DejaVu Sans,{font_sz},{primary},&H00000000,{outline},&H00000000,"
                 f"-1,0,0,0,100,100,0,0,1,{outline_sz},{shadow_sz},{alignment},{margin_lr},{margin_lr},{margin_v},1"
             )
 
@@ -473,13 +484,16 @@ class CaptionBurner:
         lines.append("[V4+ Styles]")
         lines.append("Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding")
         # Captions bottom (alignment 2 = bottom-center)
-        lines.append(style_line("CapGlowMale", glow_primary, male_outline, glow_outline, 0, 2, margin_v_bottom, font_size))
-        lines.append(style_line("CapGlowFemale", glow_primary, female_outline, glow_outline, 0, 2, margin_v_bottom, font_size))
-        lines.append(style_line("CapGlowNeutral", glow_primary, neutral_outline, glow_outline, 0, 2, margin_v_bottom, font_size))
-        lines.append(style_line("CapMain", white, black, main_outline, shadow, 2, margin_v_bottom, font_size))
+        lines.append(style_line("CapGlowMale", caption_font_size, glow_primary, male_outline, glow_outline, 0, 2, margin_v_bottom))
+        lines.append(style_line("CapGlowFemale", caption_font_size, glow_primary, female_outline, glow_outline, 0, 2, margin_v_bottom))
+        lines.append(style_line("CapGlowNeutral", caption_font_size, glow_primary, neutral_outline, glow_outline, 0, 2, margin_v_bottom))
+        lines.append(style_line("CapMain", caption_font_size, white, black, main_outline, shadow, 2, margin_v_bottom))
         # Titles top (alignment 8 = top-center)
-        lines.append(style_line("TitleGlow", glow_primary, title_outline, glow_outline, 0, 8, margin_v_top, title_font_size))
-        lines.append(style_line("TitleMain", white, black, main_outline, shadow, 8, margin_v_top, title_font_size))
+        title_main_outline = max(4, int(main_outline * 0.60))
+        title_glow_outline = max(8, int(glow_outline * 0.60))
+        title_shadow = max(2, int(shadow * 0.60))
+        lines.append(style_line("TitleGlow", title_font_size, glow_primary, title_outline, title_glow_outline, 0, 8, margin_v_top))
+        lines.append(style_line("TitleMain", title_font_size, white, black, title_main_outline, title_shadow, 8, margin_v_top))
         lines.append("")
 
         lines.append("[Events]")
@@ -493,39 +507,53 @@ class CaptionBurner:
                 return "CapGlowMale" if b_gender == "male" else ("CapGlowFemale" if b_gender == "female" else "CapGlowNeutral")
             return "CapGlowNeutral"
 
-        def _wrap_title_for_safe_area(s: str) -> str:
-            """Wrap (and if needed truncate) title text so it stays within horizontal safe margins.
-
-            We use a simple character-width heuristic; libass wrapping is enabled, but explicit wrapping
-            gives predictable results for long titles and avoids border clipping.
-            """
-            t = (s or "").strip()
-            if not t:
+        def wrap_title(text: str) -> str:
+            """Hard-wrap long titles to avoid clipping on mobile frames."""
+            raw = (text or "").strip()
+            if not raw:
                 return ""
-            usable_w = max(1, width - 2 * margin_lr)
-            # Heuristic: average glyph width ~0.56 * font size (DejaVu Sans, mixed case)
-            max_chars = max(18, int(usable_w / (max(10, title_font_size) * 0.56)))
-            lines_wrapped = textwrap.wrap(t, width=max_chars, break_long_words=False, break_on_hyphens=True)
-            if not lines_wrapped:
-                return t
-            max_lines = int(os.environ.get("CAPTIONS_TITLE_MAX_LINES", "2"))
-            if len(lines_wrapped) <= max_lines:
-                return "\\N".join(lines_wrapped)
-            # Truncate to max_lines with ellipsis on last line
-            trimmed = lines_wrapped[:max_lines]
-            last = trimmed[-1]
-            if len(last) > 3:
-                last = last[:-3].rstrip() + "..."
-            else:
-                last = "..."
-            trimmed[-1] = last
-            return "\\N".join(trimmed)
+            # Approximate max chars per line based on available width and font size.
+            try:
+                avail = max(200, width - 2 * margin_lr)
+                approx_chars = max(18, int(avail / max(10, int(title_font_size * 0.55))))
+            except Exception:
+                approx_chars = 44
+            max_lines = 2
+
+            words = raw.split()
+            if not words:
+                return raw
+            lines_out: List[str] = []
+            cur: List[str] = []
+            cur_len = 0
+            for w in words:
+                w_len = len(w)
+                add = w_len if not cur else (w_len + 1)
+                if cur and (cur_len + add) > approx_chars:
+                    lines_out.append(" ".join(cur))
+                    cur = [w]
+                    cur_len = w_len
+                else:
+                    cur.append(w)
+                    cur_len += add
+            if cur:
+                lines_out.append(" ".join(cur))
+
+            if len(lines_out) > max_lines:
+                # Truncate to max lines and add ellipsis.
+                kept = lines_out[:max_lines]
+                kept[-1] = (kept[-1].rstrip(" .") + "…") if not kept[-1].endswith("…") else kept[-1]
+                lines_out = kept
+
+            return "\\N".join(lines_out)
 
         # Titles (top)
         for seg in title_segments:
             start = _ass_time(seg["start"])
             end = _ass_time(seg["end"])
-            txt = _ass_escape(_wrap_title_for_safe_area(str(seg["text"])))
+            txt = _ass_escape(wrap_title(str(seg["text"]) or ""))
+            if not txt:
+                continue
             lines.append(f"Dialogue: 0,{start},{end},TitleGlow,,0,0,0,,{txt}")
             lines.append(f"Dialogue: 1,{start},{end},TitleMain,,0,0,0,,{txt}")
 
@@ -671,3 +699,35 @@ def burn_captions_subflow(
 ) -> bool:
     burner = CaptionBurner(config=config)
     return burner.burn(video_path=Path(video_path), audio_path=audio_path, width=width, height=height, fps=fps, in_place=True)
+
+
+def build_overlays_ass_from_segments(
+    video_path: Path,
+    width: int,
+    height: int,
+    caption_segments: List[Dict[str, Any]],
+    title_segments: List[Dict[str, Any]],
+    config: Optional[CaptionBurnConfig] = None,
+    hide_speaker_names: bool = True,
+) -> Optional[Path]:
+    """Create an ASS overlays file (titles + captions) without running FFmpeg.
+
+    Intended for single-pass rendering where overlays are applied during the main
+    FFmpeg encode (subtitles filter), avoiding additional re-encodes.
+    """
+    burner = CaptionBurner(config=config)
+    if not burner.config.enabled:
+        return None
+    ctx = burner._load_topic_context(Path(video_path))
+    known_names = [ctx.get("a_name", ""), ctx.get("b_name", "")]
+    known_names = [n for n in known_names if n]
+    return burner._build_ass_file(
+        width=int(width),
+        height=int(height),
+        caption_segments=caption_segments or [],
+        title_segments=title_segments or [],
+        a_gender=ctx.get("a_gender", "unknown"),
+        b_gender=ctx.get("b_gender", "unknown"),
+        known_names=known_names,
+        hide_speaker_names=hide_speaker_names,
+    )

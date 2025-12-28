@@ -10,17 +10,11 @@ on:
         description: 'Comma-separated topic IDs (e.g., topic-01,topic-02) or "all"'
         required: false
         default: 'all'
-      video_renderer:
-        description: 'Video renderer to use (ffmpeg or blender)'
-        required: false
-        default: 'ffmpeg'
 
 env:
   PYTHON_VERSION: '3.11'
-  # Defaults to FFmpeg. When manually triggering the workflow, you can override via workflow_dispatch input.
-  # For scheduled runs (or other triggers without inputs), this will evaluate to 'ffmpeg'.
-  VIDEO_RENDERER: ${{ github.event.inputs.video_renderer || 'ffmpeg' }}
-  BLENDER_TEMPLATES_VERSION: "v1"
+  # FFmpeg-only pipeline
+  VIDEO_RENDERER: 'ffmpeg'
 
   PASS_A_MODEL: gpt-5.2-pro
   PASS_B_MODEL: gpt-5-nano
@@ -109,9 +103,8 @@ jobs:
       KEEP_OUTPUT_JSON: "false"
       KEEP_OUTPUT_TEXT: "false"
       KEEP_OUTPUT_IMAGE_CACHE: "false"
-      # Do not hard-code Blender here. Use the workflow input (or default) so FFmpeg runs don't require Blender secrets.
-      VIDEO_RENDERER: ${{ github.event.inputs.video_renderer || 'ffmpeg' }}
-      BLENDER_TEMPLATES_BUNDLE_URL: ${{ secrets.BLENDER_TEMPLATES_BUNDLE_URL }}
+      # FFmpeg-only rendering
+      VIDEO_RENDERER: "ffmpeg"
     strategy:
       fail-fast: false
       matrix: ${{fromJson(needs.prepare-matrix.outputs.matrix)}}
@@ -265,12 +258,8 @@ jobs:
           sudo apt-get update -qq
           # Add universe repository if needed
           sudo add-apt-repository -y universe || true
-          # Install with explicit error checking
-          if [ "${VIDEO_RENDERER}" = "blender" ]; then
-            sudo apt-get install -y ffmpeg libxi6 libxrender1 libgl1
-          else
-            sudo apt-get install -y ffmpeg
-          fi
+          # FFmpeg-only rendering
+          sudo apt-get install -y ffmpeg
           # Verify installation
           if ! command -v ffmpeg &> /dev/null; then
             echo "ERROR: ffmpeg installation failed"
@@ -285,76 +274,11 @@ jobs:
           echo "CACHE_RESET=true: removing local caches and large temp artifacts"
           rm -rf outputs/**/processed_images || true
           rm -rf outputs/**/_prepared_images || true
-          rm -rf blender-4.5.0-linux-x64 || true
           rm -rf templates/safe templates/cinematic templates/experimental || true
-          rm -rf /tmp/podcast_chunks /tmp/podcast_* /tmp/ffmpeg_* /tmp/blender_* /tmp/captions_* || true
+          rm -rf /tmp/podcast_chunks /tmp/podcast_* /tmp/ffmpeg_* /tmp/captions_* || true
           df -h || true
 
 
-      - name: Cache Blender
-        if: env.VIDEO_RENDERER == 'blender' && env.CACHE_RESET != 'true'
-        id: cache-blender
-        uses: actions/cache@v4
-        with:
-          path: blender-4.5.0-linux-x64
-          key: blender-4.5.0-linux-x64
-
-      - name: Download and Setup Blender 4.5 LTS
-        if: env.VIDEO_RENDERER == 'blender' && env.CACHE_RESET != 'true' && steps.cache-blender.outputs.cache-hit != 'true'
-        run: |
-          echo "Downloading Blender 4.5 LTS..."
-          wget -q https://download.blender.org/release/Blender4.5/blender-4.5.0-linux-x64.tar.xz
-          
-          echo "Extracting Blender..."
-          tar -xf blender-4.5.0-linux-x64.tar.xz
-          
-          echo "Cleaning up archive..."
-          rm blender-4.5.0-linux-x64.tar.xz
-          
-          echo "✓ Blender 4.5 LTS ready"
-
-      - name: Debug Blender Cache
-        if: env.VIDEO_RENDERER == 'blender'
-        run: |
-          echo "Checking Blender cache restoration..."
-          echo "Current directory: $(pwd)"
-          echo "Looking for: blender-4.5.0-linux-x64/"
-          if [ -d "blender-4.5.0-linux-x64" ]; then
-            echo "✓ Blender directory exists"
-            ls -la blender-4.5.0-linux-x64/ | head -10
-          else
-            echo "✗ Blender directory not found"
-            echo "Cache reported hit but directory missing - cache may be corrupted"
-            echo "Contents of current directory:"
-            ls -la | grep -i blender || echo "No blender-related files found"
-          fi
-
-      - name: Verify Blender Installation
-        if: env.VIDEO_RENDERER == 'blender'
-        run: |
-          if [ -x "./blender-4.5.0-linux-x64/blender" ]; then
-            ./blender-4.5.0-linux-x64/blender --version
-            echo "✓ Blender is functional"
-          else
-            echo "✗ Blender binary not found or not executable"
-            echo "Attempting to list directory contents:"
-            ls -la blender-4.5.0-linux-x64/ 2>&1 || echo "Directory does not exist"
-            exit 1
-          fi
-
-      - name: Cache Blender Templates
-        if: env.VIDEO_RENDERER == 'blender' && env.CACHE_RESET != 'true'
-        id: cache-blender-templates
-        uses: actions/cache@v4
-        with:
-          path: |
-            templates/safe
-            templates/cinematic
-            templates/experimental
-            templates/**/previews
-          key: blender-templates-${{ env.BLENDER_TEMPLATES_VERSION }}-${{ hashFiles('templates/inventory.yml') }}
-          restore-keys: |
-            blender-templates-${{ env.BLENDER_TEMPLATES_VERSION }}-
 
       - name: Install Python dependencies
         run: |
@@ -364,31 +288,6 @@ jobs:
             echo "CACHE_RESET=true: purging pip cache to reduce disk usage"
             pip cache purge || true
           fi
-
-      - name: Check templates bundle URL is available
-        if: env.VIDEO_RENDERER == 'blender'
-        run: |
-          if [ -z "${BLENDER_TEMPLATES_BUNDLE_URL}" ]; then
-            echo "ERROR: BLENDER_TEMPLATES_BUNDLE_URL is empty."
-            echo ""
-            echo "This secret must be configured for Blender template downloads to work."
-            echo ""
-            echo "To fix this issue, configure the secret at:"
-            echo "  Settings → Environments → Main → Secrets"
-            echo "  OR"
-            echo "  Settings → Secrets and variables → Actions → Repository secrets"
-            echo ""
-            echo "Current configuration uses environment: Main, so the secret should be set in:"
-            echo "  Settings → Environments → Main → Secrets → BLENDER_TEMPLATES_BUNDLE_URL"
-            echo ""
-            exit 1
-          fi
-          echo "✓ BLENDER_TEMPLATES_BUNDLE_URL is configured"
-
-      - name: Verify/Download Blender Templates
-        if: env.VIDEO_RENDERER == 'blender'
-        run: |
-          python3 scripts/ensure_blender_templates.py --required
 
       - name: Verify Piper integration with Python TTS code
         run: |
