@@ -91,21 +91,37 @@ def _count_words(s: str) -> int:
 
 
 def _extract_first_json_object(text: str) -> Dict[str, Any]:
-    """
-    Best-effort extraction of the first JSON object from a string.
-    Used when we cannot rely on strict JSON mode (e.g. web_search present).
+    """Best-effort extraction of the first JSON object from a string.
+
+    This function must be tolerant: upstream responses can sometimes be plain text
+    (network truncation, model formatting drift, etc.). In those cases, we wrap
+    the text into a minimal JSON object rather than raising.
     """
     if not isinstance(text, str):
-        raise ValueError("Expected string text for JSON extraction")
+        return {"script": str(text)}
 
     t = text.strip()
-    if t.startswith("{") and t.endswith("}"):
-        return json.loads(t)
+    if not t:
+        return {"script": ""}
 
-    # Scan for balanced braces
+    # Strip common fenced blocks
+    t = re.sub(r"^```(?:json)?\s*", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s*```$", "", t)
+    t = t.strip()
+
+    # Fast-path: full JSON object
+    if t.startswith("{") and t.endswith("}"):
+        try:
+            obj = json.loads(t)
+            return obj if isinstance(obj, dict) else {"content": obj}
+        except Exception:
+            return {"script": t}
+
+    # Scan for first balanced object
     start = t.find("{")
     if start < 0:
-        raise ValueError("No JSON object start '{' found")
+        # No JSON at all; wrap
+        return {"script": t}
 
     depth = 0
     in_str = False
@@ -115,7 +131,7 @@ def _extract_first_json_object(text: str) -> Dict[str, Any]:
         if in_str:
             if esc:
                 esc = False
-            elif ch == "\\":
+            elif ch == "\":
                 esc = True
             elif ch == '"':
                 in_str = False
@@ -130,9 +146,14 @@ def _extract_first_json_object(text: str) -> Dict[str, Any]:
                 depth -= 1
                 if depth == 0:
                     candidate = t[start : i + 1]
-                    return json.loads(candidate)
+                    try:
+                        obj = json.loads(candidate)
+                        return obj if isinstance(obj, dict) else {"content": obj}
+                    except Exception:
+                        return {"script": candidate}
 
-    raise ValueError("Could not find a complete JSON object in output")
+    # Unterminated JSON; wrap
+    return {"script": t}
 
 
 # ---------------------------------------------------------------------------
