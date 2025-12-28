@@ -896,7 +896,7 @@ def _run_pass_b_from_pass_a(
         if not force_max:
             est = _estimate_max_output_tokens_from_specs(nonlong_specs, tokens_per_word=2.0, overhead=1800, floor=2048)
             if requested_out > int(est * 2.0):
-                logger.warning(f"pass_b_max_output_tokens={requested_out} is far above estimated need ({est}); capping to estimate for stability. Set OPENAI_FORCE_MAX_OUTPUT=true to override.")
+                logger.warning(f"pass_b_max_output_tokens={requested_out} is large vs estimate={est}; capping for stability. Set OPENAI_FORCE_MAX_OUTPUT=true to override.")
                 requested_out = est
     max_out = clamp_output_tokens(model, requested_out)
 
@@ -971,7 +971,7 @@ def _run_single_pass_b(
             "\nHOST_B: Understood. What’s the core point we need to cover?"
             f"\nHOST_A: Topic: {topic}. "
             + (f"Here’s the context we have: {desc} " if desc else "")
-            "We will summarize only what is supported by the provided context."
+            + "We will summarize only what is supported by the provided context."
             "\nHOST_B: Good. Let’s frame the key takeaways and keep it practical."
         )
         wrapped_content: List[Dict[str, Any]] = []
