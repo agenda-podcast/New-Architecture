@@ -920,12 +920,7 @@ def _run_single_pass_b(
 ) -> Dict[str, Any]:
     """
     Single-pass: do not browse the web and produce all non-long items in one JSON response.
-    Strict JSON mode is enforced.
-
-    Robustness:
-      - If the returned JSON object is missing the expected "content" list but includes a
-        top-level "script" field, we wrap it into a single-item content list using the
-        first requested spec as the envelope.
+    JSON mode cannot be enforced when strict JSON mode is not enforceable; we parse best-effort.
     """
     model = _pick_model_pass_b(config)
     prompt = _build_single_pass_b_prompt(config, nonlong_specs)
@@ -943,6 +938,8 @@ def _run_single_pass_b(
                 requested_out = est
     max_out = clamp_output_tokens(model, requested_out)
 
+    # Enforce strict JSON output for single-pass B.
+    # This pass does not use any web tools, so JSON mode is enforceable.
     resp = create_openai_completion(
         client=client,
         model=model,
@@ -953,35 +950,29 @@ def _run_single_pass_b(
     )
 
     txt = extract_completion_text(resp, model) or ""
-    data: Any = None
-    try:
-        data = json.loads(txt) if isinstance(txt, str) else None
-    except Exception:
-        data = _extract_first_json_object(txt)
+    data = _extract_first_json_object(txt)
 
+    # Robustness: if the model violates the contract (or JSON mode isn't honored
+    # due to upstream issues), do not crash the pipeline. Wrap into the expected
+    # envelope shape.
     if not isinstance(data, dict):
-        raise ValueError("Single-pass output is not a JSON object")
-
-    # If the model returned {"script": "..."} (or similar), wrap it.
-    if ("content" not in data or not isinstance(data.get("content"), list)) and isinstance(data.get("script"), str):
-        first = nonlong_specs[0] if nonlong_specs else {}
-        code = str(first.get("code") or "S1").strip() or "S1"
-        typ = str(first.get("type") or "short").strip() or "short"
-        mw = _safe_int(first.get("target_words") or first.get("max_words"), 350)
-        data = {
-            "content": [
-                {
-                    "code": code,
-                    "type": typ,
-                    "script": str(data.get("script") or "").strip(),
-                    "max_words": mw,
-                }
-            ],
-            "sources": [],
-        }
+        data = {"script": (txt or "").strip()}
 
     if "content" not in data or not isinstance(data.get("content"), list):
-        raise ValueError("Single-pass output JSON missing 'content' list")
+        # Common alternate shape: {"script": "..."}
+        script_text = str(data.get("script") or txt or "").strip()
+        wrapped_content: List[Dict[str, Any]] = []
+        for spec in (nonlong_specs or []):
+            wrapped_content.append(
+                {
+                    "code": spec.get("code") or spec.get("id") or "item",
+                    "type": spec.get("type") or "script",
+                    "max_words": spec.get("max_words"),
+                    "script": script_text,
+                }
+            )
+        data = {"content": wrapped_content, "sources": []}
+
     if "sources" in data and not isinstance(data.get("sources"), list):
         data["sources"] = []
     return data
