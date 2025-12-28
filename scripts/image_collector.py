@@ -382,7 +382,7 @@ def collect_images_for_topic(
                     num=GOOGLE_SEARCH_RESULTS_PER_PAGE,  # Always request 10 (API max)
                     start=start_index,  # Pagination parameter
                     safe='active',  # Safe search
-                    imgSize='XXLARGE'  # Prefer large images (uppercase required by API)
+                    imgSize='LARGE'  # Prefer large images (uppercase required by API)
                 ).execute()
                 
                 # Extract image URLs from this page
