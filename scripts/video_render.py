@@ -464,7 +464,7 @@ def render_slideshow_ffmpeg_effects(
                         }
                     )
                 t0 += still_dur
-            image_title_segs = segs
+            _write_image_titles_sidecar(output_path, segs)
         except Exception:
             pass
         
@@ -931,27 +931,114 @@ def _find_images_metadata(start_dir: Path) -> Optional[Path]:
 
 
 def _load_image_title_map(images: List[Path]) -> Dict[str, str]:
-    """Map filename -> cleaned Google-visible title."""
+    """Map prepared image filenames -> cleaned titles.
+
+    Important: in portrait renders, most source images are undersized and get transformed into
+    cached composites under _prepared_images/<WxH>/processed/composite_XXXXX.jpg. Those filenames
+    do NOT exist in images_metadata.json, so a naïve filename->title mapping returns empty and
+    produces an empty <video>.image_titles.json.
+
+    This function therefore builds a robust mapping that covers:
+      1) original source filenames (e.g., image_000.jpg) -> title
+      2) prepared composites via manifest mapping (processed/manifest_<WxH>.json):
+            out_file (e.g., composite_00012.jpg) -> title for source_name
+      3) fallback: composite_XXXXX.* -> title for source index if it can be inferred
+    """
     if not images:
         return {}
+
+    # Locate the canonical metadata for the topic's images folder.
     meta_path = _find_images_metadata(images[0].parent)
     if not meta_path:
         return {}
+
+    def _clean_title(t: str) -> str:
+        return (t or "").strip()
+
+    def _extract_int(s: str) -> Optional[int]:
+        m = re.search(r"(\d+)(?!.*\d)", s)
+        return int(m.group(1)) if m else None
+
     try:
-        with open(meta_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        items = data.get("images", []) if isinstance(data, dict) else []
-        out: Dict[str, str] = {}
-        for it in items:
-            if not isinstance(it, dict):
-                continue
-            fn = str(it.get("filename", "")).strip()
-            title = str(it.get("title_clean") or it.get("title") or "").strip()
-            if fn and title:
-                out[fn] = title
-        return out
+        data = json.loads(meta_path.read_text(encoding="utf-8", errors="ignore"))
     except Exception:
         return {}
+
+    items = data.get("images", []) if isinstance(data, dict) else []
+    if not isinstance(items, list) or not items:
+        return {}
+
+    # Source filename -> title
+    title_by_source: Dict[str, str] = {}
+    # Numeric index (best-effort) -> title (for composite_XXXXX fallback)
+    title_by_index: Dict[int, str] = {}
+
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        src_fn = str(it.get("filename", "")).strip()
+        title = _clean_title(str(it.get("title_clean") or it.get("title") or ""))
+        if src_fn and title:
+            title_by_source[src_fn] = title
+            idx = _extract_int(Path(src_fn).stem)
+            if idx is not None:
+                title_by_index[idx] = title
+
+    out: Dict[str, str] = dict(title_by_source)
+
+    # 1) Manifest mapping (preferred, exact):
+    #    processed/manifest_<WxH>.json contains entries {source_name, out_file} for composites.
+    try:
+        processed_dir = images[0].parent
+        manifest_candidates: List[Path] = []
+        if processed_dir.name.lower() == "processed":
+            manifest_candidates = sorted(processed_dir.glob("manifest_*.json"))
+        else:
+            # Sometimes schedule points at the parent dir; search nearby.
+            manifest_candidates = sorted((processed_dir / "processed").glob("manifest_*.json")) +                                  sorted(processed_dir.glob("manifest_*.json"))
+
+        for mp in manifest_candidates:
+            try:
+                mdata = json.loads(mp.read_text(encoding="utf-8", errors="ignore"))
+            except Exception:
+                continue
+            entries = mdata.get("entries", []) if isinstance(mdata, dict) else []
+            if not isinstance(entries, list):
+                continue
+            for e in entries:
+                if not isinstance(e, dict):
+                    continue
+                src_name = str(e.get("source_name", "")).strip()
+                out_file = str(e.get("out_file", "")).strip()
+                mode = str(e.get("mode", "")).strip()
+                if mode != "composite" or not out_file or not src_name:
+                    continue
+                t = title_by_source.get(src_name, "")
+                if t:
+                    out[out_file] = t
+            # If we parsed at least one manifest, we can stop.
+            if len(out) > len(title_by_source):
+                break
+    except Exception:
+        pass
+
+    # 2) Fallback: composite_XXXXX.* -> infer index
+    try:
+        for p in images:
+            nm = p.name
+            if nm in out:
+                continue
+            if nm.lower().startswith("composite_"):
+                idx = _extract_int(Path(nm).stem)
+                if idx is not None:
+                    # composite index usually matches source position; try direct
+                    t = title_by_index.get(idx, "")
+                    if t:
+                        out[nm] = t
+    except Exception:
+        pass
+
+    return out
 
 
 def _write_image_titles_sidecar(video_out: Path, segments: List[Dict[str, Any]]) -> None:
@@ -2286,7 +2373,7 @@ def create_video_from_images(background_images: List[Path], audio_path: Optional
                         }
                     )
                 t0 += d
-            image_title_segs = segs
+            _write_image_titles_sidecar(output_path, segs)
         except Exception:
             pass
         
@@ -2682,7 +2769,6 @@ def render_multi_format_for_topic(topic_id: str, date_str: str,
 
         # Generate corresponding video filename
         video_path = output_dir / f"{topic_id}-{date_str}-{code}.mp4"
-        image_title_segs: list[dict] = []
 
         # Load corresponding chapters
         chapters_path = output_dir / f"{topic_id}-{date_str}-{code}.chapters.json"
@@ -2940,20 +3026,6 @@ def render_multi_format_for_topic(topic_id: str, date_str: str,
                     except ImportError:
                         pass  # Validator not available, skip validation
                 
-                                # Write image-title timeline for the *final* output path (important for Blender .blender.mp4)
-                try:
-                    if image_title_segs:
-                        _write_image_titles_sidecar(video_path, image_title_segs)
-                except Exception:
-                    pass
-
-                # Final post-render step: burn frame + titles + captions into the video
-                if ENABLE_BURN_IN_CAPTIONS:
-                    if not maybe_burn_captions(audio_path=audio_path, video_path=video_path):
-                        print("  ✗ Post-process overlay burn-in failed")
-                        fail_count += 1
-                        continue
-
                 print(f"  ✓ Generated: {video_path.name} (using {renderer_used})")
                 success_count += 1
             else:

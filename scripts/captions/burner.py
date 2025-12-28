@@ -40,6 +40,7 @@ from typing import Optional, List, Tuple, Dict, Any
 import json
 import os
 import re
+import textwrap
 import subprocess
 import tempfile
 
@@ -178,39 +179,8 @@ def _repo_root_from_here() -> Path:
     # .../repo_root/scripts/captions/burner.py
     return Path(__file__).resolve().parents[2]
 
-def _probe_video_duration_seconds(video_path: Path) -> float:
-    """Return duration in seconds via ffprobe, or 0.0 if unavailable."""
-    try:
-        r = subprocess.run(
-            [
-                "ffprobe", "-v", "error",
-                "-show_entries", "format=duration",
-                "-of", "default=noprint_wrappers=1:nokey=1",
-                str(video_path),
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if r.returncode != 0:
-            return 0.0
-        s = (r.stdout or "").strip()
-        return float(s) if s else 0.0
-    except Exception:
-        return 0.0
-
-
 
 def _discover_frame_png(repo_root: Path) -> Optional[Path]:
-    """Discover a static PNG frame overlay.
-
-    Resolution-independent: the caller scales it to the output size.
-    Search order:
-      1) VIDEO_FRAME_PNG / FRAME_PNG env (absolute or repo-relative)
-      2) repo_root/Assets (preferred) then repo_root/assets (fallback)
-         - frame.png (preferred)
-         - first file matching frame*.png
-    """
     # Explicit override
     for envk in ("VIDEO_FRAME_PNG", "FRAME_PNG"):
         v = (os.environ.get(envk) or "").strip()
@@ -221,25 +191,9 @@ def _discover_frame_png(repo_root: Path) -> Optional[Path]:
             if p.exists() and p.is_file():
                 return p
 
-    for assets_dir_name in ("Assets", "assets"):
-        assets = repo_root / assets_dir_name
-        if not assets.exists():
-            continue
-
-        preferred = assets / "frame.png"
-        if preferred.exists() and preferred.is_file():
-            return preferred
-
-        # Any frame*.png
-        try:
-            cands = sorted(assets.glob("frame*.png"))
-            for p in cands:
-                if p.is_file():
-                    return p
-        except Exception:
-            continue
-
-    return None
+    assets = repo_root / "assets"
+    if not assets.exists():
+        return None
 
     # Preferred name
     preferred = assets / "frame.png"
@@ -471,9 +425,11 @@ class CaptionBurner:
     ) -> Path:
         """Build a temporary ASS file with TikTok-style glow."""
         font_size = max(24, int(height * self.config.font_size_fraction))
+        # Titles are intentionally smaller to avoid clipping and to maintain TikTok-style readability.
+        title_font_size = max(18, int(font_size * 0.50))
 
         margin_v_bottom = max(24, int(height * self.config.bottom_margin_fraction))
-        margin_v_top = max(24, int(height * 0.10))  # inside top ~20%
+        margin_v_top = max(32, int(height * 0.14))  # keep fully inside top ~20% and avoid clipping
         margin_lr = max(24, int(width * self.config.left_right_margin_fraction))
 
         # Glow parameters
@@ -498,10 +454,10 @@ class CaptionBurner:
         female_outline = _ass_color_rgba(_pick_glow_color_for_gender("female"), glow_aa)
         neutral_outline = _ass_color_rgba(_pick_glow_color_for_gender("unknown"), glow_aa)
 
-        def style_line(name: str, primary: str, outline: str, outline_sz: int, shadow_sz: int, alignment: int, margin_v: int) -> str:
+        def style_line(name: str, primary: str, outline: str, outline_sz: int, shadow_sz: int, alignment: int, margin_v: int, fs: int) -> str:
             # BorderStyle=1, outline+shadow enabled
             return (
-                f"Style: {name},DejaVu Sans,{font_size},{primary},&H00000000,{outline},&H00000000,"
+                f"Style: {name},DejaVu Sans,{fs},{primary},&H00000000,{outline},&H00000000,"
                 f"-1,0,0,0,100,100,0,0,1,{outline_sz},{shadow_sz},{alignment},{margin_lr},{margin_lr},{margin_v},1"
             )
 
@@ -517,13 +473,13 @@ class CaptionBurner:
         lines.append("[V4+ Styles]")
         lines.append("Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding")
         # Captions bottom (alignment 2 = bottom-center)
-        lines.append(style_line("CapGlowMale", glow_primary, male_outline, glow_outline, 0, 2, margin_v_bottom))
-        lines.append(style_line("CapGlowFemale", glow_primary, female_outline, glow_outline, 0, 2, margin_v_bottom))
-        lines.append(style_line("CapGlowNeutral", glow_primary, neutral_outline, glow_outline, 0, 2, margin_v_bottom))
-        lines.append(style_line("CapMain", white, black, main_outline, shadow, 2, margin_v_bottom))
+        lines.append(style_line("CapGlowMale", glow_primary, male_outline, glow_outline, 0, 2, margin_v_bottom, font_size))
+        lines.append(style_line("CapGlowFemale", glow_primary, female_outline, glow_outline, 0, 2, margin_v_bottom, font_size))
+        lines.append(style_line("CapGlowNeutral", glow_primary, neutral_outline, glow_outline, 0, 2, margin_v_bottom, font_size))
+        lines.append(style_line("CapMain", white, black, main_outline, shadow, 2, margin_v_bottom, font_size))
         # Titles top (alignment 8 = top-center)
-        lines.append(style_line("TitleGlow", glow_primary, title_outline, glow_outline, 0, 8, margin_v_top))
-        lines.append(style_line("TitleMain", white, black, main_outline, shadow, 8, margin_v_top))
+        lines.append(style_line("TitleGlow", glow_primary, title_outline, glow_outline, 0, 8, margin_v_top, title_font_size))
+        lines.append(style_line("TitleMain", white, black, main_outline, shadow, 8, margin_v_top, title_font_size))
         lines.append("")
 
         lines.append("[Events]")
@@ -537,11 +493,39 @@ class CaptionBurner:
                 return "CapGlowMale" if b_gender == "male" else ("CapGlowFemale" if b_gender == "female" else "CapGlowNeutral")
             return "CapGlowNeutral"
 
+        def _wrap_title_for_safe_area(s: str) -> str:
+            """Wrap (and if needed truncate) title text so it stays within horizontal safe margins.
+
+            We use a simple character-width heuristic; libass wrapping is enabled, but explicit wrapping
+            gives predictable results for long titles and avoids border clipping.
+            """
+            t = (s or "").strip()
+            if not t:
+                return ""
+            usable_w = max(1, width - 2 * margin_lr)
+            # Heuristic: average glyph width ~0.56 * font size (DejaVu Sans, mixed case)
+            max_chars = max(18, int(usable_w / (max(10, title_font_size) * 0.56)))
+            lines_wrapped = textwrap.wrap(t, width=max_chars, break_long_words=False, break_on_hyphens=True)
+            if not lines_wrapped:
+                return t
+            max_lines = int(os.environ.get("CAPTIONS_TITLE_MAX_LINES", "2"))
+            if len(lines_wrapped) <= max_lines:
+                return "\\N".join(lines_wrapped)
+            # Truncate to max_lines with ellipsis on last line
+            trimmed = lines_wrapped[:max_lines]
+            last = trimmed[-1]
+            if len(last) > 3:
+                last = last[:-3].rstrip() + "..."
+            else:
+                last = "..."
+            trimmed[-1] = last
+            return "\\N".join(trimmed)
+
         # Titles (top)
         for seg in title_segments:
             start = _ass_time(seg["start"])
             end = _ass_time(seg["end"])
-            txt = _ass_escape(str(seg["text"]))
+            txt = _ass_escape(_wrap_title_for_safe_area(str(seg["text"])))
             lines.append(f"Dialogue: 0,{start},{end},TitleGlow,,0,0,0,,{txt}")
             lines.append(f"Dialogue: 1,{start},{end},TitleMain,,0,0,0,,{txt}")
 
@@ -621,7 +605,7 @@ class CaptionBurner:
                 filter_complex = (
                     f"[0:v]subtitles=filename='{_escape_filter_path(str(ass_path))}':charenc=UTF-8[v0];"
                     f"[1:v]scale={width}:{height}[fr];"
-                    f"[v0][fr]overlay=0:0:format=auto:shortest=1[v]"
+                    f"[v0][fr]overlay=0:0:format=auto[v]"
                 )
                 cmd = [
                     "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
@@ -630,12 +614,12 @@ class CaptionBurner:
                     "-filter_complex", filter_complex,
                     "-map", "[v]",
                     "-map", "0:a?",
-                    "-shortest", "-shortest", "-r", str(int(fps)),
+                    "-r", str(int(fps)),
                     "-c:v", "libx264",
-                    "-preset", os.environ.get("CAPTIONS_X264_PRESET","ultrafast"), "-pix_fmt", "yuv420p",
+                    "-pix_fmt", "yuv420p",
                     "-movflags", "+faststart",
                     "-c:a", "copy",
-                    "-t", str(max(0.1, _probe_video_duration_seconds(video_path))), str(tmp_out),
+                    str(tmp_out),
                 ]
             else:
                 vf = f"subtitles=filename='{_escape_filter_path(str(ass_path))}':charenc=UTF-8"
@@ -645,12 +629,12 @@ class CaptionBurner:
                     "-vf", vf,
                     "-r", str(int(fps)),
                     "-c:v", "libx264",
-                    "-preset", os.environ.get("CAPTIONS_X264_PRESET","ultrafast"), "-pix_fmt", "yuv420p",
+                    "-pix_fmt", "yuv420p",
                     "-movflags", "+faststart",
                     "-map", "0:v:0",
                     "-map", "0:a?",
-                    "-shortest", "-shortest", "-c:a", "copy",
-                    "-t", str(max(0.1, _probe_video_duration_seconds(video_path))), str(tmp_out),
+                    "-c:a", "copy",
+                    str(tmp_out),
                 ]
 
             r = subprocess.run(cmd, capture_output=True, text=True, check=False)
