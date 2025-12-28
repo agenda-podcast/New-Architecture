@@ -20,7 +20,7 @@ Pass A:
 Pass B:
 - Always returns ONE JSON object with ALL non-long items in ONE response.
 - If Pass A ran: derive from Pass A script and sources (no new facts, no web_search).
-- If Pass A skipped: generate non-long items directly (may use web_search unless sources provided).
+- If Pass A skipped: generate non-long items directly (may do not browse the web unless sources provided).
 
 Mock mode (NEW):
 - If Testing Mode is True AND a Source Text file exists:
@@ -716,22 +716,16 @@ Rules:
 """
 
 
-def _build_single_pass_b_prompt_with_web_search(config: Dict[str, Any], nonlong_specs: List[Dict[str, Any]]) -> str:
-    """
-    Single-pass generation (no Pass A). Uses web_search and returns all requested items in one JSON response.
+def _build_single_pass_b_prompt(config: Dict[str, Any], nonlong_specs: List[Dict[str, Any]]) -> str:
+    """Single-pass generation (no Pass A). Returns all requested items in one JSON response.
+
+    Note: This prompt must not instruct the model to browse the web. It should work from its internal knowledge
+    and the provided topic description only.
     """
     hosts = _resolve_hosts(config)
 
     topic = str(config.get("title") or config.get("topic") or "").strip() or "(untitled topic)"
     desc = str(config.get("description") or "").strip()
-    freshness_hours = _safe_int(config.get("freshness_hours"), 24)
-    freshness_window = f"last {freshness_hours} hours"
-
-    regions = config.get("search_regions") or []
-    region_txt = ", ".join([str(r).upper() for r in regions]) if regions else "GLOBAL"
-
-    queries = config.get("queries") or []
-    query_txt = "\n".join([f"- {q}" for q in queries]) if queries else "- (use your judgment)"
 
     req_lines: List[str] = []
     for s in nonlong_specs:
@@ -740,64 +734,37 @@ def _build_single_pass_b_prompt_with_web_search(config: Dict[str, Any], nonlong_
         mw = _safe_int(s.get("target_words") or s.get("max_words"), 300)
         if not c:
             continue
-        req_lines.append(f"- {c} ({t}): max_words={mw} (EXACT)")
-    req_txt = "\n".join(req_lines) if req_lines else "- (no outputs requested)"
+        req_lines.append(f"- {c} ({t}): words={mw} (EXACT)")
+    req_txt = "\n".join(req_lines) if req_lines else "- (none)"
 
-    return f"""You are a newsroom producer and dialogue scriptwriter for an English-language news podcast.
-You MUST use the web_search tool before writing to verify the latest news and to avoid any "knowledge cutoff" disclaimers.
+    host_a = hosts.get("HOST_A") or {}
+    host_b = hosts.get("HOST_B") or {}
 
-Topic: {topic}
-Topic description: {desc}
-Freshness window: {freshness_window}
-Region focus: {region_txt}
+    persona_block = f"""Personas:
+HOST_A: {host_a.get('name','HOST_A')} — {host_a.get('summary','')}
+HOST_B: {host_b.get('name','HOST_B')} — {host_b.get('summary','')}
 
-Host personas:
-- HOST_A ({hosts['host_a_name']}): {hosts['host_a_bio']}
-- HOST_B ({hosts['host_b_name']}): {hosts['host_b_bio']}
-
-Search guidance (use as web_search queries; adjust as needed):
-{query_txt}
-
-Your task:
-1) Use web_search to gather and cross-check facts from multiple reputable sources.
-2) Produce the requested summarized scripts below.
-3) Return ALL items in ONE response as STRICT JSON (no markdown).
-
-Requested items:
-{req_txt}
-
-JSON OUTPUT SCHEMA (STRICT):
-{{
-  "sources": [
-    {{
-      "n": 1,
-      "publisher": "Publisher",
-      "title": "Title",
-      "date": "YYYY-MM-DD",
-      "url": "https://..."
-    }}
-  ],
-  "content": [
-    {{
-      "code": "S1",
-      "type": "short",
-      "script": "HOST_A: ...\\nHOST_B: ...",
-      "max_words": 350
-    }}
-  ]
-}}
-
-Rules:
-- Use speaker tags HOST_A and HOST_B (do NOT replace with names).
-- Each script must be exactly max_words words (word_count = max_words).
-- Use concrete dates.
-- Return ONLY the JSON object.
+Constraints:
+- Return ONLY valid JSON.
+- Do not add any facts or sources not implied by the topic description.
+- Do not include speaker names in the dialogue text.
 """
 
+    prompt = f"""System: Return only valid JSON.
 
-# ---------------------------------------------------------------------------
-# Parsing helpers for Pass A output (real OpenAI path)
-# ---------------------------------------------------------------------------
+You are generating multiple short scripts from existing context (no external browsing).
+Topic: {topic}
+Topic description: {desc}
+
+{persona_block}
+
+Targets to generate (all in ONE JSON object):
+{req_txt}
+
+Output format:
+{{ "items": [ {{ "code": "S1", "text": "..." }}, ... ] }}
+"""
+    return prompt
 
 def _parse_pass_a_text(pass_a_text: str) -> Tuple[str, str]:
     """
@@ -828,6 +795,28 @@ def _parse_pass_a_text(pass_a_text: str) -> Tuple[str, str]:
     return _normalize_ws(sources_text), _normalize_ws(script_text)
 
 
+
+
+def _estimate_max_output_tokens_from_specs(specs: list[dict], *, tokens_per_word: float = 2.2, overhead: int = 2500, floor: int = 4096) -> int:
+    """Estimate an appropriate `max_output_tokens` for a set of requested content specs.
+
+    This is a reliability guard: requesting the *model maximum* output tokens for every call increases the chance
+    of network/proxy disconnects on long-running responses. Instead, we size the budget to what the request
+    actually needs (still within the model's hard cap), while allowing an explicit override via config/env.
+    """
+    total_words = 0
+    for s in specs or []:
+        try:
+            mw = _safe_int(s.get('target_words') or s.get('max_words'), 0)
+        except Exception:
+            mw = 0
+        if mw > 0:
+            total_words += mw
+
+    est = int((int(total_words * tokens_per_word) + int(overhead)) * 2)
+    if est < floor:
+        est = floor
+    return est
 # ---------------------------------------------------------------------------
 # Pass runners (real OpenAI paths)
 # ---------------------------------------------------------------------------
@@ -843,14 +832,25 @@ def _run_pass_a(
     model = _pick_model_pass_a(config)
     prompt = _build_pass_a_prompt(config, long_specs)
 
-    requested_out = _safe_int(config.get("pass_a_max_output_tokens"), default_max_output_tokens(model))
+    requested_cfg = config.get("pass_a_max_output_tokens")
+    force_max = str(os.getenv("OPENAI_FORCE_MAX_OUTPUT", "false")).strip().lower() in ("1", "true", "yes", "y")
+    if requested_cfg is None and not force_max:
+        requested_out = _estimate_max_output_tokens_from_specs(long_specs)
+    else:
+        # Respect explicit config override, but optionally cap oversize values unless force_max is set.
+        requested_out = _safe_int(requested_cfg, default_max_output_tokens(model))
+        if not force_max:
+            est = _estimate_max_output_tokens_from_specs(long_specs)
+            if requested_out > int(est * 1.8):
+                logger.warning(f"pass_a_max_output_tokens={requested_out} is far above estimated need ({est}); capping to estimate for stability. Set OPENAI_FORCE_MAX_OUTPUT=true to override.")
+                requested_out = est
     max_out = clamp_output_tokens(model, requested_out)
 
     resp = create_openai_completion(
         client=client,
         model=model,
         messages=[{"role": "user", "content": prompt}],
-        tools=[{"type": "web_search"}],
+        tools=None,
         json_mode=False,
         max_completion_tokens=max_out,
     )
@@ -871,12 +871,22 @@ def _run_pass_b_from_pass_a(
     script_text: str,
 ) -> Dict[str, Any]:
     """
-    Pass B derived from Pass A (no web_search). Strict JSON mode.
+    Pass B derived from Pass A (no external browsing). Strict JSON mode.
     """
     model = _pick_model_pass_b(config)
     prompt = _build_pass_b_prompt_from_pass_a(config, nonlong_specs, sources_text, script_text)
 
-    requested_out = _safe_int(config.get("pass_b_max_output_tokens"), default_max_output_tokens(model))
+    requested_cfg = config.get("pass_b_max_output_tokens")
+    force_max = str(os.getenv("OPENAI_FORCE_MAX_OUTPUT", "false")).strip().lower() in ("1", "true", "yes", "y")
+    if requested_cfg is None and not force_max:
+        requested_out = _estimate_max_output_tokens_from_specs(nonlong_specs, tokens_per_word=2.0, overhead=1800, floor=2048)
+    else:
+        requested_out = _safe_int(requested_cfg, default_max_output_tokens(model))
+        if not force_max:
+            est = _estimate_max_output_tokens_from_specs(nonlong_specs, tokens_per_word=2.0, overhead=1800, floor=2048)
+            if requested_out > int(est * 2.0):
+                logger.warning(f"pass_b_max_output_tokens={requested_out} is far above estimated need ({est}); capping to estimate for stability. Set OPENAI_FORCE_MAX_OUTPUT=true to override.")
+                requested_out = est
     max_out = clamp_output_tokens(model, requested_out)
 
     resp = create_openai_completion(
@@ -897,26 +907,36 @@ def _run_pass_b_from_pass_a(
     return data
 
 
-def _run_single_pass_b_with_web_search(
+def _run_single_pass_b(
     client: Any,
     config: Dict[str, Any],
     nonlong_specs: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     """
-    Single-pass: use web_search and produce all non-long items in one JSON response.
-    JSON mode cannot be enforced when web_search is present; we parse best-effort.
+    Single-pass: do not browse the web and produce all non-long items in one JSON response.
+    JSON mode cannot be enforced when strict JSON mode is not enforceable; we parse best-effort.
     """
     model = _pick_model_pass_b(config)
-    prompt = _build_single_pass_b_prompt_with_web_search(config, nonlong_specs)
+    prompt = _build_single_pass_b_prompt(config, nonlong_specs)
 
-    requested_out = _safe_int(config.get("pass_b_max_output_tokens"), default_max_output_tokens(model))
+    requested_cfg = config.get("pass_b_max_output_tokens")
+    force_max = str(os.getenv("OPENAI_FORCE_MAX_OUTPUT", "false")).strip().lower() in ("1", "true", "yes", "y")
+    if requested_cfg is None and not force_max:
+        requested_out = _estimate_max_output_tokens_from_specs(nonlong_specs, tokens_per_word=2.0, overhead=1800, floor=2048)
+    else:
+        requested_out = _safe_int(requested_cfg, default_max_output_tokens(model))
+        if not force_max:
+            est = _estimate_max_output_tokens_from_specs(nonlong_specs, tokens_per_word=2.0, overhead=1800, floor=2048)
+            if requested_out > int(est * 2.0):
+                logger.warning(f"pass_b_max_output_tokens={requested_out} is far above estimated need ({est}); capping to estimate for stability. Set OPENAI_FORCE_MAX_OUTPUT=true to override.")
+                requested_out = est
     max_out = clamp_output_tokens(model, requested_out)
 
     resp = create_openai_completion(
         client=client,
         model=model,
         messages=[{"role": "user", "content": prompt}],
-        tools=[{"type": "web_search"}],
+        tools=None,
         json_mode=False,
         max_completion_tokens=max_out,
     )
@@ -982,7 +1002,7 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
         # Long-form script generation can take minutes for large outputs.
         # Increase timeouts and retries to reduce transient disconnect failures in CI.
         timeout_s = float(os.getenv("OPENAI_TIMEOUT", "600"))
-        max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "6"))
+        max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "0"))  # default 0 to enforce single-request per pass
         client = OpenAI(api_key=api_key, timeout=timeout_s, max_retries=max_retries)
 
     long_specs, nonlong_specs = _enabled_specs_from_content_specs(enabled_specs)
@@ -1026,7 +1046,7 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
 
             prompt = f"""You are a newsroom producer and dialogue scriptwriter for an English-language news podcast.
 
-You will be given SOURCE_ITEMS (pre-collected). Do NOT use web_search.
+You will be given SOURCE_ITEMS (pre-collected). Do NOT do not browse the web.
 Use only SOURCE_ITEMS for facts.
 
 Requested items:
@@ -1057,7 +1077,7 @@ Return STRICT JSON only:
             sources_out = sources_in
             content.extend(out_b.get("content", []))
         else:
-            out_b = _run_single_pass_b_with_web_search(client, config, nonlong_specs)
+            out_b = _run_single_pass_b(client, config, nonlong_specs)
             sources_out = out_b.get("sources", []) or []
             content.extend(out_b.get("content", []))
 

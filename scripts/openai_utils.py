@@ -10,6 +10,7 @@ from typing import Dict, Any, List, Optional
 import os
 import json
 import logging
+import time
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -238,38 +239,34 @@ def create_openai_completion(
 
         if stream:
             params_stream = dict(params)
-            params_stream["stream"] = True
-
+            params_stream['stream'] = True
             out_parts: List[str] = []
             response_id: Optional[str] = None
-
             try:
                 stream_iter = client.responses.create(**params_stream)
                 for ev in stream_iter:
-                    etype = getattr(ev, "type", None)
+                    etype = getattr(ev, 'type', None)
                     if etype is None and isinstance(ev, dict):
-                        etype = ev.get("type")
-
-                    if etype == "response.created":
-                        rid = getattr(ev, "response", None)
+                        etype = ev.get('type')
+                    if etype == 'response.created':
+                        rid = getattr(ev, 'response', None)
                         if rid is None and isinstance(ev, dict):
-                            rid = ev.get("response")
+                            rid = ev.get('response')
                         try:
-                            response_id = getattr(rid, "id", None) if rid is not None else response_id
+                            response_id = getattr(rid, 'id', None) if rid is not None else response_id
                         except Exception:
                             pass
-
-                    elif etype == "response.output_text.delta":
-                        delta = getattr(ev, "delta", None)
+                    elif etype == 'response.output_text.delta':
+                        delta = getattr(ev, 'delta', None)
                         if delta is None and isinstance(ev, dict):
-                            delta = ev.get("delta")
+                            delta = ev.get('delta')
                         if isinstance(delta, str) and delta:
                             out_parts.append(delta)
-
-                response = StreamedResponse(output_text="".join(out_parts), status="completed", response_id=response_id)
             except Exception as e:
-                logger.exception("Streaming Responses API request failed: %s", str(e))
+                # Single-request policy: do not retry; surface the failure.
+                logger.exception('Streaming Responses API request failed: %s', str(e))
                 raise
+            return StreamedResponse(output_text=''.join(out_parts), status='completed', response_id=response_id)
         else:
             response = client.responses.create(**params)
 
