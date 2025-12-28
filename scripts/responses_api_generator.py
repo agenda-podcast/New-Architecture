@@ -751,6 +751,21 @@ def _build_single_pass_b_prompt(config: Dict[str, Any], nonlong_specs: List[Dict
     host_a = hosts.get("HOST_A") or {}
     host_b = hosts.get("HOST_B") or {}
 
+    # Optional SOURCE_TEXT from mock-data / source text file (when L1 is not requested)
+    source_text = ""
+    try:
+        st_path = _source_text_file_path(config)
+        if st_path:
+            p = Path(st_path)
+            if p.exists():
+                raw = p.read_text(encoding="utf-8", errors="ignore")
+                _meta, full = _split_source_text_file(raw)
+                source_text = (full or "").strip()
+    except Exception:
+        source_text = ""
+
+    source_block = f"\nSOURCE_TEXT:\n{source_text}\n" if source_text else ""
+
     persona_block = f"""Personas:
 HOST_A: {host_a.get('name','HOST_A')} — {host_a.get('summary','')}
 HOST_B: {host_b.get('name','HOST_B')} — {host_b.get('summary','')}
@@ -766,10 +781,7 @@ Constraints:
 You are generating multiple short scripts by summarizing ONLY the provided SOURCE_TEXT (if present) and topic description (no external browsing).
 Topic: {topic}
 Topic description: {desc}
-
-SOURCE_TEXT:
-{source_text}
-
+{source_block}
 {persona_block}
 
 Targets to generate (all in ONE JSON object):
