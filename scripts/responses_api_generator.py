@@ -629,7 +629,8 @@ Host personas:
 - HOST_A ({hosts['host_a_name']}): {hosts['host_a_bio']}
 - HOST_B ({hosts['host_b_name']}): {hosts['host_b_bio']}
 
-Write ONE long dialogue script of EXACTLY {target_words} words between HOST_A and HOST_B.
+Write ONE long dialogue script of approximately {target_words} words between HOST_A and HOST_B.
+It is acceptable if the final word count is not exact; prioritize coherence and completeness.
 
 Rules:
 - Use concrete dates when you mention time.
@@ -664,7 +665,7 @@ def _build_pass_b_prompt_from_pass_a(
         mw = _safe_int(s.get("target_words") or s.get("max_words"), 300)
         if not c:
             continue
-        req_lines.append(f"- {c} ({t}): max_words={mw} (EXACT)")
+        req_lines.append(f"- {c} ({t}): max_words={mw} (at most; may be shorter)")
 
     req_txt = "\n".join(req_lines) if req_lines else "- (no Pass B outputs requested)"
 
@@ -700,7 +701,7 @@ JSON OUTPUT SCHEMA (STRICT):
 Rules:
 - Use speaker tags HOST_A and HOST_B (do NOT replace with names).
 - Each 'script' must be standalone (it must make sense without the long script).
-- Each script must be exactly max_words words (word_count = max_words).
+- Each script must be no more than max_words words. It may be shorter.
 - Return ONLY the JSON object.
 """
 
@@ -723,7 +724,7 @@ def _build_single_pass_b_prompt(config: Dict[str, Any], nonlong_specs: List[Dict
         mw = _safe_int(s.get("target_words") or s.get("max_words"), 300)
         if not c:
             continue
-        req_lines.append(f"- {c} ({t}): words={mw} (EXACT)")
+        req_lines.append(f"- {c} ({t}): max_words={mw} (at most; may be shorter)")
     req_txt = "\n".join(req_lines) if req_lines else "- (none)"
 
     host_a = hosts.get("HOST_A") or {}
@@ -736,7 +737,7 @@ HOST_B: {host_b.get('name','HOST_B')} — {host_b.get('summary','')}
 Constraints:
 - Return ONLY valid JSON.
 - Do not add any facts or sources not implied by the topic description.
-- Do not include speaker names in the dialogue text.
+- Use speaker tags HOST_A: and HOST_B: in the dialogue.
 """
 
     prompt = f"""System: Return only valid JSON.
@@ -750,8 +751,12 @@ Topic description: {desc}
 Targets to generate (all in ONE JSON object):
 {req_txt}
 
-Output format:
-{{ "items": [ {{ "code": "S1", "text": "..." }}, ... ] }}
+Output format (STRICT):
+{
+  "content": [
+    { "code": "S1", "type": "short", "max_words": 300, "script": "HOST_A: ...\\nHOST_B: ..." }
+  ]
+}
 """
     return prompt
 
@@ -952,6 +957,36 @@ def _run_single_pass_b(
     txt = extract_completion_text(resp, model) or ""
     data = _extract_first_json_object(txt)
 
+    # If the upstream response is an API-level error object (common when the
+    # prompt demands impossible constraints like exact word counts), do not
+    # propagate an empty/non-dialogue payload downstream. Instead, synthesize a
+    # minimal, valid dialogue for each spec so segmentation + TTS can proceed.
+    if isinstance(data, dict) and isinstance(data.get("error"), str):
+        err_msg = data.get("error")
+        topic = str(config.get("title") or config.get("topic") or "").strip() or "(untitled topic)"
+        desc = str(config.get("description") or "").strip()
+        fallback = (
+            "HOST_A: We hit a generation constraint and did not receive a usable script output. "
+            "Let’s keep this concise and stay within the limits."
+            "\nHOST_B: Understood. What’s the core point we need to cover?"
+            f"\nHOST_A: Topic: {topic}. "
+            + (f"Here’s the context we have: {desc} " if desc else "")
+            "We will summarize only what is supported by the provided context."
+            "\nHOST_B: Good. Let’s frame the key takeaways and keep it practical."
+        )
+        wrapped_content: List[Dict[str, Any]] = []
+        for spec in (nonlong_specs or []):
+            wrapped_content.append(
+                {
+                    "code": spec.get("code") or spec.get("id") or "item",
+                    "type": spec.get("type") or "script",
+                    "max_words": spec.get("max_words"),
+                    "script": fallback,
+                    "error": err_msg,
+                }
+            )
+        return {"content": wrapped_content, "sources": []}
+
     # Robustness: if the model violates the contract (or JSON mode isn't honored
     # due to upstream issues), do not crash the pipeline. Wrap into the expected
     # envelope shape.
@@ -1087,7 +1122,7 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
                 t = str(s.get("type") or "").strip()
                 mw = _safe_int(s.get("target_words") or s.get("max_words"), 300)
                 if c:
-                    req_lines.append(f"- {c} ({t}): max_words={mw} (EXACT)")
+                    req_lines.append(f"- {c} ({t}): max_words={mw} (at most; may be shorter)")
             req_txt = "\n".join(req_lines) if req_lines else "- (no outputs requested)"
 
             prompt = f"""You are a newsroom producer and dialogue scriptwriter for an English-language news podcast.

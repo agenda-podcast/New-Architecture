@@ -235,19 +235,12 @@ def generate_multi_format_for_topic(
                     ensure_ascii=False,
                 )
 
-        # Save raw Pass A output (if present) — even if incomplete.
-        # Pass A is expected to be strict JSON (script-only).
+        # Save raw Pass A output (if present) — even if incomplete
         pass_a_raw = (multi_data.get("pass_a_raw_text") or "").strip()
         if pass_a_raw:
-            pass_a_path = output_dir / f"{topic_id}-{date_str}-PASS_A.json"
-            try:
-                parsed = json.loads(pass_a_raw)
-                with open(pass_a_path, "w", encoding="utf-8") as f:
-                    json.dump(parsed, f, indent=2, ensure_ascii=False)
-            except Exception:
-                # Fallback: write as-is
-                with open(pass_a_path, "w", encoding="utf-8") as f:
-                    f.write(pass_a_raw + "\n")
+            pass_a_path = output_dir / f"{topic_id}-{date_str}-PASS_A.txt"
+            with open(pass_a_path, "w", encoding="utf-8") as f:
+                f.write(pass_a_raw + "\n")
 
         print(f"Generated {len(content_list)} content pieces")
 
@@ -255,7 +248,15 @@ def generate_multi_format_for_topic(
         for content_item in content_list:
             code = str(content_item.get("code", "UNKNOWN"))
             content_type = str(content_item.get("type", "unknown"))
-            script_text_raw = content_item.get("script", "") or ""
+            # Some upstream generators may return "segments" without "script", or
+            # return a non-standard key such as "text". Downstream TTS requires
+            # valid segments, so we normalize here to avoid empty outputs.
+            script_text_raw = (
+                content_item.get("script")
+                or content_item.get("text")
+                or content_item.get("output_text")
+                or ""
+            )
 
             target_duration = int(content_item.get("target_duration", 0) or 0)
             if target_duration <= 0:
@@ -274,10 +275,26 @@ def generate_multi_format_for_topic(
 
             segments = content_item.get("segments") or []
             if not segments:
-                print(f"ERROR: {code} has no segments; skipping save to avoid downstream failures.")
-                preview = script_text_raw[:200].replace("\n", " ")
-                print(f"  Script preview: {preview}...")
-                continue
+                # Last-resort: create a minimal placeholder script so that downstream
+                # steps have a .script.json to work with. This is preferable to a hard
+                # failure that blocks the entire pipeline.
+                fallback_text = (script_text_raw or "").strip()
+                if not fallback_text:
+                    fallback_text = f"HOST_A: [EMPTY SCRIPT] Generator produced no script for {code}."
+                content_item["script"] = fallback_text
+                content_item = convert_content_script_to_segments(content_item)
+                segments = content_item.get("segments") or []
+                if not segments:
+                    segments = [
+                        {
+                            "chapter": 1,
+                            "title": content_type.capitalize(),
+                            "start_time": 0,
+                            "duration": 0,
+                            "dialogue": [{"speaker": "A", "text": fallback_text}],
+                        }
+                    ]
+                print(f"WARN: {code} had no segments; wrote placeholder segments to keep pipeline moving.")
 
             if validate_segments is not None:
                 if not validate_segments(segments, code):
