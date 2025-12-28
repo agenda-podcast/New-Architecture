@@ -280,7 +280,7 @@ VIDEO_TIMER_COLOR = "white"
 
 # File Naming Patterns
 SCRIPT_TXT_PATTERN = "{topic}-{date}-{code}.txt"
-SCRIPT_JSON_PATTERN = "{topic}-{date}-{code}.json"
+SCRIPT_JSON_PATTERN = "{topic}-{date}-{code}.captions.json"
 CHAPTERS_JSON_PATTERN = "{topic}-{date}-{code}.chapters.json"
 FFMETA_PATTERN = "{topic}-{date}-{code}.ffmeta"
 AUDIO_PATTERN = "{topic}-{date}-{code}.m4a"
