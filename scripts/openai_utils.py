@@ -15,6 +15,13 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+# Optional: used only for selective retry classification when the OpenAI SDK
+# raises transport exceptions (it uses httpx under the hood).
+try:
+    import httpx  # type: ignore
+except Exception:  # pragma: no cover
+    httpx = None
+
 try:
     from openai import OpenAI
 except ImportError:
@@ -167,6 +174,64 @@ def create_openai_completion(
     """
     endpoint_type = get_openai_endpoint_type(model)
 
+    # Transport-level retries are OFF by default to preserve the pipeline's
+    # single-request-per-pass behavior. If you run in CI and occasionally hit
+    # transient disconnects (e.g., httpx.RemoteProtocolError), you can enable a
+    # small number of retries via env without changing code.
+    transport_retries = int(os.getenv("OPENAI_TRANSPORT_RETRIES", "0"))
+    transport_retry_sleep_s = float(os.getenv("OPENAI_TRANSPORT_RETRY_SLEEP_S", "1.5"))
+
+    def _is_retryable_transport_error(e: Exception) -> bool:
+        if httpx is None:
+            return False
+        retryable = (
+            getattr(httpx, "RemoteProtocolError", tuple()),
+            getattr(httpx, "ReadTimeout", tuple()),
+            getattr(httpx, "ConnectError", tuple()),
+            getattr(httpx, "ReadError", tuple()),
+            getattr(httpx, "WriteError", tuple()),
+            getattr(httpx, "ProtocolError", tuple()),
+        )
+        return isinstance(e, retryable)
+
+    def _with_transport_retries(fn):
+        attempts = max(1, 1 + transport_retries)
+        last_exc: Exception | None = None
+        for attempt in range(1, attempts + 1):
+            try:
+                return fn()
+            except Exception as e:
+                last_exc = e
+                if attempt >= attempts or not _is_retryable_transport_error(e):
+                    raise
+                logger.warning(
+                    "Transient transport error from OpenAI SDK (attempt %d/%d): %s",
+                    attempt,
+                    attempts,
+                    str(e),
+                )
+                time.sleep(transport_retry_sleep_s)
+        if last_exc:
+            raise last_exc
+        raise RuntimeError("Unexpected retry wrapper state")
+
+    transport_backoff_s = float(os.getenv("OPENAI_TRANSPORT_BACKOFF", "2.0"))
+
+    def _is_retryable_transport_error(exc: Exception) -> bool:
+        if httpx is None:
+            return False
+        retryables = (
+            getattr(httpx, "RemoteProtocolError", ()),
+            getattr(httpx, "ReadTimeout", ()),
+            getattr(httpx, "ConnectTimeout", ()),
+            getattr(httpx, "ConnectError", ()),
+            getattr(httpx, "ReadError", ()),
+        )
+        try:
+            return isinstance(exc, retryables)
+        except Exception:
+            return False
+
     if endpoint_type == "responses":
         # Use /v1/responses endpoint (Responses API)
         logger.info(f"Using Responses API endpoint for model: {model}")
@@ -243,7 +308,7 @@ def create_openai_completion(
             out_parts: List[str] = []
             response_id: Optional[str] = None
             try:
-                stream_iter = client.responses.create(**params_stream)
+                stream_iter = _with_transport_retries(lambda: client.responses.create(**params_stream))
                 for ev in stream_iter:
                     etype = getattr(ev, 'type', None)
                     if etype is None and isinstance(ev, dict):
@@ -268,7 +333,7 @@ def create_openai_completion(
                 raise
             return StreamedResponse(output_text=''.join(out_parts), status='completed', response_id=response_id)
         else:
-            response = client.responses.create(**params)
+            response = _with_transport_retries(lambda: client.responses.create(**params))
 
         # Persist the full Responses API payload (including tool calls/results) for later analysis
         if output_file:
@@ -359,7 +424,7 @@ def create_openai_completion(
             logger.info(f"Tools: {tools}")
 
         _validate_params_for_endpoint("chat", params)
-        response = client.chat.completions.create(**params)
+        response = _with_transport_retries(lambda: client.chat.completions.create(**params))
 
         # Log response details
         logger.info("Response received from OpenAI Chat Completions API")

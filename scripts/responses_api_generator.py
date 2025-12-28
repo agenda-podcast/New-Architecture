@@ -51,6 +51,12 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+# Optional: used for custom HTTP transport to mitigate CI proxy disconnects.
+try:
+    import httpx  # type: ignore
+except Exception:  # pragma: no cover
+    httpx = None
+
 try:
     from openai import OpenAI
 except Exception:  # pragma: no cover
@@ -1001,8 +1007,27 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
         # Long-form script generation can take minutes for large outputs.
         # Increase timeouts and retries to reduce transient disconnect failures in CI.
         timeout_s = float(os.getenv("OPENAI_TIMEOUT", "600"))
-        max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "0"))  # default 0 to enforce single-request per pass
-        client = OpenAI(api_key=api_key, timeout=timeout_s, max_retries=max_retries)
+        # NOTE: this controls SDK-level retries. Default remains 0 to preserve your
+        # "one request per pass" policy. If you want automatic retries on transient
+        # disconnects, set OPENAI_MAX_RETRIES to a small number (e.g., 1-2).
+        max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "0"))
+
+        # CI/CD environments sometimes sit behind proxies that are more stable over HTTP/2.
+        # When available, we can pass a custom httpx client to the OpenAI SDK.
+        http_client = None
+        use_http2 = str(os.getenv("OPENAI_HTTP2", "true")).strip().lower() in ("1", "true", "yes", "y")
+        if httpx is not None and use_http2:
+            try:
+                limits = httpx.Limits(max_connections=20, max_keepalive_connections=10, keepalive_expiry=60)
+                http_client = httpx.Client(http2=True, timeout=timeout_s, limits=limits)
+            except Exception as e:
+                logger.warning("Failed to init custom httpx client (HTTP/2). Falling back to SDK default: %s", str(e))
+                http_client = None
+
+        if http_client is not None:
+            client = OpenAI(api_key=api_key, timeout=timeout_s, max_retries=max_retries, http_client=http_client)
+        else:
+            client = OpenAI(api_key=api_key, timeout=timeout_s, max_retries=max_retries)
 
     long_specs, nonlong_specs = _enabled_specs_from_content_specs(enabled_specs)
 
