@@ -12,7 +12,7 @@ from pathlib import Path
 # ============================================================================
 
 # Testing Configuration
-TESTING_MODE = False  # When True, use saved mock responses instead of calling OpenAI API
+TESTING_MODE = True  # When True, use saved mock responses instead of calling OpenAI API
 
 # Resolve repo-rooted paths robustly (GitHub Actions may run scripts from ./scripts, so relative paths break)
 REPO_ROOT = Path(os.environ.get('GITHUB_WORKSPACE', Path(__file__).resolve().parents[1])).resolve()
@@ -191,6 +191,27 @@ GOOGLE_SEARCH_RESULTS_PER_PAGE = 10  # Results per page (API hard limit)
 # Video Rendering Settings
 # ============================================================================
 
+# ---------------------------------------------------------------------------
+# Optional social/ffmpeg effects flags
+#
+# Some branches/forks import these symbols from global_config. If you are
+# using a trimmed-down global_config.py, these may be missing and imports will
+# fail. Define them here with environment-driven defaults.
+# ---------------------------------------------------------------------------
+
+if 'ENABLE_SOCIAL_EFFECTS' not in globals():
+    ENABLE_SOCIAL_EFFECTS = os.environ.get('ENABLE_SOCIAL_EFFECTS', 'true').lower() in ('true', '1', 'yes')
+
+if 'SOCIAL_EFFECTS_STYLE' not in globals():
+    # 'auto' lets the renderer choose a reasonable style based on format
+    SOCIAL_EFFECTS_STYLE = os.environ.get('SOCIAL_EFFECTS_STYLE', 'auto')
+
+if 'ENABLE_FFMPEG_EFFECTS' not in globals():
+    ENABLE_FFMPEG_EFFECTS = os.environ.get('ENABLE_FFMPEG_EFFECTS', 'true').lower() in ('true', '1', 'yes')
+
+if 'FFMPEG_EFFECTS_CONFIG' not in globals():
+    FFMPEG_EFFECTS_CONFIG = os.environ.get('FFMPEG_EFFECTS_CONFIG', 'config/video_effects_ffmpeg.yml')
+
 # Video Resolution Configurations
 VIDEO_RESOLUTIONS = {
     'horizontal': {
@@ -229,11 +250,23 @@ VIDEO_BITRATE_SETTINGS = {
     }
 }
 
+# Video Renderer Selection
+# Options: 'ffmpeg' (legacy, direct FFmpeg composition) or 'blender' (Blender VSE with FFmpeg encoder)
+# Can be overridden with VIDEO_RENDERER environment variable
 import os
+VIDEO_RENDERER = os.environ.get('VIDEO_RENDERER', 'blender')  # Default to FFmpeg for backward compatibility
+# Set VIDEO_RENDERER='blender' environment variable to use Blender 4.5 LTS rendering pipeline
 
-# Video Renderer
-# FFmpeg-only pipeline. Blender rendering is intentionally not supported.
-VIDEO_RENDERER = 'ffmpeg'
+# Social Media Visual Effects (Blender templates)
+# Controls whether to apply social media style visual effects using Blender templates
+ENABLE_SOCIAL_EFFECTS = os.environ.get('ENABLE_SOCIAL_EFFECTS', 'true').lower() in ('true', '1', 'yes')
+# Template selection style options:
+#   'auto' - Weighted random selection (60% safe, 30% cinematic, 10% experimental)
+#   'none' - Minimal template with no effects
+#   'safe' - Professional, subtle effects (clean grade, minimal grain, subtle vignette)
+#   'cinematic' - Film-quality effects (noir, golden hour, vintage film, teal & orange)
+#   'experimental' - Bold, artistic effects (neon glow, glitch, high contrast)
+SOCIAL_EFFECTS_STYLE = os.environ.get('SOCIAL_EFFECTS_STYLE', 'auto')
 
 # FFmpeg Effects Configuration
 # Controls whether to use FFmpeg effects mode (Ken Burns + xfade transitions)
