@@ -606,17 +606,6 @@ def _build_pass_a_prompt(config: Dict[str, Any], long_specs: List[Dict[str, Any]
 
     topic = str(config.get("title") or config.get("topic") or "").strip() or "(untitled topic)"
     desc = str(config.get("description") or "").strip()
-
-    # Optional SOURCE_TEXT from mock-data / source text file
-    source_text = ""
-    p = _source_text_file_path(config)
-    if p:
-        try:
-            raw = p.read_text(encoding="utf-8", errors="ignore")
-            _, full_text = _split_source_text_file(raw)
-            source_text = full_text.strip()
-        except Exception:
-            source_text = ""
     freshness_hours = _safe_int(config.get("freshness_hours"), 24)
     freshness_window = f"last {freshness_hours} hours"
 
@@ -745,26 +734,11 @@ def _build_single_pass_b_prompt(config: Dict[str, Any], nonlong_specs: List[Dict
         mw = _safe_int(s.get("target_words") or s.get("max_words"), 300)
         if not c:
             continue
-        req_lines.append(f"- {c} ({t}): max_words={mw} (at most; may be shorter)")
+        req_lines.append(f"- {c} ({t}): words={mw} (EXACT)")
     req_txt = "\n".join(req_lines) if req_lines else "- (none)"
 
     host_a = hosts.get("HOST_A") or {}
     host_b = hosts.get("HOST_B") or {}
-
-    # Optional SOURCE_TEXT from mock-data / source text file (when L1 is not requested)
-    source_text = ""
-    try:
-        st_path = _source_text_file_path(config)
-        if st_path:
-            p = Path(st_path)
-            if p.exists():
-                raw = p.read_text(encoding="utf-8", errors="ignore")
-                _meta, full = _split_source_text_file(raw)
-                source_text = (full or "").strip()
-    except Exception:
-        source_text = ""
-
-    source_block = f"\nSOURCE_TEXT:\n{source_text}\n" if source_text else ""
 
     persona_block = f"""Personas:
 HOST_A: {host_a.get('name','HOST_A')} — {host_a.get('summary','')}
@@ -772,16 +746,16 @@ HOST_B: {host_b.get('name','HOST_B')} — {host_b.get('summary','')}
 
 Constraints:
 - Return ONLY valid JSON.
-- Do not add any facts or sources not implied by the provided SOURCE_TEXT (if present) or the topic description.
-- Use dialogue lines that start with 'HOST_A:' and 'HOST_B:' only (no real names).
+- Do not add any facts or sources not implied by the topic description.
+- Do not include speaker names in the dialogue text.
 """
 
     prompt = f"""System: Return only valid JSON.
 
-You are generating multiple short scripts by summarizing ONLY the provided SOURCE_TEXT (if present) and topic description (no external browsing).
+You are generating multiple short scripts from existing context (no external browsing).
 Topic: {topic}
 Topic description: {desc}
-{source_block}
+
 {persona_block}
 
 Targets to generate (all in ONE JSON object):
@@ -877,7 +851,7 @@ def _run_pass_a(
         model=model,
         messages=[{"role": "user", "content": prompt}],
         tools=None,
-        json_mode=True,
+        json_mode=False,
         max_completion_tokens=max_out,
     )
 
@@ -963,69 +937,17 @@ def _run_single_pass_b(
         model=model,
         messages=[{"role": "user", "content": prompt}],
         tools=None,
-        json_mode=True,
+        json_mode=False,
         max_completion_tokens=max_out,
     )
 
     txt = extract_completion_text(resp, model) or ""
     data = _extract_first_json_object(txt)
-    # Normalize to expected envelope: {"content":[...], "sources":[]}
     if not isinstance(data, dict):
-        data = {"text": txt.strip()}
-
-    # If API returned an error payload, keep it and synthesize minimal scripts so downstream can proceed.
-    if "error" in data and "content" not in data:
-        err = str(data.get("error") or "").strip() or "unknown error"
-        content = []
-        for s in nonlong_specs:
-            code = (s.get("code") or "").strip()
-            typ = (s.get("type") or "").strip()
-            mw = _safe_int(s.get("target_words") or s.get("max_words"), 300)
-            if not code:
-                continue
-            script = f"HOST_A: We hit a generation error and will produce a minimal draft for {code}.\nHOST_B: Acknowledged. {err}"
-            content.append({"code": code, "type": typ, "max_words": mw, "script": script, "error": err})
-        return {"content": content, "sources": []}
-
-    # Accept legacy shape {"items":[{"code":"S1","text":"..."}]}
-    if "content" not in data and isinstance(data.get("items"), list):
-        content = []
-        spec_by_code = {str(s.get("code") or "").strip(): s for s in nonlong_specs if str(s.get("code") or "").strip()}
-        for it in data.get("items") or []:
-            if not isinstance(it, dict):
-                continue
-            code = str(it.get("code") or "").strip()
-            txt_piece = str(it.get("text") or "").strip()
-            spec = spec_by_code.get(code, {})
-            typ = str(spec.get("type") or "").strip()
-            mw = _safe_int(spec.get("target_words") or spec.get("max_words"), 300)
-            content.append({"code": code, "type": typ, "max_words": mw, "script": txt_piece})
-        data = {"content": content, "sources": []}
-
-    # If still missing content, wrap whatever text we have into one entry per requested spec.
+        raise ValueError("Single-pass output is not a JSON object")
     if "content" not in data or not isinstance(data.get("content"), list):
-        base_text = ""
-        for k in ("script", "text", "output"):
-            if isinstance(data.get(k), str) and data.get(k).strip():
-                base_text = data.get(k).strip()
-                break
-        if not base_text:
-            base_text = txt.strip()
-        content = []
-        for s in nonlong_specs:
-            code = (s.get("code") or "").strip()
-            typ = (s.get("type") or "").strip()
-            mw = _safe_int(s.get("target_words") or s.get("max_words"), 300)
-            if not code:
-                continue
-            # Ensure at least two speaker lines for segmenter
-            script = base_text
-            if "HOST_A:" not in script and "HOST_B:" not in script:
-                script = f"HOST_A: {base_text}\nHOST_B: (continuing)"
-            content.append({"code": code, "type": typ, "max_words": mw, "script": script})
-        data = {"content": content, "sources": []}
-
-    if "sources" not in data or not isinstance(data.get("sources"), list):
+        raise ValueError("Single-pass output JSON missing 'content' list")
+    if "sources" in data and not isinstance(data.get("sources"), list):
         data["sources"] = []
     return data
 
@@ -1033,6 +955,65 @@ def _run_single_pass_b(
 # ---------------------------------------------------------------------------
 # Public entrypoint
 # ---------------------------------------------------------------------------
+
+
+def _run_pass_b_grouped(
+    client: Any,
+    config: Dict[str, Any],
+    nonlong_specs: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Run Pass B in multiple requests:
+
+    - One request per each *medium* item (e.g., M1, M2 ...)
+    - One combined request for all *short* items (e.g., S1..S*)
+    - One combined request for all *reels* items (e.g., R1..R*)
+    - Any other non-long types are requested in a single final batch.
+
+    Returns a single object shaped like: {"content": [...], "sources": [...]}
+    """
+    if not nonlong_specs:
+        return {"content": [], "sources": []}
+
+    def _type(s: Dict[str, Any]) -> str:
+        return str(s.get("type") or "").strip().lower()
+
+    # Preserve original order for the per-medium calls.
+    medium_specs = [s for s in nonlong_specs if _type(s) == "medium"]
+    short_specs = [s for s in nonlong_specs if _type(s) == "short"]
+    reels_specs = [s for s in nonlong_specs if _type(s) == "reels"]
+    other_specs = [s for s in nonlong_specs if _type(s) not in ("medium", "short", "reels")]
+
+    batches: List[List[Dict[str, Any]]] = []
+    # Medium: one request per item, in original order.
+    for s in medium_specs:
+        batches.append([s])
+    # Short: one request for all shorts.
+    if short_specs:
+        batches.append(short_specs)
+    # Reels: one request for all reels.
+    if reels_specs:
+        batches.append(reels_specs)
+    # Anything else: one final request.
+    if other_specs:
+        batches.append(other_specs)
+
+    combined_content: List[Dict[str, Any]] = []
+    combined_sources: List[Any] = []
+
+    for batch in batches:
+        out = _run_single_pass_b(client, config, batch)
+        if isinstance(out, dict):
+            combined_content.extend(out.get("content") or [])
+            # Keep sources if present (usually empty in your no-browsing setup).
+            src = out.get("sources") or []
+            if isinstance(src, list) and src:
+                combined_sources.extend(src)
+
+    return {
+        "content": combined_content,
+        "sources": combined_sources,
+    }
+
 
 def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
     """
@@ -1155,7 +1136,7 @@ Return STRICT JSON only:
             sources_out = sources_in
             content.extend(out_b.get("content", []))
         else:
-            out_b = _run_single_pass_b(client, config, nonlong_specs)
+            out_b = _run_pass_b_grouped(client, config, nonlong_specs)
             sources_out = out_b.get("sources", []) or []
             content.extend(out_b.get("content", []))
 

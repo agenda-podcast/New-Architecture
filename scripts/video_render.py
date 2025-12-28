@@ -1144,6 +1144,48 @@ def _discover_frame_png(repo_root: Path) -> Optional[Path]:
     if not repo_root:
         return None
 
+    # Common locations (deterministic order).
+    # Prefer a portrait frame for vertical video and a landscape frame for horizontal.
+    assets_dir = Path(repo_root) / "assets"
+    if not assets_dir.exists():
+        return None
+
+    # If caller is rendering horizontal, prefer the horizontal frame variant when present.
+    prefer_horizontal = False
+    try:
+        # VIDEO_WIDTH/VIDEO_HEIGHT are global defaults; the caller may override width/height,
+        # but the frame choice is best-effort and will still work in either orientation.
+        prefer_horizontal = bool(VIDEO_WIDTH and VIDEO_HEIGHT and VIDEO_WIDTH >= VIDEO_HEIGHT)
+    except Exception:
+        prefer_horizontal = False
+
+    candidates: List[Path] = []
+    if prefer_horizontal:
+        candidates.extend([
+            assets_dir / "frame_horizontal.png",
+            assets_dir / "frame.png",
+        ])
+    else:
+        candidates.extend([
+            assets_dir / "frame.png",
+            assets_dir / "frame_horizontal.png",
+        ])
+
+    # Fallback: any png containing "frame" in name.
+    try:
+        candidates.extend(sorted(assets_dir.glob("*frame*.png")))
+    except Exception:
+        pass
+
+    for p in candidates:
+        try:
+            if p and p.exists() and p.is_file() and p.stat().st_size > 0:
+                return p
+        except Exception:
+            continue
+
+    return None
+
 
 def _safe_positive_duration(value: float, default: float = 1.0) -> float:
     try:
@@ -2528,7 +2570,10 @@ def create_video_from_images(background_images: List[Path], audio_path: Optional
                 content_type=content_type,
                 seed=seed,
                 audio_path=audio_path,
-                enable_overlays=bool(ENABLE_BURN_IN_CAPTIONS),
+                # Image titles and the static frame overlay are part of the "overlays" pipeline.
+                # Captions can be disabled independently by simply having no caption segments.
+                # Keep overlays enabled so frames/titles render even when ENABLE_BURN_IN_CAPTIONS is False.
+                enable_overlays=True,
                 repo_root=repo_root,
             )
             
