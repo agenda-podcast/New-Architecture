@@ -235,12 +235,19 @@ def generate_multi_format_for_topic(
                     ensure_ascii=False,
                 )
 
-        # Save raw Pass A output (if present) — even if incomplete
+        # Save raw Pass A output (if present) — even if incomplete.
+        # Pass A is expected to be strict JSON (script-only).
         pass_a_raw = (multi_data.get("pass_a_raw_text") or "").strip()
         if pass_a_raw:
-            pass_a_path = output_dir / f"{topic_id}-{date_str}-PASS_A.txt"
-            with open(pass_a_path, "w", encoding="utf-8") as f:
-                f.write(pass_a_raw + "\n")
+            pass_a_path = output_dir / f"{topic_id}-{date_str}-PASS_A.json"
+            try:
+                parsed = json.loads(pass_a_raw)
+                with open(pass_a_path, "w", encoding="utf-8") as f:
+                    json.dump(parsed, f, indent=2, ensure_ascii=False)
+            except Exception:
+                # Fallback: write as-is
+                with open(pass_a_path, "w", encoding="utf-8") as f:
+                    f.write(pass_a_raw + "\n")
 
         print(f"Generated {len(content_list)} content pieces")
 

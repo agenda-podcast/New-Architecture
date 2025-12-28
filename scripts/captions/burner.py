@@ -678,3 +678,51 @@ def burn_captions_subflow(
 ) -> bool:
     burner = CaptionBurner(config=config)
     return burner.burn(video_path=Path(video_path), audio_path=audio_path, width=width, height=height, fps=fps, in_place=True)
+
+
+# ---------------------------------------------------------------------------
+# Compatibility helpers (used by scripts/video_render.py)
+# ---------------------------------------------------------------------------
+
+def build_overlays_ass_from_segments(
+    *,
+    video_path: Path,
+    width: int,
+    height: int,
+    caption_segments: List[Dict[str, Any]] | None = None,
+    title_segments: List[Dict[str, Any]] | None = None,
+) -> Path:
+    """Build an ASS overlays file for the given caption/title segments.
+
+    This is a lightweight wrapper around CaptionBurner._build_ass_file, exposed as a
+    stable import for the slideshow/video renderer.
+
+    Args:
+        video_path: Used to infer topic context (speaker names/genders). Only the path
+            string matters; the file does not need to exist.
+        width/height: Target video resolution.
+        caption_segments: List of {start,end,text[,speaker]}.
+        title_segments: List of {start,end,text}.
+
+    Returns:
+        Path to a temporary .ass file.
+    """
+
+    burner = CaptionBurner(config=_load_config_from_env())
+    caption_segments = caption_segments or []
+    title_segments = title_segments or []
+
+    ctx = burner._load_topic_context(Path(video_path))
+    known_names = [str(ctx.get("a_name", "")).strip(), str(ctx.get("b_name", "")).strip()]
+    known_names = [n for n in known_names if n]
+
+    return burner._build_ass_file(
+        width=int(width),
+        height=int(height),
+        caption_segments=caption_segments,
+        title_segments=title_segments,
+        a_gender=str(ctx.get("a_gender", "unknown")),
+        b_gender=str(ctx.get("b_gender", "unknown")),
+        known_names=known_names,
+        hide_speaker_names=burner.config.hide_speaker_names,
+    )

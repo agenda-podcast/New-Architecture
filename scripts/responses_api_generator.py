@@ -519,7 +519,7 @@ def _make_mock_outputs_from_source_text(config: Dict[str, Any], enabled_specs: L
 
     long_specs, nonlong_specs = _enabled_specs_from_content_specs(enabled_specs)
 
-    # Long script (Pass A mock)
+    # Long script (Pass A mock) - script-only JSON to match real Pass A output
     pass_a_raw_text = ""
     long_script_text = ""
     if long_specs:
@@ -529,18 +529,7 @@ def _make_mock_outputs_from_source_text(config: Dict[str, Any], enabled_specs: L
 
         long_script_text = _mock_dialogue_from_text(full_text or src_text, target_words=target_words)
 
-        # Build Pass A plain text output
-        src_lines = []
-        for idx, it in enumerate(sources_list, start=1):
-            pub = it.get("publisher", "Source")
-            title = it.get("title", "Untitled")
-            date = it.get("date", "")
-            url = it.get("url", "")
-            d = f" ({date})" if date else ""
-            u = f" {url}" if url else ""
-            src_lines.append(f"- [{idx}] {pub} — {title}{d}.{u}".rstrip("."))
-
-        pass_a_raw_text = "SOURCES:\n" + "\n".join(src_lines).strip() + "\n\nSCRIPT:\n" + long_script_text.strip() + "\n"
+        pass_a_raw_text = json.dumps({"script": long_script_text.strip()}, ensure_ascii=False)
 
     # Build content list for all items
     content: List[Dict[str, Any]] = []
@@ -599,8 +588,11 @@ def _pick_model_pass_b(config: Dict[str, Any]) -> str:
 
 
 def _build_pass_a_prompt(config: Dict[str, Any], long_specs: List[Dict[str, Any]]) -> str:
-    """
-    Pass A prompt: ONLY "SOURCES" and "SCRIPT" in plain text. No JSON.
+    """Build the Pass A prompt.
+
+    Pass A returns ONLY strict JSON and MUST contain ONLY the long dialogue script.
+    Web sources must NOT be included in the output (to keep output size stable and
+    to simplify downstream Pass B inputs).
     """
     hosts = _resolve_hosts(config)
 
@@ -619,43 +611,38 @@ def _build_pass_a_prompt(config: Dict[str, Any], long_specs: List[Dict[str, Any]
     for s in long_specs:
         target_words = max(target_words, _safe_int(s.get("target_words") or s.get("max_words"), 9000))
 
-    return f"""You are a newsroom producer and dialogue scriptwriter for an English-language news podcast.
-You MUST use the web_search tool before writing to verify the latest news and to avoid any "knowledge cutoff" disclaimers.
+    return f"""System: Return only valid JSON.
+
+You are Pass A of a two-pass dialogue pipeline.
 
 Topic: {topic}
 Topic description: {desc}
-Freshness window: {freshness_window}
-Region focus: {region_txt}
 
 Host personas:
 - HOST_A ({hosts['host_a_name']}): {hosts['host_a_bio']}
 - HOST_B ({hosts['host_b_name']}): {hosts['host_b_bio']}
 
-Search guidance (use as web_search queries; adjust as needed):
-{query_txt}
+Write ONE long dialogue script of EXACTLY {target_words} words between HOST_A and HOST_B.
 
-OUTPUT FORMAT (STRICT — no markdown, no JSON):
-SOURCES:
-- [1] <Publisher> — <Title> (<YYYY-MM-DD>). <URL>
-- [2] ...
-(Include 6–12 high-quality sources. Prefer primary/official where possible.)
+Rules:
+- Use concrete dates when you mention time.
+- No bullet lists; write as spoken dialogue.
+- Use speaker tags HOST_A: and HOST_B:.
+- Output MUST be a single JSON object.
+- The JSON object MUST contain ONLY one key: "script".
+- Do NOT include sources, citations, URLs, or any other keys.
 
-SCRIPT:
-Write ONE long dialogue script (= {target_words} words) between HOST_A and HOST_B.
-- Use concrete dates.
-- Clearly distinguish verified facts vs claims.
-- Keep it engaging but grounded.
-- No bullet lists inside the script; write as spoken dialogue with speaker tags.
-
-Return ONLY the two sections above: SOURCES and SCRIPT.
+JSON output schema:
+{{
+  "script": "HOST_A: ...\\nHOST_B: ..."
+}}
 """
 
 
 def _build_pass_b_prompt_from_pass_a(
     config: Dict[str, Any],
     nonlong_specs: List[Dict[str, Any]],
-    pass_a_sources_text: str,
-    pass_a_script_text: str,
+    pass_a_json_text: str,
 ) -> str:
     """
     Pass B prompt when Pass A ran: derive summaries from Pass A script only.
@@ -676,13 +663,11 @@ def _build_pass_b_prompt_from_pass_a(
 
     return f"""You are Pass B of a two-pass pipeline.
 
-You will be given:
-1) SOURCES (as text)
-2) LONG_SCRIPT (dialogue)
+You will be given PASS_A_JSON (a strict JSON object) containing a single key: "script".
 
 Your task:
 - Create summarized/derived scripts for each requested item below.
-- Do NOT introduce new facts. Use ONLY what is supported by LONG_SCRIPT and SOURCES.
+- Do NOT introduce new facts. Use ONLY what is supported by PASS_A_JSON.script.
 - Return ALL items in ONE response as STRICT JSON (no markdown).
 
 Topic: {topic}
@@ -690,11 +675,8 @@ Topic: {topic}
 Requested items:
 {req_txt}
 
-SOURCES (text, for attribution / grounding):
-{pass_a_sources_text}
-
-LONG_SCRIPT (text, for summarization/derivation):
-{pass_a_script_text}
+PASS_A_JSON:
+{pass_a_json_text}
 
 JSON OUTPUT SCHEMA (STRICT):
 {{
@@ -827,7 +809,13 @@ def _run_pass_a(
     long_specs: List[Dict[str, Any]],
 ) -> Tuple[List[Dict[str, Any]], str, str, str]:
     """
-    Run Pass A. Returns: (sources_list, sources_text, script_text, raw_text)
+    Run Pass A.
+
+    Returns: (sources_list, sources_text, script_text, raw_text)
+
+    Notes:
+      - Pass A now returns strict JSON with ONLY {"script": ...}.
+      - sources_list and sources_text are returned as empty for backward compatibility.
     """
     model = _pick_model_pass_a(config)
     prompt = _build_pass_a_prompt(config, long_specs)
@@ -851,30 +839,41 @@ def _run_pass_a(
         model=model,
         messages=[{"role": "user", "content": prompt}],
         tools=None,
-        json_mode=False,
+        json_mode=True,
         max_completion_tokens=max_out,
     )
 
     raw_text = extract_completion_text(resp, model)
     raw_text = raw_text.strip() if isinstance(raw_text, str) else ""
-    sources_text, script_text = _parse_pass_a_text(raw_text)
-    sources_list = _sources_text_to_list(sources_text)
 
-    return sources_list, sources_text, script_text, raw_text
+    # Pass A is expected to be strict JSON: {"script": "..."}
+    data: Any = None
+    try:
+        data = json.loads(raw_text) if raw_text else None
+    except Exception:
+        data = _extract_first_json_object(raw_text)
+
+    script_text = ""
+    if isinstance(data, dict):
+        script_text = str(data.get("script") or "").strip()
+    else:
+        # Best-effort fallback: treat raw text as the script.
+        script_text = raw_text
+
+    return [], "", script_text, raw_text
 
 
 def _run_pass_b_from_pass_a(
     client: Any,
     config: Dict[str, Any],
     nonlong_specs: List[Dict[str, Any]],
-    sources_text: str,
-    script_text: str,
+    pass_a_json_text: str,
 ) -> Dict[str, Any]:
     """
     Pass B derived from Pass A (no external browsing). Strict JSON mode.
     """
     model = _pick_model_pass_b(config)
-    prompt = _build_pass_b_prompt_from_pass_a(config, nonlong_specs, sources_text, script_text)
+    prompt = _build_pass_b_prompt_from_pass_a(config, nonlong_specs, pass_a_json_text)
 
     requested_cfg = config.get("pass_b_max_output_tokens")
     force_max = str(os.getenv("OPENAI_FORCE_MAX_OUTPUT", "false")).strip().lower() in ("1", "true", "yes", "y")
@@ -971,9 +970,9 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
             raise ValueError("OpenAI client is required")
         enabled_specs = kwargs.get("enabled_specs") or []
         _, nonlong_specs = _enabled_specs_from_content_specs(enabled_specs)
-        sources_text = ""
         script_text = str(pass_a_long_script or "").strip()
-        out = _run_pass_b_from_pass_a(client, config, nonlong_specs, sources_text, script_text)
+        pass_a_json_text = json.dumps({"script": script_text}, ensure_ascii=False)
+        out = _run_pass_b_from_pass_a(client, config, nonlong_specs, pass_a_json_text)
         return {"content": out.get("content", []), "sources": sources or [], "pass_a_raw_text": ""}
 
     # New style: (config, ...)
@@ -1013,7 +1012,7 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
 
     if _should_run_pass_a(config, enabled_specs):
         # Pass A: long script only (plain text). Treat incomplete as completed.
-        sources_out, sources_text, script_text, pass_a_raw_text = _run_pass_a(client, config, long_specs)
+        sources_out, _sources_text_unused, script_text, pass_a_raw_text = _run_pass_a(client, config, long_specs)
 
         # Build long content item(s)
         for i, spec in enumerate(long_specs):
@@ -1027,7 +1026,8 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
 
         # Pass B: generate all non-long items derived from the long script + sources.
         if nonlong_specs:
-            out_b = _run_pass_b_from_pass_a(client, config, nonlong_specs, sources_text, script_text)
+            # Pass B consumes the Pass A JSON (script-only) to avoid re-parsing.
+            out_b = _run_pass_b_from_pass_a(client, config, nonlong_specs, pass_a_raw_text or json.dumps({"script": script_text}, ensure_ascii=False))
             content.extend(out_b.get("content", []))
 
     else:
