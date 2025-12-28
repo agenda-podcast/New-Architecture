@@ -629,8 +629,7 @@ Host personas:
 - HOST_A ({hosts['host_a_name']}): {hosts['host_a_bio']}
 - HOST_B ({hosts['host_b_name']}): {hosts['host_b_bio']}
 
-Write ONE long dialogue script of approximately {target_words} words between HOST_A and HOST_B.
-It is acceptable if the final word count is not exact; prioritize coherence and completeness.
+Write ONE long dialogue script of EXACTLY {target_words} words between HOST_A and HOST_B.
 
 Rules:
 - Use concrete dates when you mention time.
@@ -665,6 +664,8 @@ def _build_pass_b_prompt_from_pass_a(
         mw = _safe_int(s.get("target_words") or s.get("max_words"), 300)
         if not c:
             continue
+        # Do NOT require exact word counts; exact targets can cause model-side refusal.
+        # Treat mw as an upper bound.
         req_lines.append(f"- {c} ({t}): max_words={mw} (at most; may be shorter)")
 
     req_txt = "\n".join(req_lines) if req_lines else "- (no Pass B outputs requested)"
@@ -701,7 +702,7 @@ JSON OUTPUT SCHEMA (STRICT):
 Rules:
 - Use speaker tags HOST_A and HOST_B (do NOT replace with names).
 - Each 'script' must be standalone (it must make sense without the long script).
-- Each script must be no more than max_words words. It may be shorter.
+- Keep each script within max_words (at most; being shorter is acceptable).
 - Return ONLY the JSON object.
 """
 
@@ -724,6 +725,8 @@ def _build_single_pass_b_prompt(config: Dict[str, Any], nonlong_specs: List[Dict
         mw = _safe_int(s.get("target_words") or s.get("max_words"), 300)
         if not c:
             continue
+        # Do NOT require exact word counts; exact targets can cause model-side refusal.
+        # Treat mw as an upper bound.
         req_lines.append(f"- {c} ({t}): max_words={mw} (at most; may be shorter)")
     req_txt = "\n".join(req_lines) if req_lines else "- (none)"
 
@@ -737,7 +740,7 @@ HOST_B: {host_b.get('name','HOST_B')} — {host_b.get('summary','')}
 Constraints:
 - Return ONLY valid JSON.
 - Do not add any facts or sources not implied by the topic description.
-- Use speaker tags HOST_A: and HOST_B: in the dialogue.
+- Use speaker tags HOST_A: and HOST_B: at the start of lines.
 """
 
     prompt = f"""System: Return only valid JSON.
@@ -751,12 +754,8 @@ Topic description: {desc}
 Targets to generate (all in ONE JSON object):
 {req_txt}
 
-Output format (STRICT):
-{
-  "content": [
-    { "code": "S1", "type": "short", "max_words": 300, "script": "HOST_A: ...\\nHOST_B: ..." }
-  ]
-}
+Output format:
+{{ "items": [ {{ "code": "S1", "text": "..." }}, ... ] }}
 """
     return prompt
 
@@ -896,7 +895,7 @@ def _run_pass_b_from_pass_a(
         if not force_max:
             est = _estimate_max_output_tokens_from_specs(nonlong_specs, tokens_per_word=2.0, overhead=1800, floor=2048)
             if requested_out > int(est * 2.0):
-                logger.warning(f"pass_b_max_output_tokens={requested_out} is large vs estimate={est}; capping for stability. Set OPENAI_FORCE_MAX_OUTPUT=true to override.")
+                logger.warning(f"pass_b_max_output_tokens={requested_out} is far above estimated need ({est}); capping to estimate for stability. Set OPENAI_FORCE_MAX_OUTPUT=true to override.")
                 requested_out = est
     max_out = clamp_output_tokens(model, requested_out)
 
@@ -943,71 +942,21 @@ def _run_single_pass_b(
                 requested_out = est
     max_out = clamp_output_tokens(model, requested_out)
 
-    # Enforce strict JSON output for single-pass B.
-    # This pass does not use any web tools, so JSON mode is enforceable.
     resp = create_openai_completion(
         client=client,
         model=model,
         messages=[{"role": "user", "content": prompt}],
         tools=None,
-        json_mode=True,
+        json_mode=False,
         max_completion_tokens=max_out,
     )
 
     txt = extract_completion_text(resp, model) or ""
     data = _extract_first_json_object(txt)
-
-    # If the upstream response is an API-level error object (common when the
-    # prompt demands impossible constraints like exact word counts), do not
-    # propagate an empty/non-dialogue payload downstream. Instead, synthesize a
-    # minimal, valid dialogue for each spec so segmentation + TTS can proceed.
-    if isinstance(data, dict) and isinstance(data.get("error"), str):
-        err_msg = data.get("error")
-        topic = str(config.get("title") or config.get("topic") or "").strip() or "(untitled topic)"
-        desc = str(config.get("description") or "").strip()
-        fallback = (
-            "HOST_A: We hit a generation constraint and did not receive a usable script output. "
-            "Let’s keep this concise and stay within the limits."
-            "\nHOST_B: Understood. What’s the core point we need to cover?"
-            f"\nHOST_A: Topic: {topic}. "
-            + (f"Here’s the context we have: {desc} " if desc else "")
-            + "We will summarize only what is supported by the provided context."
-            "\nHOST_B: Good. Let’s frame the key takeaways and keep it practical."
-        )
-        wrapped_content: List[Dict[str, Any]] = []
-        for spec in (nonlong_specs or []):
-            wrapped_content.append(
-                {
-                    "code": spec.get("code") or spec.get("id") or "item",
-                    "type": spec.get("type") or "script",
-                    "max_words": spec.get("max_words"),
-                    "script": fallback,
-                    "error": err_msg,
-                }
-            )
-        return {"content": wrapped_content, "sources": []}
-
-    # Robustness: if the model violates the contract (or JSON mode isn't honored
-    # due to upstream issues), do not crash the pipeline. Wrap into the expected
-    # envelope shape.
     if not isinstance(data, dict):
-        data = {"script": (txt or "").strip()}
-
+        raise ValueError("Single-pass output is not a JSON object")
     if "content" not in data or not isinstance(data.get("content"), list):
-        # Common alternate shape: {"script": "..."}
-        script_text = str(data.get("script") or txt or "").strip()
-        wrapped_content: List[Dict[str, Any]] = []
-        for spec in (nonlong_specs or []):
-            wrapped_content.append(
-                {
-                    "code": spec.get("code") or spec.get("id") or "item",
-                    "type": spec.get("type") or "script",
-                    "max_words": spec.get("max_words"),
-                    "script": script_text,
-                }
-            )
-        data = {"content": wrapped_content, "sources": []}
-
+        raise ValueError("Single-pass output JSON missing 'content' list")
     if "sources" in data and not isinstance(data.get("sources"), list):
         data["sources"] = []
     return data
@@ -1158,9 +1107,24 @@ Return STRICT JSON only:
             sources_out = sources_in
             content.extend(out_b.get("content", []))
         else:
-            out_b = _run_single_pass_b(client, config, nonlong_specs)
-            sources_out = out_b.get("sources", []) or []
-            content.extend(out_b.get("content", []))
+            # If no L1 is requested, we may still have an existing Source Text file
+            # (mock-data / pre-collected context). In that case, use it as the
+            # SOURCE_TEXT for Pass B instead of relying only on the topic description.
+            st_path = _source_text_file_path(config)
+            if st_path is not None:
+                try:
+                    st_raw = st_path.read_text(encoding="utf-8")
+                except Exception:
+                    st_raw = st_path.read_text(errors="ignore")
+                st_sources_text, st_full_text = _split_source_text_file(st_raw)
+                pass_a_json_text = json.dumps({"script": st_full_text}, ensure_ascii=False)
+                out_b = _run_pass_b_from_pass_a(client, config, nonlong_specs, pass_a_json_text)
+                sources_out = _sources_text_to_list(st_sources_text)
+                content.extend(out_b.get("content", []))
+            else:
+                out_b = _run_single_pass_b(client, config, nonlong_specs)
+                sources_out = out_b.get("sources", []) or []
+                content.extend(out_b.get("content", []))
 
     return {
         "content": content,
