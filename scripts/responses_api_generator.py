@@ -641,8 +641,7 @@ SOURCES:
 (Include 6–12 high-quality sources. Prefer primary/official where possible.)
 
 SCRIPT:
-Write ONE long dialogue script (= {target_words} words) between HOST_A and HOST_B.
-- The word count target is EXACT: aim for exactly {target_words} words (not fewer, not more).
+Write ONE long dialogue script (~{target_words} words) between HOST_A and HOST_B.
 - Use concrete dates.
 - Clearly distinguish verified facts vs claims.
 - Keep it engaging but grounded.
@@ -671,8 +670,7 @@ def _build_pass_b_prompt_from_pass_a(
         mw = _safe_int(s.get("target_words") or s.get("max_words"), 300)
         if not c:
             continue
-        # Use '=' semantics in the prompt to encourage exact word counts.
-        req_lines.append(f"- {c} ({t}): words={mw}")
+        req_lines.append(f"- {c} ({t}): max_words={mw}")
 
     req_txt = "\n".join(req_lines) if req_lines else "- (no Pass B outputs requested)"
 
@@ -713,7 +711,7 @@ JSON OUTPUT SCHEMA (STRICT):
 Rules:
 - Use speaker tags HOST_A and HOST_B (do NOT replace with names).
 - Each 'script' must be standalone (it must make sense without the long script).
-- Word count must be EXACT: each 'script' must be exactly max_words words (word_count = max_words).
+- Keep each script within max_words.
 - Return ONLY the JSON object.
 """
 
@@ -742,8 +740,7 @@ def _build_single_pass_b_prompt_with_web_search(config: Dict[str, Any], nonlong_
         mw = _safe_int(s.get("target_words") or s.get("max_words"), 300)
         if not c:
             continue
-        # Use '=' semantics in the prompt to encourage exact word counts.
-        req_lines.append(f"- {c} ({t}): words={mw}")
+        req_lines.append(f"- {c} ({t}): max_words={mw}")
     req_txt = "\n".join(req_lines) if req_lines else "- (no outputs requested)"
 
     return f"""You are a newsroom producer and dialogue scriptwriter for an English-language news podcast.
@@ -792,7 +789,7 @@ JSON OUTPUT SCHEMA (STRICT):
 
 Rules:
 - Use speaker tags HOST_A and HOST_B (do NOT replace with names).
-- Each script must be EXACTLY 'max_words' words (word_count = max_words; not fewer, not more).
+- Keep each script within max_words.
 - Use concrete dates.
 - Return ONLY the JSON object.
 """
@@ -981,7 +978,12 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
     if client is None:
         if OpenAI is None:
             raise ImportError("openai package is required. Install with: pip install openai")
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY") or os.getenv("GPT_KEY"))
+        api_key = os.getenv("OPENAI_API_KEY") or os.getenv("GPT_KEY")
+# Long-form script generation can legitimately take minutes for large outputs.
+# Increase timeouts and retries to reduce transient disconnect failures in CI.
+timeout_s = float(os.getenv("OPENAI_TIMEOUT", "600"))
+max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "6"))
+client = OpenAI(api_key=api_key, timeout=timeout_s, max_retries=max_retries)
 
     long_specs, nonlong_specs = _enabled_specs_from_content_specs(enabled_specs)
 
@@ -1019,8 +1021,7 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
                 t = str(s.get("type") or "").strip()
                 mw = _safe_int(s.get("target_words") or s.get("max_words"), 300)
                 if c:
-                    # Use '=' semantics in the prompt to encourage exact word counts.
-                    req_lines.append(f"- {c} ({t}): words={mw}")
+                    req_lines.append(f"- {c} ({t}): max_words={mw}")
             req_txt = "\n".join(req_lines) if req_lines else "- (no outputs requested)"
 
             prompt = f"""You are a newsroom producer and dialogue scriptwriter for an English-language news podcast.
@@ -1033,10 +1034,6 @@ Requested items:
 
 SOURCE_ITEMS (JSON):
 {json.dumps(sources_in, ensure_ascii=False)}
-
-Rules:
-- Use speaker tags HOST_A and HOST_B (do NOT replace with names).
-- Each script must be EXACTLY 'max_words' words (word_count = max_words; not fewer, not more).
 
 Return STRICT JSON only:
 {{"content":[{{"code":"S1","type":"short","script":"HOST_A:...\\nHOST_B:...","max_words":350}}]}}
