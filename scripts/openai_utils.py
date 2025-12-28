@@ -276,7 +276,9 @@ def create_openai_completion(
             if has_web_search:
                 logger.warning("JSON mode requested but web_search tool is present; disabling JSON mode for this request.")
             else:
-                params["text.format"] = {"type": "json_object"}
+                params.setdefault("text", {})
+                # Ensure nested format structure per Responses API
+                params["text"].setdefault("format", {"type": "json_object"})
 
         # Add any additional kwargs
         params.update(kwargs)

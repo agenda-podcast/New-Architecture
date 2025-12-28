@@ -111,7 +111,8 @@ def _extract_first_json_object(text: str) -> Dict[str, Any]:
     # Scan for balanced braces
     start = t.find("{")
     if start < 0:
-        raise ValueError("No JSON object start '{' found")
+        # Fallback: model returned plain text; wrap it into a minimal JSON object.
+        return {"script": t}
 
     depth = 0
     in_str = False
