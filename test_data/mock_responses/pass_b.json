@@ -1,0 +1,88 @@
+{
+  "content": [
+    {
+      "code": "M1",
+      "type": "medium",
+      "script": "HOST_A: This is Gary Thompson. Today we’re talking about the global cost of living and why, even when inflation sounds calmer, families still feel squeezed.\nHOST_B: I’m Margaret Butcher. And if someone’s thinking, “Calmer where?”—rent, groceries, utilities, childcare—none of that feels calm.\nHOST_A: Let’s set a standard. No panic, no villains. Just what’s actually driving prices and what working families can do now.\nHOST_B: Start with the big picture. What are you watching globally?\nHOST_A: Three things: inflation trends, wages, and energy. Energy leaks into everything.\nHOST_B: And inflation slowing doesn’t mean prices go down.\nHOST_A: Exactly. Slower increases still mean higher price levels. That’s the disconnect people live with.\nHOST_B: Services seem especially painful.\nHOST_A: They are. Services rely on labor and housing. When rents and wages rise, services stay sticky even if goods cool.\nHOST_B: So families cut where they can, but the basics don’t budge.\nHOST_A: Right. Housing is a choke point. Supply can’t adjust quickly, so rents stay high.\nHOST_B: Food is another one. It’s not just price, it’s time and energy.\nHOST_A: Food costs reflect global shocks, energy, and local factors. For many families, predictability matters more than perfection.\nHOST_B: And energy?\nHOST_A: Energy prices move fast. Even when averages look stable, volatility shows up in bills and transport costs.\nHOST_B: Central banks are cutting rates though. People expect relief.\nHOST_A: Rate cuts help at the margin, but they don’t instantly lower rent or childcare. They’re blunt tools.\nHOST_B: Here’s a tough thought: maybe people have to accept a higher-cost world.\nHOST_A: That’s tempting, but unfair if basics eat most of your budget. Families didn’t choose this.\nHOST_B: So what’s realistic?\nHOST_A: Expect uneven relief. Some prices stabilize, others don’t. No miracle year.\nHOST_B: And the coping plan?\nHOST_A: Protect cash flow, reduce exposure to volatile costs, and buy time with small buffers.\nHOST_B: Practical, not flashy.\nHOST_A: Exactly. You can’t control the world, but you can control your response.\nHOST_B: That’s the frame.\nHOST_A: Stay steady and practical.",
+      "actual_words": 392
+    },
+    {
+      "code": "M2",
+      "type": "medium",
+      "script": "HOST_A: Let’s talk about why the cost of living still hurts even after the worst inflation headlines faded.\nHOST_B: People hear “inflation is down” and think life should feel cheaper.\nHOST_A: But inflation measures speed, not level. Prices already climbed.\nHOST_B: Housing feels like the core issue.\nHOST_A: It is. Years of underbuilding and tight supply keep rents high.\nHOST_B: And moving isn’t always cheaper once you count deposits and commute.\nHOST_A: Exactly. So renters live with the now.\nHOST_B: Food is next. Families feel it weekly.\nHOST_A: Food costs reflect global conditions—weather, energy, shipping—and local choices. Stability matters.\nHOST_B: Energy still scares people.\nHOST_A: Because it feeds into everything. Even small swings matter for lower-income households.\nHOST_B: Services keep rising too.\nHOST_A: Labor and rent costs push them up. It becomes a loop.\nHOST_B: Central banks are easing. Should people celebrate?\nHOST_A: Cautiously. Cuts help over time but don’t fix structural shortages.\nHOST_B: So what should families expect?\nHOST_A: No sudden reversal. Some easing, some stickiness.\nHOST_B: And what should they do?\nHOST_A: Focus on cash flow, negotiate big expenses like rent, reduce waste, and build even a small buffer.\nHOST_B: No shame in adapting.\nHOST_A: Exactly. This isn’t failure. It’s adjustment.\nHOST_B: Clear and grounded.\nHOST_A: That’s the goal.",
+      "actual_words": 266
+    },
+    {
+      "code": "S1",
+      "type": "short",
+      "script": "HOST_A: Inflation slowing doesn’t mean life gets cheaper.\nHOST_B: It just means prices rise more slowly.\nHOST_A: And when rents and services stay high, families still feel squeezed.\nHOST_B: That’s the gap between headlines and reality.\nHOST_A: Exactly. Understanding that gap helps people plan instead of feeling gaslit.",
+      "actual_words": 47
+    },
+    {
+      "code": "S2",
+      "type": "short",
+      "script": "HOST_A: Housing is the biggest pressure point.\nHOST_B: Because supply can’t adjust quickly.\nHOST_A: Years of underbuilding show up as high rent today.\nHOST_B: And moving isn’t always cheaper once costs add up.\nHOST_A: That’s why rent stays central to the cost-of-living debate.",
+      "actual_words": 52
+    },
+    {
+      "code": "S3",
+      "type": "short",
+      "script": "HOST_A: Services stay expensive because they’re labor-heavy.\nHOST_B: And workers face high rent too.\nHOST_A: So higher costs loop through the system.\nHOST_B: Even when goods calm down.\nHOST_A: That’s why everyday services feel sticky.",
+      "actual_words": 44
+    },
+    {
+      "code": "S4",
+      "type": "short",
+      "script": "HOST_A: Rate cuts help, but slowly.\nHOST_B: They don’t instantly lower rent or childcare.\nHOST_A: They’re blunt tools for structural problems.\nHOST_B: So expectations matter.\nHOST_A: Relief comes unevenly, not all at once.",
+      "actual_words": 39
+    },
+    {
+      "code": "R1",
+      "type": "reels",
+      "script": "HOST_A: Inflation down doesn’t mean prices down.\nHOST_B: It means the climb slowed.\nHOST_A: Families still live with higher rent and bills.\nHOST_B: That’s the disconnect.\nHOST_A: Knowing it helps you plan.",
+      "actual_words": 27
+    },
+    {
+      "code": "R2",
+      "type": "reels",
+      "script": "HOST_A: Rent stays high because supply is tight.\nHOST_B: You can’t fix that overnight.\nHOST_A: That’s why housing dominates budgets.\nHOST_B: And stress.\nHOST_A: It’s structural, not personal.",
+      "actual_words": 28
+    },
+    {
+      "code": "R3",
+      "type": "reels",
+      "script": "HOST_A: Services feel expensive because labor and rent feed into them.\nHOST_B: Haircuts, childcare, repairs.\nHOST_A: They don’t deflate easily.\nHOST_B: Even when goods do.\nHOST_A: That’s the squeeze.",
+      "actual_words": 29
+    },
+    {
+      "code": "R4",
+      "type": "reels",
+      "script": "HOST_A: Energy costs move fast.\nHOST_B: Even small swings hit budgets.\nHOST_A: Especially for working families.\nHOST_B: Volatility matters.\nHOST_A: Planning beats guessing.",
+      "actual_words": 21
+    },
+    {
+      "code": "R5",
+      "type": "reels",
+      "script": "HOST_A: Central banks cutting rates isn’t magic.\nHOST_B: It helps slowly.\nHOST_A: It doesn’t erase high prices.\nHOST_B: Expectations matter.\nHOST_A: Patience and planning.",
+      "actual_words": 22
+    },
+    {
+      "code": "R6",
+      "type": "reels",
+      "script": "HOST_A: Food costs aren’t just price.\nHOST_B: They’re time and energy too.\nHOST_A: Predictability matters most.\nHOST_B: Waste hurts budgets.\nHOST_A: Simple planning helps.",
+      "actual_words": 23
+    },
+    {
+      "code": "R7",
+      "type": "reels",
+      "script": "HOST_A: Protect cash flow first.\nHOST_B: Know your non-negotiables.\nHOST_A: Cut silent leaks.\nHOST_B: Then build a buffer.\nHOST_A: Small steps count.",
+      "actual_words": 19
+    },
+    {
+      "code": "R8",
+      "type": "reels",
+      "script": "HOST_A: Cost-of-living pressure isn’t a moral failure.\nHOST_B: It’s an environment.\nHOST_A: You adapt together.\nHOST_B: Without shame.\nHOST_A: That’s resilience.",
+      "actual_words": 20
+    }
+  ]
+}

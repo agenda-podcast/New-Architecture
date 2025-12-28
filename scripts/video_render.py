@@ -2244,6 +2244,10 @@ def create_video_from_images(background_images: List[Path], audio_path: Optional
         True if successful, False otherwise
     """
     import random
+
+    # Resolve repository root early so it is available to *all* branches.
+    # This avoids UnboundLocalError when effects mode references repo_root before later assignments.
+    repo_root = Path(__file__).resolve().parent.parent
     
     try:
         # Early validation: Check parameter combinations
@@ -2403,7 +2407,6 @@ def create_video_from_images(background_images: List[Path], audio_path: Optional
             ffmpeg_cmd.extend(['-i', str(audio_path)])
 
         # Resolve repo_root so we can find assets/frame.png (supports both assets/ and Assets/)
-        repo_root = Path(__file__).resolve().parent.parent
         frame_path = _discover_frame_png(repo_root)
         frame_idx = None
         if frame_path and frame_path.exists():
