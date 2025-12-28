@@ -46,6 +46,16 @@ from global_config import (
     ENABLE_BURN_IN_CAPTIONS, CAPTIONS_BOTTOM_MARGIN_FRACTION
 )
 
+# ---------------------------------------------------------------------------
+# Compatibility aliases
+#
+# Some rendering paths refer to AUDIO_CODEC/AUDIO_BITRATE while the canonical
+# settings live in global_config as TTS_AUDIO_CODEC/TTS_AUDIO_BITRATE.
+# Define aliases to avoid NameError and keep behavior consistent.
+# ---------------------------------------------------------------------------
+AUDIO_CODEC = TTS_AUDIO_CODEC
+AUDIO_BITRATE = TTS_AUDIO_BITRATE
+
 # Sidecar metadata written by image_collector.py
 IMAGES_METADATA_FILENAME = "images_metadata.json"
 
