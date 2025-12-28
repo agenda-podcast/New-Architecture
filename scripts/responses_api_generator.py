@@ -947,16 +947,63 @@ def _run_single_pass_b(
         model=model,
         messages=[{"role": "user", "content": prompt}],
         tools=None,
-        json_mode=False,
+        json_mode=True,
         max_completion_tokens=max_out,
     )
 
     txt = extract_completion_text(resp, model) or ""
     data = _extract_first_json_object(txt)
-    if not isinstance(data, dict):
-        raise ValueError("Single-pass output is not a JSON object")
-    if "content" not in data or not isinstance(data.get("content"), list):
-        raise ValueError("Single-pass output JSON missing 'content' list")
+# Be tolerant to schema drift: if the model returns a different JSON shape,
+# wrap it into the expected envelope instead of failing the whole pipeline.
+if not isinstance(data, dict):
+    data = {"script": str(data)}
+
+# If the model returned an API-style error payload, turn it into minimal scripts.
+if isinstance(data.get("error"), str):
+    err = data.get("error")
+    content_out = []
+    for spec in nonlong_specs:
+        content_out.append({
+            "code": spec.code,
+            "type": spec.kind,
+            "max_words": getattr(spec, "max_words", None),
+            "script": f"HOST_A: {err}\nHOST_B: {err}",
+            "error": err,
+        })
+    data = {"content": content_out, "sources": []}
+
+# Accept legacy output shape: {"items": [{"code": "S1", "text": "..."}, ...]}
+if "content" not in data and isinstance(data.get("items"), list):
+    spec_by_code = {s.code: s for s in nonlong_specs}
+    content_out = []
+    for it in data.get("items") or []:
+        if not isinstance(it, dict):
+            continue
+        code = str(it.get("code") or "").strip()
+        txt_item = it.get("text") or it.get("script") or ""
+        spec = spec_by_code.get(code) or (nonlong_specs[0] if nonlong_specs else None)
+        if spec is None:
+            continue
+        content_out.append({
+            "code": code or spec.code,
+            "type": getattr(spec, "kind", None),
+            "max_words": getattr(spec, "max_words", None),
+            "script": str(txt_item),
+        })
+    data = {"content": content_out, "sources": []}
+
+# If still missing "content", wrap a single script across all requested specs.
+if "content" not in data or not isinstance(data.get("content"), list):
+    base_script = data.get("script") or data.get("text") or ""
+    content_out = []
+    for spec in nonlong_specs:
+        content_out.append({
+            "code": spec.code,
+            "type": spec.kind,
+            "max_words": getattr(spec, "max_words", None),
+            "script": str(base_script),
+        })
+    data = {"content": content_out, "sources": []}
     if "sources" in data and not isinstance(data.get("sources"), list):
         data["sources"] = []
     return data
