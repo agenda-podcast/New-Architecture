@@ -142,6 +142,25 @@ def _ffmpeg_has_filter(name: str) -> bool:
 _TOPIC_ID_RE = re.compile(r"\b(topic-\d+)\b", re.IGNORECASE)
 
 
+
+def _ffprobe_duration_seconds(path: Path) -> float:
+    """Return media duration (seconds) using ffprobe; 0.0 on failure."""
+    try:
+        r = subprocess.run(
+            [
+                'ffprobe','-v','error',
+                '-show_entries','format=duration',
+                '-of','default=noprint_wrappers=1:nokey=1',
+                str(path),
+            ],
+            capture_output=True, text=True, check=False,
+        )
+        if r.returncode != 0:
+            return 0.0
+        s = (r.stdout or '').strip().splitlines()[0] if (r.stdout or '').strip() else ''
+        return float(s) if s else 0.0
+    except Exception:
+        return 0.0
 def _infer_topic_id_from_path(p: Path) -> Optional[str]:
     for part in reversed(p.parts):
         m = _TOPIC_ID_RE.search(part)
@@ -211,22 +230,6 @@ def _discover_frame_png(repo_root: Path) -> Optional[Path]:
             return candidates[0]
 
     return None
-
-
-    assets = repo_root / "assets"
-    if not assets.exists():
-        return None
-
-    # Preferred name
-    preferred = assets / "frame.png"
-    if preferred.exists():
-        return preferred
-
-    # Any frame_*.png or frame*.png
-    candidates = sorted(assets.glob("frame*.png")) + sorted(assets.glob("Frame*.png"))
-    return candidates[0] if candidates else None
-
-
 def _strip_speaker_prefix(text: str, known_names: List[str], hide: bool) -> str:
     """Remove leading 'Name: ' (or A:/B:) prefix for display text."""
     t = (text or "").strip()
@@ -561,6 +564,16 @@ class CaptionBurner:
             print(f"  ✗ Video not found: {video_path}")
             return False
 
+
+        # Idempotency: if this exact video was already burned in a previous step/run, skip to avoid double re-encodes.
+        burned_marker = video_path.with_suffix(video_path.suffix + ".burned")
+        try:
+            if burned_marker.exists() and burned_marker.stat().st_mtime >= video_path.stat().st_mtime:
+                print("  ⓘ Overlays already burned; skipping")
+                return True
+        except Exception:
+            pass
+
         if not _ffmpeg_has_filter("subtitles"):
             print("  ✗ FFmpeg subtitles filter (libass) not available; cannot burn TikTok-style overlays")
             return False
@@ -590,14 +603,21 @@ class CaptionBurner:
         repo_root = _repo_root_from_here()
         frame_png = _discover_frame_png(repo_root)
 
+        dur_s = _ffprobe_duration_seconds(video_path)
+        dur_arg = []
+        if dur_s and dur_s > 0:
+            # Hard-stop encoding at source duration (prevents infinite outputs if an input is looped)
+            dur_arg = ["-t", f"{dur_s:.3f}"]
+
         tmp_out = Path(tempfile.mkstemp(prefix="burn_", suffix=video_path.suffix)[1])
+        preset = (os.environ.get("CAPTIONS_X264_PRESET", "veryfast") or "veryfast").strip()
         try:
             if frame_png and frame_png.exists():
                 # Burn ASS then overlay frame on top (static)
                 filter_complex = (
                     f"[0:v]subtitles=filename='{_escape_filter_path(str(ass_path))}':charenc=UTF-8[v0];"
                     f"[1:v]scale={width}:{height}[fr];"
-                    f"[v0][fr]overlay=0:0:format=auto[v]"
+                    f"[v0][fr]overlay=0:0:format=auto:shortest=1[v]"
                 )
                 cmd = [
                     "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
@@ -608,9 +628,12 @@ class CaptionBurner:
                     "-map", "0:a?",
                     "-r", str(int(fps)),
                     "-c:v", "libx264",
+                    "-preset", preset,
                     "-pix_fmt", "yuv420p",
                     "-movflags", "+faststart",
                     "-c:a", "copy",
+                    "-shortest",
+                ] + dur_arg + [
                     str(tmp_out),
                 ]
             else:
@@ -621,11 +644,14 @@ class CaptionBurner:
                     "-vf", vf,
                     "-r", str(int(fps)),
                     "-c:v", "libx264",
+                    "-preset", preset,
                     "-pix_fmt", "yuv420p",
                     "-movflags", "+faststart",
                     "-map", "0:v:0",
                     "-map", "0:a?",
                     "-c:a", "copy",
+                    "-shortest",
+                ] + dur_arg + [
                     str(tmp_out),
                 ]
 
@@ -644,6 +670,11 @@ class CaptionBurner:
                 os.replace(str(tmp_out), str(video_path))
 
             print("  ✓ Overlays burned into video")
+            try:
+                burned_marker.write_text("burned\n", encoding="utf-8")
+            except Exception:
+                pass
+
             return True
         finally:
             try:
