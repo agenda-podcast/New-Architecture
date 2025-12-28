@@ -439,6 +439,8 @@ class CaptionBurner:
         caption_font_size = max(24, int(height * self.config.font_size_fraction))
         title_font_size = max(20, int(caption_font_size * 0.50))
 
+        # Safe-area margins: glow/outline can visually extend beyond glyph bounds.
+        # We therefore add padding proportional to outline sizes to prevent border clipping.
         margin_v_bottom = max(24, int(height * self.config.bottom_margin_fraction))
         margin_v_top = max(24, int(height * 0.10))  # inside top ~20%
         margin_lr = max(24, int(width * self.config.left_right_margin_fraction))
@@ -447,6 +449,12 @@ class CaptionBurner:
         main_outline = int(os.environ.get("CAPTIONS_MAIN_OUTLINE", "10"))
         glow_outline = int(os.environ.get("CAPTIONS_GLOW_OUTLINE", "20"))
         shadow = int(os.environ.get("CAPTIONS_SHADOW", "3"))
+
+        # Add a safety pad to margins so no part of glow/outline gets clipped at frame edges.
+        safe_pad = max(16, int(max(main_outline, glow_outline) * 1.8))
+        margin_lr = max(margin_lr, safe_pad + 24)
+        margin_v_top = max(margin_v_top, safe_pad + 24)
+        margin_v_bottom = max(margin_v_bottom, safe_pad + 24)
 
         # Opacity: 0=opaque in ASS; use partially transparent glow
         glow_alpha_float = float(os.environ.get("CAPTIONS_GLOW_ALPHA_ASS", "0.55"))

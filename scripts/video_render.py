@@ -507,7 +507,10 @@ def render_slideshow_ffmpeg_effects(
         pan_speed = kenburns_config.get('pan_speed', 0.5)
         
         # Finishing pass configuration
-        vignette_enabled = finishing_config.get('vignette', {}).get('enabled', False)
+        # IMPORTANT: Vignette is intentionally disabled. The requested output must not
+        # darken edges, and vignette also increases risk of visual clipping when combined
+        # with strong text glows.
+        vignette_enabled = False
         vignette_angle = finishing_config.get('vignette', {}).get('angle', math.pi / 4)
         grain_enabled = finishing_config.get('grain', {}).get('enabled', False)
         grain_intensity = finishing_config.get('grain', {}).get('intensity', 5)
@@ -647,12 +650,9 @@ def render_slideshow_ffmpeg_effects(
                 filter_complex.append(xfade_filter)
                 current_label = out_label
         
-        # Step 3: Apply finishing passes (vignette + grain)
-        if vignette_enabled or grain_enabled:
+        # Step 3: Apply finishing passes (grain only; vignette disabled)
+        if grain_enabled:
             finishing_filters = []
-            
-            if vignette_enabled:
-                finishing_filters.append(f'vignette=angle={vignette_angle}')
             
             if grain_enabled:
                 finishing_filters.append(f'noise=alls={grain_intensity}:allf=t+u')
@@ -694,20 +694,22 @@ def render_slideshow_ffmpeg_effects(
             frame_idx = len(schedule) + (1 if audio_idx is not None else 0)
             ffmpeg_cmd.extend(['-loop', '1', '-i', str(frame_path)])
         
-        # Compose the final filtergraph: base slideshow -> ASS subtitles -> frame overlay
+        # Compose the final filtergraph.
+        # Requirement: The static frame may sit *under* text, so we apply:
+        #   base slideshow -> frame overlay -> ASS subtitles
         filter_complex_str = ';'.join(filter_complex)
         overlay_chain = []
 
         base_label = output_map
-        if ass_path:
-            esc_ass = _escape_filter_path(str(ass_path))
-            overlay_chain.append(f"{base_label}subtitles=filename='{esc_ass}':charenc=UTF-8[vsub]")
-            base_label = '[vsub]'
-
         if frame_idx is not None:
             overlay_chain.append(f"[{frame_idx}:v]scale={width}:{height}[fr]")
             # Ensure the looped frame input cannot extend the output beyond the base timeline.
-            overlay_chain.append(f"{base_label}[fr]overlay=0:0:format=auto:shortest=1[vout]")
+            overlay_chain.append(f"{base_label}[fr]overlay=0:0:format=auto:shortest=1[vfr]")
+            base_label = '[vfr]'
+
+        if ass_path:
+            esc_ass = _escape_filter_path(str(ass_path))
+            overlay_chain.append(f"{base_label}subtitles=filename='{esc_ass}':charenc=UTF-8[vout]")
             map_label = '[vout]'
         else:
             map_label = base_label
@@ -1697,8 +1699,7 @@ def create_blurred_background_composite(input_image: Path, output_image: Path,
     For images smaller than target resolution:
     1. Background layer: Image scaled to cover, blurred (sigma=20), and darkened (brightness=-0.3)
     2. Foreground layer: Image scaled to contain (no crop), centered
-    3. Add subtle vignette (darken edges)
-    4. Add subtle grain for texture
+    3. Add subtle grain for texture
     
     Args:
         input_image: Path to source image
@@ -1715,8 +1716,7 @@ def create_blurred_background_composite(input_image: Path, output_image: Path,
         # 2. Background: scale to cover, blur heavily, and darken
         # 3. Foreground: scale to contain within target, pad to center
         # 4. Overlay foreground on background
-        # 5. Add vignette effect (darken edges)
-        # 6. Add subtle grain
+        # 5. Add subtle grain
         
         video_filter = (
             # Split input into background and foreground streams
@@ -1735,11 +1735,9 @@ def create_blurred_background_composite(input_image: Path, output_image: Path,
             # Overlay centered foreground on blurred background
             f'[blurred_bg][fg_centered]overlay=0:0[composed];'
             
-            # Add vignette effect (darken edges at 45-degree angle)
-            f'[composed]vignette=angle={VIGNETTE_ANGLE}:mode=forward[vignetted];'
-            
+            # IMPORTANT: Vignette disabled per requirements (no edge darkening).
             # Add subtle grain for texture
-            f'[vignetted]noise=alls={GRAIN_INTENSITY}:allf=t+u[final]'
+            f'[composed]noise=alls={GRAIN_INTENSITY}:allf=t+u[final]'
         )
         
         subprocess.run([
