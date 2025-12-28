@@ -51,12 +51,6 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-# Optional: used for custom HTTP transport to mitigate CI proxy disconnects.
-try:
-    import httpx  # type: ignore
-except Exception:  # pragma: no cover
-    httpx = None
-
 try:
     from openai import OpenAI
 except Exception:  # pragma: no cover
@@ -111,8 +105,7 @@ def _extract_first_json_object(text: str) -> Dict[str, Any]:
     # Scan for balanced braces
     start = t.find("{")
     if start < 0:
-        # Fallback: model returned plain text; wrap it into a minimal JSON object.
-        return {"script": t}
+        raise ValueError("No JSON object start '{' found")
 
     depth = 0
     in_str = False
@@ -526,7 +519,7 @@ def _make_mock_outputs_from_source_text(config: Dict[str, Any], enabled_specs: L
 
     long_specs, nonlong_specs = _enabled_specs_from_content_specs(enabled_specs)
 
-    # Long script (Pass A mock) - script-only JSON to match real Pass A output
+    # Long script (Pass A mock)
     pass_a_raw_text = ""
     long_script_text = ""
     if long_specs:
@@ -536,7 +529,18 @@ def _make_mock_outputs_from_source_text(config: Dict[str, Any], enabled_specs: L
 
         long_script_text = _mock_dialogue_from_text(full_text or src_text, target_words=target_words)
 
-        pass_a_raw_text = json.dumps({"script": long_script_text.strip()}, ensure_ascii=False)
+        # Build Pass A plain text output
+        src_lines = []
+        for idx, it in enumerate(sources_list, start=1):
+            pub = it.get("publisher", "Source")
+            title = it.get("title", "Untitled")
+            date = it.get("date", "")
+            url = it.get("url", "")
+            d = f" ({date})" if date else ""
+            u = f" {url}" if url else ""
+            src_lines.append(f"- [{idx}] {pub} — {title}{d}.{u}".rstrip("."))
+
+        pass_a_raw_text = "SOURCES:\n" + "\n".join(src_lines).strip() + "\n\nSCRIPT:\n" + long_script_text.strip() + "\n"
 
     # Build content list for all items
     content: List[Dict[str, Any]] = []
@@ -595,16 +599,24 @@ def _pick_model_pass_b(config: Dict[str, Any]) -> str:
 
 
 def _build_pass_a_prompt(config: Dict[str, Any], long_specs: List[Dict[str, Any]]) -> str:
-    """Build the Pass A prompt.
-
-    Pass A returns ONLY strict JSON and MUST contain ONLY the long dialogue script.
-    Web sources must NOT be included in the output (to keep output size stable and
-    to simplify downstream Pass B inputs).
+    """
+    Pass A prompt: ONLY "SOURCES" and "SCRIPT" in plain text. No JSON.
     """
     hosts = _resolve_hosts(config)
 
     topic = str(config.get("title") or config.get("topic") or "").strip() or "(untitled topic)"
     desc = str(config.get("description") or "").strip()
+
+    # Optional SOURCE_TEXT from mock-data / source text file
+    source_text = ""
+    p = _source_text_file_path(config)
+    if p:
+        try:
+            raw = p.read_text(encoding="utf-8", errors="ignore")
+            _, full_text = _split_source_text_file(raw)
+            source_text = full_text.strip()
+        except Exception:
+            source_text = ""
     freshness_hours = _safe_int(config.get("freshness_hours"), 24)
     freshness_window = f"last {freshness_hours} hours"
 
@@ -618,38 +630,43 @@ def _build_pass_a_prompt(config: Dict[str, Any], long_specs: List[Dict[str, Any]
     for s in long_specs:
         target_words = max(target_words, _safe_int(s.get("target_words") or s.get("max_words"), 9000))
 
-    return f"""System: Return only valid JSON.
-
-You are Pass A of a two-pass dialogue pipeline.
+    return f"""You are a newsroom producer and dialogue scriptwriter for an English-language news podcast.
+You MUST use the web_search tool before writing to verify the latest news and to avoid any "knowledge cutoff" disclaimers.
 
 Topic: {topic}
 Topic description: {desc}
+Freshness window: {freshness_window}
+Region focus: {region_txt}
 
 Host personas:
 - HOST_A ({hosts['host_a_name']}): {hosts['host_a_bio']}
 - HOST_B ({hosts['host_b_name']}): {hosts['host_b_bio']}
 
-Write ONE long dialogue script of EXACTLY {target_words} words between HOST_A and HOST_B.
+Search guidance (use as web_search queries; adjust as needed):
+{query_txt}
 
-Rules:
-- Use concrete dates when you mention time.
-- No bullet lists; write as spoken dialogue.
-- Use speaker tags HOST_A: and HOST_B:.
-- Output MUST be a single JSON object.
-- The JSON object MUST contain ONLY one key: "script".
-- Do NOT include sources, citations, URLs, or any other keys.
+OUTPUT FORMAT (STRICT — no markdown, no JSON):
+SOURCES:
+- [1] <Publisher> — <Title> (<YYYY-MM-DD>). <URL>
+- [2] ...
+(Include 6–12 high-quality sources. Prefer primary/official where possible.)
 
-JSON output schema:
-{{
-  "script": "HOST_A: ...\\nHOST_B: ..."
-}}
+SCRIPT:
+Write ONE long dialogue script (= {target_words} words) between HOST_A and HOST_B.
+- Use concrete dates.
+- Clearly distinguish verified facts vs claims.
+- Keep it engaging but grounded.
+- No bullet lists inside the script; write as spoken dialogue with speaker tags.
+
+Return ONLY the two sections above: SOURCES and SCRIPT.
 """
 
 
 def _build_pass_b_prompt_from_pass_a(
     config: Dict[str, Any],
     nonlong_specs: List[Dict[str, Any]],
-    pass_a_json_text: str,
+    pass_a_sources_text: str,
+    pass_a_script_text: str,
 ) -> str:
     """
     Pass B prompt when Pass A ran: derive summaries from Pass A script only.
@@ -664,19 +681,19 @@ def _build_pass_b_prompt_from_pass_a(
         mw = _safe_int(s.get("target_words") or s.get("max_words"), 300)
         if not c:
             continue
-        # Do NOT require exact word counts; exact targets can cause model-side refusal.
-        # Treat mw as an upper bound.
-        req_lines.append(f"- {c} ({t}): max_words={mw} (at most; may be shorter)")
+        req_lines.append(f"- {c} ({t}): max_words={mw} (EXACT)")
 
     req_txt = "\n".join(req_lines) if req_lines else "- (no Pass B outputs requested)"
 
     return f"""You are Pass B of a two-pass pipeline.
 
-You will be given PASS_A_JSON (a strict JSON object) containing a single key: "script".
+You will be given:
+1) SOURCES (as text)
+2) LONG_SCRIPT (dialogue)
 
 Your task:
 - Create summarized/derived scripts for each requested item below.
-- Do NOT introduce new facts. Use ONLY what is supported by PASS_A_JSON.script.
+- Do NOT introduce new facts. Use ONLY what is supported by LONG_SCRIPT and SOURCES.
 - Return ALL items in ONE response as STRICT JSON (no markdown).
 
 Topic: {topic}
@@ -684,8 +701,11 @@ Topic: {topic}
 Requested items:
 {req_txt}
 
-PASS_A_JSON:
-{pass_a_json_text}
+SOURCES (text, for attribution / grounding):
+{pass_a_sources_text}
+
+LONG_SCRIPT (text, for summarization/derivation):
+{pass_a_script_text}
 
 JSON OUTPUT SCHEMA (STRICT):
 {{
@@ -702,7 +722,7 @@ JSON OUTPUT SCHEMA (STRICT):
 Rules:
 - Use speaker tags HOST_A and HOST_B (do NOT replace with names).
 - Each 'script' must be standalone (it must make sense without the long script).
-- Keep each script within max_words (at most; being shorter is acceptable).
+- Each script must be exactly max_words words (word_count = max_words).
 - Return ONLY the JSON object.
 """
 
@@ -725,8 +745,6 @@ def _build_single_pass_b_prompt(config: Dict[str, Any], nonlong_specs: List[Dict
         mw = _safe_int(s.get("target_words") or s.get("max_words"), 300)
         if not c:
             continue
-        # Do NOT require exact word counts; exact targets can cause model-side refusal.
-        # Treat mw as an upper bound.
         req_lines.append(f"- {c} ({t}): max_words={mw} (at most; may be shorter)")
     req_txt = "\n".join(req_lines) if req_lines else "- (none)"
 
@@ -739,15 +757,18 @@ HOST_B: {host_b.get('name','HOST_B')} — {host_b.get('summary','')}
 
 Constraints:
 - Return ONLY valid JSON.
-- Do not add any facts or sources not implied by the topic description.
-- Use speaker tags HOST_A: and HOST_B: at the start of lines.
+- Do not add any facts or sources not implied by the provided SOURCE_TEXT (if present) or the topic description.
+- Use dialogue lines that start with 'HOST_A:' and 'HOST_B:' only (no real names).
 """
 
     prompt = f"""System: Return only valid JSON.
 
-You are generating multiple short scripts from existing context (no external browsing).
+You are generating multiple short scripts by summarizing ONLY the provided SOURCE_TEXT (if present) and topic description (no external browsing).
 Topic: {topic}
 Topic description: {desc}
+
+SOURCE_TEXT:
+{source_text}
 
 {persona_block}
 
@@ -820,13 +841,7 @@ def _run_pass_a(
     long_specs: List[Dict[str, Any]],
 ) -> Tuple[List[Dict[str, Any]], str, str, str]:
     """
-    Run Pass A.
-
-    Returns: (sources_list, sources_text, script_text, raw_text)
-
-    Notes:
-      - Pass A now returns strict JSON with ONLY {"script": ...}.
-      - sources_list and sources_text are returned as empty for backward compatibility.
+    Run Pass A. Returns: (sources_list, sources_text, script_text, raw_text)
     """
     model = _pick_model_pass_a(config)
     prompt = _build_pass_a_prompt(config, long_specs)
@@ -856,35 +871,24 @@ def _run_pass_a(
 
     raw_text = extract_completion_text(resp, model)
     raw_text = raw_text.strip() if isinstance(raw_text, str) else ""
+    sources_text, script_text = _parse_pass_a_text(raw_text)
+    sources_list = _sources_text_to_list(sources_text)
 
-    # Pass A is expected to be strict JSON: {"script": "..."}
-    data: Any = None
-    try:
-        data = json.loads(raw_text) if raw_text else None
-    except Exception:
-        data = _extract_first_json_object(raw_text)
-
-    script_text = ""
-    if isinstance(data, dict):
-        script_text = str(data.get("script") or "").strip()
-    else:
-        # Best-effort fallback: treat raw text as the script.
-        script_text = raw_text
-
-    return [], "", script_text, raw_text
+    return sources_list, sources_text, script_text, raw_text
 
 
 def _run_pass_b_from_pass_a(
     client: Any,
     config: Dict[str, Any],
     nonlong_specs: List[Dict[str, Any]],
-    pass_a_json_text: str,
+    sources_text: str,
+    script_text: str,
 ) -> Dict[str, Any]:
     """
     Pass B derived from Pass A (no external browsing). Strict JSON mode.
     """
     model = _pick_model_pass_b(config)
-    prompt = _build_pass_b_prompt_from_pass_a(config, nonlong_specs, pass_a_json_text)
+    prompt = _build_pass_b_prompt_from_pass_a(config, nonlong_specs, sources_text, script_text)
 
     requested_cfg = config.get("pass_b_max_output_tokens")
     force_max = str(os.getenv("OPENAI_FORCE_MAX_OUTPUT", "false")).strip().lower() in ("1", "true", "yes", "y")
@@ -953,59 +957,64 @@ def _run_single_pass_b(
 
     txt = extract_completion_text(resp, model) or ""
     data = _extract_first_json_object(txt)
-    # Be tolerant to schema drift: if the model returns a different JSON shape,
-    # wrap it into the expected envelope instead of failing the whole pipeline.
+    # Normalize to expected envelope: {"content":[...], "sources":[]}
     if not isinstance(data, dict):
-        data = {"script": str(data)}
+        data = {"text": txt.strip()}
 
-    # If the model returned an API-style error payload, turn it into minimal scripts.
-    if isinstance(data.get("error"), str):
-        err = data.get("error")
-        content_out = []
-        for spec in nonlong_specs:
-            content_out.append({
-                "code": spec.code,
-                "type": spec.kind,
-                "max_words": getattr(spec, "max_words", None),
-                "script": f"HOST_A: {err}\nHOST_B: {err}",
-                "error": err,
-            })
-        data = {"content": content_out, "sources": []}
+    # If API returned an error payload, keep it and synthesize minimal scripts so downstream can proceed.
+    if "error" in data and "content" not in data:
+        err = str(data.get("error") or "").strip() or "unknown error"
+        content = []
+        for s in nonlong_specs:
+            code = (s.get("code") or "").strip()
+            typ = (s.get("type") or "").strip()
+            mw = _safe_int(s.get("target_words") or s.get("max_words"), 300)
+            if not code:
+                continue
+            script = f"HOST_A: We hit a generation error and will produce a minimal draft for {code}.\nHOST_B: Acknowledged. {err}"
+            content.append({"code": code, "type": typ, "max_words": mw, "script": script, "error": err})
+        return {"content": content, "sources": []}
 
-    # Accept legacy output shape: {"items": [{"code": "S1", "text": "..."}, ...]}
+    # Accept legacy shape {"items":[{"code":"S1","text":"..."}]}
     if "content" not in data and isinstance(data.get("items"), list):
-        spec_by_code = {s.code: s for s in nonlong_specs}
-        content_out = []
+        content = []
+        spec_by_code = {str(s.get("code") or "").strip(): s for s in nonlong_specs if str(s.get("code") or "").strip()}
         for it in data.get("items") or []:
             if not isinstance(it, dict):
                 continue
             code = str(it.get("code") or "").strip()
-            txt_item = it.get("text") or it.get("script") or ""
-            spec = spec_by_code.get(code) or (nonlong_specs[0] if nonlong_specs else None)
-            if spec is None:
-                continue
-            content_out.append({
-                "code": code or spec.code,
-                "type": getattr(spec, "kind", None),
-                "max_words": getattr(spec, "max_words", None),
-                "script": str(txt_item),
-            })
-        data = {"content": content_out, "sources": []}
+            txt_piece = str(it.get("text") or "").strip()
+            spec = spec_by_code.get(code, {})
+            typ = str(spec.get("type") or "").strip()
+            mw = _safe_int(spec.get("target_words") or spec.get("max_words"), 300)
+            content.append({"code": code, "type": typ, "max_words": mw, "script": txt_piece})
+        data = {"content": content, "sources": []}
 
-    # If still missing "content", wrap a single script across all requested specs.
+    # If still missing content, wrap whatever text we have into one entry per requested spec.
     if "content" not in data or not isinstance(data.get("content"), list):
-        base_script = data.get("script") or data.get("text") or ""
-        content_out = []
-        for spec in nonlong_specs:
-            content_out.append({
-                "code": spec.code,
-                "type": spec.kind,
-                "max_words": getattr(spec, "max_words", None),
-                "script": str(base_script),
-            })
-        data = {"content": content_out, "sources": []}
-        if "sources" in data and not isinstance(data.get("sources"), list):
-            data["sources"] = []
+        base_text = ""
+        for k in ("script", "text", "output"):
+            if isinstance(data.get(k), str) and data.get(k).strip():
+                base_text = data.get(k).strip()
+                break
+        if not base_text:
+            base_text = txt.strip()
+        content = []
+        for s in nonlong_specs:
+            code = (s.get("code") or "").strip()
+            typ = (s.get("type") or "").strip()
+            mw = _safe_int(s.get("target_words") or s.get("max_words"), 300)
+            if not code:
+                continue
+            # Ensure at least two speaker lines for segmenter
+            script = base_text
+            if "HOST_A:" not in script and "HOST_B:" not in script:
+                script = f"HOST_A: {base_text}\nHOST_B: (continuing)"
+            content.append({"code": code, "type": typ, "max_words": mw, "script": script})
+        data = {"content": content, "sources": []}
+
+    if "sources" not in data or not isinstance(data.get("sources"), list):
+        data["sources"] = []
     return data
 
 
@@ -1028,9 +1037,9 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
             raise ValueError("OpenAI client is required")
         enabled_specs = kwargs.get("enabled_specs") or []
         _, nonlong_specs = _enabled_specs_from_content_specs(enabled_specs)
+        sources_text = ""
         script_text = str(pass_a_long_script or "").strip()
-        pass_a_json_text = json.dumps({"script": script_text}, ensure_ascii=False)
-        out = _run_pass_b_from_pass_a(client, config, nonlong_specs, pass_a_json_text)
+        out = _run_pass_b_from_pass_a(client, config, nonlong_specs, sources_text, script_text)
         return {"content": out.get("content", []), "sources": sources or [], "pass_a_raw_text": ""}
 
     # New style: (config, ...)
@@ -1059,27 +1068,8 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
         # Long-form script generation can take minutes for large outputs.
         # Increase timeouts and retries to reduce transient disconnect failures in CI.
         timeout_s = float(os.getenv("OPENAI_TIMEOUT", "600"))
-        # NOTE: this controls SDK-level retries. Default remains 0 to preserve your
-        # "one request per pass" policy. If you want automatic retries on transient
-        # disconnects, set OPENAI_MAX_RETRIES to a small number (e.g., 1-2).
-        max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "0"))
-
-        # CI/CD environments sometimes sit behind proxies that are more stable over HTTP/2.
-        # When available, we can pass a custom httpx client to the OpenAI SDK.
-        http_client = None
-        use_http2 = str(os.getenv("OPENAI_HTTP2", "true")).strip().lower() in ("1", "true", "yes", "y")
-        if httpx is not None and use_http2:
-            try:
-                limits = httpx.Limits(max_connections=20, max_keepalive_connections=10, keepalive_expiry=60)
-                http_client = httpx.Client(http2=True, timeout=timeout_s, limits=limits)
-            except Exception as e:
-                logger.warning("Failed to init custom httpx client (HTTP/2). Falling back to SDK default: %s", str(e))
-                http_client = None
-
-        if http_client is not None:
-            client = OpenAI(api_key=api_key, timeout=timeout_s, max_retries=max_retries, http_client=http_client)
-        else:
-            client = OpenAI(api_key=api_key, timeout=timeout_s, max_retries=max_retries)
+        max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "0"))  # default 0 to enforce single-request per pass
+        client = OpenAI(api_key=api_key, timeout=timeout_s, max_retries=max_retries)
 
     long_specs, nonlong_specs = _enabled_specs_from_content_specs(enabled_specs)
 
@@ -1089,7 +1079,7 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
 
     if _should_run_pass_a(config, enabled_specs):
         # Pass A: long script only (plain text). Treat incomplete as completed.
-        sources_out, _sources_text_unused, script_text, pass_a_raw_text = _run_pass_a(client, config, long_specs)
+        sources_out, sources_text, script_text, pass_a_raw_text = _run_pass_a(client, config, long_specs)
 
         # Build long content item(s)
         for i, spec in enumerate(long_specs):
@@ -1103,8 +1093,7 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
 
         # Pass B: generate all non-long items derived from the long script + sources.
         if nonlong_specs:
-            # Pass B consumes the Pass A JSON (script-only) to avoid re-parsing.
-            out_b = _run_pass_b_from_pass_a(client, config, nonlong_specs, pass_a_raw_text or json.dumps({"script": script_text}, ensure_ascii=False))
+            out_b = _run_pass_b_from_pass_a(client, config, nonlong_specs, sources_text, script_text)
             content.extend(out_b.get("content", []))
 
     else:
@@ -1118,7 +1107,7 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
                 t = str(s.get("type") or "").strip()
                 mw = _safe_int(s.get("target_words") or s.get("max_words"), 300)
                 if c:
-                    req_lines.append(f"- {c} ({t}): max_words={mw} (at most; may be shorter)")
+                    req_lines.append(f"- {c} ({t}): max_words={mw} (EXACT)")
             req_txt = "\n".join(req_lines) if req_lines else "- (no outputs requested)"
 
             prompt = f"""You are a newsroom producer and dialogue scriptwriter for an English-language news podcast.
@@ -1154,24 +1143,9 @@ Return STRICT JSON only:
             sources_out = sources_in
             content.extend(out_b.get("content", []))
         else:
-            # If no L1 is requested, we may still have an existing Source Text file
-            # (mock-data / pre-collected context). In that case, use it as the
-            # SOURCE_TEXT for Pass B instead of relying only on the topic description.
-            st_path = _source_text_file_path(config)
-            if st_path is not None:
-                try:
-                    st_raw = st_path.read_text(encoding="utf-8")
-                except Exception:
-                    st_raw = st_path.read_text(errors="ignore")
-                st_sources_text, st_full_text = _split_source_text_file(st_raw)
-                pass_a_json_text = json.dumps({"script": st_full_text}, ensure_ascii=False)
-                out_b = _run_pass_b_from_pass_a(client, config, nonlong_specs, pass_a_json_text)
-                sources_out = _sources_text_to_list(st_sources_text)
-                content.extend(out_b.get("content", []))
-            else:
-                out_b = _run_single_pass_b(client, config, nonlong_specs)
-                sources_out = out_b.get("sources", []) or []
-                content.extend(out_b.get("content", []))
+            out_b = _run_single_pass_b(client, config, nonlong_specs)
+            sources_out = out_b.get("sources", []) or []
+            content.extend(out_b.get("content", []))
 
     return {
         "content": content,
