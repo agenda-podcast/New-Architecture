@@ -57,42 +57,42 @@ MODEL_CONTEXT_TOKENS: Dict[str, int] = {
     # - Maximum input tokens: 1,048,576
     # - Maximum output tokens: 65,536
     # We use the same context window value here to support prompt truncation helpers.
-    "gemini-3-flash": 1_048_576,
-    "gemini-3-flash-preview": 1_048_576,
+    "gemini-3-flash": 1048576,
+    "gemini-3-flash-preview": 1048576,
 }
 
 # Max *visible* output tokens the API will allow you to request for the model.
 MODEL_MAX_OUTPUT_TOKENS: Dict[str, int] = {
     # GPT-5 family
-    "gpt-5-pro": 272_000,
-    "gpt-5.2-pro": 128_000,
-    "gpt-5.2": 128_000,
-    "gpt-5.1": 128_000,
-    "gpt-5": 128_000,
-    "gpt-5-mini": 128_000,
-    "gpt-5-nano": 128_000,
-    "gpt-5.1-codex": 128_000,
-    "gpt-5.1-codex-max": 128_000,
-    "gpt-5-codex": 128_000,
+    "gpt-5-pro": 272000,
+    "gpt-5.2-pro": 128000,
+    "gpt-5.2": 128000,
+    "gpt-5.1": 128000,
+    "gpt-5": 128000,
+    "gpt-5-mini": 128000,
+    "gpt-5-nano": 128000,
+    "gpt-5.1-codex": 128000,
+    "gpt-5.1-codex-max": 128000,
+    "gpt-5-codex": 128000,
 
     # GPT-4.1 family
-    "gpt-4.1": 32_768,
-    "gpt-4.1-mini": 32_768,
-    "gpt-4.1-nano": 32_768,
+    "gpt-4.1": 32768,
+    "gpt-4.1-mini": 32768,
+    "gpt-4.1-nano": 32768,
 
     # GPT-4o family
-    "gpt-4o": 16_384,
-    "gpt-4o-mini": 16_384,
+    "gpt-4o": 16384,
+    "gpt-4o-mini": 16384,
 
     # Legacy chat models
-    "gpt-4-turbo": 4_096,
-    "gpt-4": 8_192,
-    "gpt-3.5-turbo": 4_096,
+    "gpt-4-turbo": 4096,
+    "gpt-4": 8192,
+    "gpt-3.5-turbo": 4096,
 
     # Gemini (Google)
     # Gemini 3 Flash token limits (Vertex AI docs): maximum output tokens: 65,536
-    "gemini-3-flash": 65_536,
-    "gemini-3-flash-preview": 65_536,
+    "gemini-3-flash": 65536,
+    "gemini-3-flash-preview": 65536,
 }
 
 
