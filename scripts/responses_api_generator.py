@@ -681,7 +681,14 @@ def _gemini_generate_text(*, model: str, prompt: str, json_mode: bool) -> str:
     if json_mode:
         if gemini_generate_once is None:
             raise ImportError("Gemini support is unavailable: google-genai not installed")
-        json_tokens = _gemini_part_tokens("GEMINI_JSON_MAX_TOKENS", 6000)
+
+        # IMPORTANT: Pass B requires valid JSON. If Gemini output is truncated,
+        # JSON becomes invalid and normalization returns 0 items.
+        # Therefore, default to the model's maximum output tokens unless the
+        # user explicitly overrides via GEMINI_JSON_MAX_TOKENS.
+        default_json_tokens = default_max_output_tokens(model)
+        json_tokens = _safe_int(os.getenv("GEMINI_JSON_MAX_TOKENS"), default_json_tokens)
+        json_tokens = clamp_output_tokens(model, json_tokens)
         return gemini_generate_once(
             model=model,
             prompt=prompt,
@@ -696,7 +703,11 @@ def _gemini_generate_text(*, model: str, prompt: str, json_mode: bool) -> str:
     if single_call:
         if gemini_generate_once is None:
             raise ImportError("Gemini support is unavailable: google-genai not installed")
-        one_shot_tokens = _gemini_part_tokens("GEMINI_SINGLE_CALL_MAX_TOKENS", 6000)
+
+        # Default to the model's maximum output tokens unless overridden.
+        default_one_shot_tokens = default_max_output_tokens(model)
+        one_shot_tokens = _safe_int(os.getenv("GEMINI_SINGLE_CALL_MAX_TOKENS"), default_one_shot_tokens)
+        one_shot_tokens = clamp_output_tokens(model, one_shot_tokens)
         return gemini_generate_once(
             model=model,
             prompt=prompt,
