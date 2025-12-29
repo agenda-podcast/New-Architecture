@@ -493,12 +493,29 @@ jobs:
             echo "Warning: No images directory found for ${{ matrix.topic }}"
           fi
 
+      - name: Debug outputs tree
+        if: always()
+        run: |
+          echo "PWD=$(pwd)"
+          ls -la
+          echo "---- outputs (if exists) ----"
+          ls -la outputs || true
+          echo "---- find outputs dirs ----"
+          find . -maxdepth 4 -type d -name outputs -print || true
+          echo "---- list likely artifacts ----"
+          find . -maxdepth 6 -type f \( -name "*.mp4" -o -name "*.m4a" -o -name "*.mp3" -o -name "*.json" -o -name "*.png" \) -print | head -n 200 || true
+
       - name: Upload outputs
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: outputs-${{ matrix.topic }}
-          path: outputs/${{ matrix.topic }}/
+          path: |
+            outputs/**
+            **/outputs/**
+            **/_raw_responses/**
           retention-days: 90
+          if-no-files-found: warn
 
   finalize:
     name: Finalize and Publish
