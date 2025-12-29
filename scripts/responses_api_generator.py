@@ -88,6 +88,107 @@ def _truthy(v: Any) -> bool:
     return s in ("1", "true", "yes", "y", "on", "enabled")
 
 
+def _enforce_unique_video_metadata(items: list[dict]) -> None:
+    """
+    Enforce required publish metadata:
+      - video_title unique (case-insensitive)
+      - video_description unique (case-insensitive)
+      - video_description length 150-200 chars inclusive (truncate/pad minimally)
+      - remove any backslashes from title/description
+      - video_tags normalized to comma-separated string (strip)
+    Deterministic (no extra model calls).
+    """
+    def clean(s: str) -> str:
+        s = (s or "").replace("\\", "")
+        s = re.sub(r"\s+", " ", s).strip()
+        return s
+
+    seen_titles = set()
+    seen_desc = set()
+
+    for it in items:
+        code = (it.get("code") or "").strip() or "X"
+        # title
+        t = clean(it.get("video_title") or "")
+        if not t:
+            # fallback from script/topic
+            t = clean((it.get("type") or "video").upper() + f" {code}")
+        # enforce length 6-70
+        if len(t) < 6:
+            t = (t + f" {code}").strip()
+        if len(t) > 70:
+            t = t[:70].rstrip()
+        key = t.lower()
+        if key in seen_titles:
+            # make unique deterministically
+            suffix = f" {code}"
+            base = t
+            if len(base) + len(suffix) > 70:
+                base = base[: max(0, 70 - len(suffix))].rstrip()
+            t = (base + suffix).strip()
+            key = t.lower()
+            # if still duplicate, add counter
+            n = 2
+            while key in seen_titles and n < 50:
+                suffix2 = f" {code}-{n}"
+                base2 = t
+                if len(base2) + len(suffix2) > 70:
+                    base2 = base2[: max(0, 70 - len(suffix2))].rstrip()
+                t = (base2 + suffix2).strip()
+                key = t.lower()
+                n += 1
+        seen_titles.add(key)
+        it["video_title"] = t
+
+        # description
+        d = clean(it.get("video_description") or "")
+        if not d:
+            d = clean(f"Listen to {it['video_title']}: a concise breakdown of key points and practical takeaways on {it.get('topic','the topic')}.")
+        # enforce 150-200 chars inclusive
+        if len(d) < 150:
+            pad = f" ({code})"
+            # add a short pad phrase if needed
+            add = " Clear context, real-world impact, and what to watch next."
+            while len(d) < 150 and add:
+                need = 150 - len(d)
+                d = (d + " " + add[:need]).strip()
+                if len(d) >= 150:
+                    break
+                add = add  # one pass
+            if len(d) < 150 and len(d) + len(pad) <= 200:
+                d = (d + " " + pad).strip()
+        if len(d) > 200:
+            d = d[:200].rstrip()
+        dkey = d.lower()
+        if dkey in seen_desc:
+            # make unique by appending code within limit
+            suffix = f" ({code})"
+            base = d
+            if len(base) + len(suffix) > 200:
+                base = base[: max(0, 200 - len(suffix))].rstrip()
+            d = (base + suffix).strip()
+            dkey = d.lower()
+        seen_desc.add(dkey)
+        it["video_description"] = d
+
+        # tags
+        tags = clean(it.get("video_tags") or "")
+        if tags:
+            # normalize comma-separated
+            parts = [p.strip() for p in tags.split(",") if p.strip()]
+            # dedupe while preserving order
+            seen = set()
+            norm = []
+            for p in parts:
+                k = p.lower()
+                if k in seen:
+                    continue
+                seen.add(k)
+                norm.append(p)
+            it["video_tags"] = ", ".join(norm[:15])
+        else:
+            it["video_tags"] = ""
+
 def _normalize_ws(s: str) -> str:
     return re.sub(r"[ \t]+\n", "\n", (s or "").strip())
 
@@ -546,6 +647,9 @@ def _make_mock_outputs_from_source_text(config: Dict[str, Any], enabled_specs: L
             "title": "Source Text File",
             "date": "",
             "url": f"file://{str(src_path) if src_path else 'missing'}",
+        "video_title": _as_str(raw.get("video_title") or raw.get("title") or ""),
+        "video_description": _as_str(raw.get("video_description") or raw.get("description") or ""),
+        "video_tags": _as_str(raw.get("video_tags") or raw.get("tags") or ""),
         }]
 
     long_specs, nonlong_specs = _enabled_specs_from_content_specs(enabled_specs)
@@ -683,34 +787,6 @@ def _gemini_generate_text(*, model: str, prompt: str, json_mode: bool) -> str:
     return full
 
 
-def _resolve_search_queries(config: Dict[str, Any]) -> List[str]:
-    """Return the canonical list of search queries used by the generator.
-
-    This is the single source of truth for:
-    - Pass A web_search guidance
-    - Downstream Google image collection queries
-
-    Priority order:
-    1) config["queries"] (list[str])
-    2) config["title"] / config["topic"]
-    """
-    raw = config.get("queries") or []
-    queries: List[str] = []
-    if isinstance(raw, (list, tuple)):
-        for q in raw:
-            qs = str(q or "").strip()
-            if qs:
-                queries.append(qs)
-    elif isinstance(raw, str) and raw.strip():
-        queries.append(raw.strip())
-
-    if not queries:
-        topic = str(config.get("title") or config.get("topic") or "").strip()
-        if topic:
-            queries.append(topic)
-    return queries
-
-
 def _build_pass_a_prompt(config: Dict[str, Any], long_specs: List[Dict[str, Any]]) -> str:
     """
     Pass A prompt: ONLY "SOURCES" and "SCRIPT" in plain text. No JSON.
@@ -725,7 +801,7 @@ def _build_pass_a_prompt(config: Dict[str, Any], long_specs: List[Dict[str, Any]
     regions = config.get("search_regions") or []
     region_txt = ", ".join([str(r).upper() for r in regions]) if regions else "GLOBAL"
 
-    queries = _resolve_search_queries(config)
+    queries = config.get("queries") or []
     query_txt = "\n".join([f"- {q}" for q in queries]) if queries else "- (use your judgment)"
 
     target_words = 9000
@@ -877,6 +953,11 @@ Targets to generate (all in ONE JSON object):
 Output format:
 {{
   "content": [
+ADDITIONAL REQUIRED METADATA PER ITEM (for publishing; NOT the same as burned image titles):
+- video_title: unique across ALL items in this run. 6–70 characters. No quotes/backslashes. Must be descriptive and click-worthy.
+- video_description: unique across ALL items in this run. 150–200 characters (inclusive). Plain text. No line breaks. No backslashes.
+- video_tags: comma-separated list of 8–15 common/popular topic-relevant tags/keywords (lowercase recommended). No hashtags. Example: "inflation, rent, groceries, wages, interest rates, energy prices, supply chain, household budget"
+
     {{
       "code": "S1",
       "type": "short",
@@ -1267,12 +1348,7 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
         sources_text = ""
         script_text = str(pass_a_long_script or "").strip()
         out = _run_pass_b_from_pass_a(client, config, nonlong_specs, sources_text, script_text)
-        return {
-            "content": out.get("content", []),
-            "sources": sources or [],
-            "pass_a_raw_text": "",
-            "search_queries": _resolve_search_queries(config),
-        }
+        return {"content": out.get("content", []), "sources": sources or [], "pass_a_raw_text": ""}
 
     # New style: (config, ...)
     if not args or not isinstance(args[0], dict):
@@ -1290,8 +1366,6 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
         # If source text file exists -> generate mocks based on it.
         # If missing -> still produce minimal mocks so pipeline can continue.
         mock = _make_mock_outputs_from_source_text(config, enabled_specs)
-        if isinstance(mock, dict):
-            mock.setdefault("search_queries", _resolve_search_queries(config))
         return mock
 
     # Determine whether we actually need an OpenAI client. If both passes use Gemini models,
@@ -1394,8 +1468,6 @@ Return STRICT JSON only:
         "content": content,
         "sources": sources_out,
         "pass_a_raw_text": pass_a_raw_text,
-        # Canonical search queries used by the generator. Downstream image collection must use these.
-        "search_queries": _resolve_search_queries(config),
     }
 
 
