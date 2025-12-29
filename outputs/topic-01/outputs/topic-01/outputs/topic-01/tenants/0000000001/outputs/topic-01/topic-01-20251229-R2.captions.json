@@ -1,0 +1,179 @@
+{
+  "captions": [
+    {
+      "index": 1,
+      "start": 0.0,
+      "end": 4.574175149999999,
+      "text": "Today we are diving into\nhow rising food and energy\nprices are impacting the global",
+      "speaker": "A"
+    },
+    {
+      "index": 2,
+      "start": 4.574175149999999,
+      "end": 6.708790219999999,
+      "text": "cost of living. It is\na squeeze.",
+      "speaker": "A"
+    },
+    {
+      "index": 3,
+      "start": 7.208790219999999,
+      "end": 11.78296537,
+      "text": "Absolutely. When you go to\nthe grocery store or pay\nyour utility bills, the numbers",
+      "speaker": "B"
+    },
+    {
+      "index": 4,
+      "start": 11.78296537,
+      "end": 13.61263543,
+      "text": "are significantly higher than last\nyear.",
+      "speaker": "B"
+    },
+    {
+      "index": 5,
+      "start": 14.11263543,
+      "end": 18.68681058,
+      "text": "Wages are simply not keeping\npace with these increases. This\nmeans families have less disposable",
+      "speaker": "A"
+    },
+    {
+      "index": 6,
+      "start": 18.68681058,
+      "end": 20.21153563,
+      "text": "income for other essential needs.",
+      "speaker": "A"
+    },
+    {
+      "index": 7,
+      "start": 20.71153563,
+      "end": 25.285710780000002,
+      "text": "The causes are complex. We\nare looking at inflation and\nsupply shocks that have hit",
+      "speaker": "B"
+    },
+    {
+      "index": 8,
+      "start": 25.285710780000002,
+      "end": 27.115380840000004,
+      "text": "the energy sector particularly hard\nlately.",
+      "speaker": "B"
+    },
+    {
+      "index": 9,
+      "start": 27.615380840000004,
+      "end": 32.18955599,
+      "text": "These supply shocks ripple through\nthe entire economy. If it\ncosts more to transport food,",
+      "speaker": "A"
+    },
+    {
+      "index": 10,
+      "start": 32.18955599,
+      "end": 34.01922605,
+      "text": "the price at the store\nrises.",
+      "speaker": "A"
+    },
+    {
+      "index": 11,
+      "start": 34.51922605,
+      "end": 39.0934012,
+      "text": "Policy also plays a role.\nDecisions made at the governmental\nlevel can either mitigate or",
+      "speaker": "B"
+    },
+    {
+      "index": 12,
+      "start": 39.0934012,
+      "end": 40.92307126,
+      "text": "exacerbate these rising costs for\neveryone.",
+      "speaker": "B"
+    },
+    {
+      "index": 13,
+      "start": 41.42307126,
+      "end": 45.99724641,
+      "text": "So, what can working families\nrealistically expect next? Will we\nsee a stabilization in food",
+      "speaker": "A"
+    },
+    {
+      "index": 14,
+      "start": 45.99724641,
+      "end": 47.52197146,
+      "text": "and energy prices anytime soon?",
+      "speaker": "A"
+    },
+    {
+      "index": 15,
+      "start": 48.02197146,
+      "end": 52.596146610000005,
+      "text": "It is hard to say\nfor certain, but the current\ntrend suggests that high prices",
+      "speaker": "B"
+    },
+    {
+      "index": 16,
+      "start": 52.596146610000005,
+      "end": 54.120871660000006,
+      "text": "might persist for a while.",
+      "speaker": "B"
+    },
+    {
+      "index": 17,
+      "start": 54.620871660000006,
+      "end": 59.19504681000001,
+      "text": "That is why finding ways\nto cope now is so\nvital. We must look at",
+      "speaker": "A"
+    },
+    {
+      "index": 18,
+      "start": 59.19504681000001,
+      "end": 60.71977186000001,
+      "text": "our budgets and prioritize spending.",
+      "speaker": "A"
+    },
+    {
+      "index": 19,
+      "start": 61.21977186000001,
+      "end": 65.489002,
+      "text": "Understanding these economic shifts is\nthe first step in navigating\nthis challenging environment today.",
+      "speaker": "B"
+    }
+  ],
+  "dialogue_chunks": [
+    {
+      "speaker": "A",
+      "text": "Today we are diving into how rising food and energy prices are impacting the global cost of living. It is a squeeze."
+    },
+    {
+      "speaker": "B",
+      "text": "Absolutely. When you go to the grocery store or pay your utility bills, the numbers are significantly higher than last year."
+    },
+    {
+      "speaker": "A",
+      "text": "Wages are simply not keeping pace with these increases. This means families have less disposable income for other essential needs."
+    },
+    {
+      "speaker": "B",
+      "text": "The causes are complex. We are looking at inflation and supply shocks that have hit the energy sector particularly hard lately."
+    },
+    {
+      "speaker": "A",
+      "text": "These supply shocks ripple through the entire economy. If it costs more to transport food, the price at the store rises."
+    },
+    {
+      "speaker": "B",
+      "text": "Policy also plays a role. Decisions made at the governmental level can either mitigate or exacerbate these rising costs for everyone."
+    },
+    {
+      "speaker": "A",
+      "text": "So, what can working families realistically expect next? Will we see a stabilization in food and energy prices anytime soon?"
+    },
+    {
+      "speaker": "B",
+      "text": "It is hard to say for certain, but the current trend suggests that high prices might persist for a while."
+    },
+    {
+      "speaker": "A",
+      "text": "That is why finding ways to cope now is so vital. We must look at our budgets and prioritize spending."
+    },
+    {
+      "speaker": "B",
+      "text": "Understanding these economic shifts is the first step in navigating this challenging environment today."
+    }
+  ]
+}
