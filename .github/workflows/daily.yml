@@ -16,8 +16,8 @@ env:
   # FFmpeg-only pipeline
   VIDEO_RENDERER: 'ffmpeg'
 
-  PASS_A_MODEL: gpt-5.2-pro
-  PASS_B_MODEL: gpt-5-nano
+  PASS_A_MODEL: gemini-3-flash
+  PASS_B_MODEL: gemini-3-flash
 
   # gpt-5.2-pro supports only: medium/high/xhigh
   PASS_A_REASONING_EFFORT: medium
