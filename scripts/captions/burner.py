@@ -180,7 +180,7 @@ def _repo_root_from_here() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _discover_frame_png(repo_root: Path) -> Optional[Path]:
+def _discover_frame_png(repo_root: Path, width: Optional[int] = None, height: Optional[int] = None) -> Optional[Path]:
     # Explicit override
     for envk in ("VIDEO_FRAME_PNG", "FRAME_PNG"):
         v = (os.environ.get(envk) or "").strip()
@@ -194,6 +194,17 @@ def _discover_frame_png(repo_root: Path) -> Optional[Path]:
     assets = repo_root / "assets"
     if not assets.exists():
         return None
+
+    # Orientation-aware preferred names
+    # Requirement:
+    #  - horizontal videos use assets/frame_horizontal.png
+    #  - vertical videos use assets/frame_vertical.png
+    # If width/height are not provided, fall back to generic discovery logic.
+    if width and height:
+        orient_name = "frame_horizontal.png" if width >= height else "frame_vertical.png"
+        oriented = assets / orient_name
+        if oriented.exists():
+            return oriented
 
     # Preferred name
     preferred = assets / "frame.png"
@@ -604,7 +615,7 @@ class CaptionBurner:
         )
 
         repo_root = _repo_root_from_here()
-        frame_png = _discover_frame_png(repo_root)
+        frame_png = _discover_frame_png(repo_root, width=width, height=height)
 
         tmp_out = Path(tempfile.mkstemp(prefix="burn_", suffix=video_path.suffix)[1])
         try:
