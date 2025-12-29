@@ -1,0 +1,100 @@
+{
+  "total_chunks": 10,
+  "successful_chunks": 10,
+  "failed_chunks": 0,
+  "total_time_sec": 27.835280418395996,
+  "output_file": "/home/runner/work/New-Architecture/New-Architecture/tenants/0000000001/outputs/topic-01/topic-01-20251229-R5.wav",
+  "output_size_mb": 5.325933456420898,
+  "chunks": [
+    {
+      "chunk_id": 0,
+      "text_length": 117,
+      "speaker": "A",
+      "attempts": 1,
+      "success": true,
+      "error": null,
+      "duration_sec": 10.649561166763306
+    },
+    {
+      "chunk_id": 1,
+      "text_length": 111,
+      "speaker": "B",
+      "attempts": 1,
+      "success": true,
+      "error": null,
+      "duration_sec": 11.431395530700684
+    },
+    {
+      "chunk_id": 2,
+      "text_length": 113,
+      "speaker": "A",
+      "attempts": 1,
+      "success": true,
+      "error": null,
+      "duration_sec": 10.622278690338135
+    },
+    {
+      "chunk_id": 3,
+      "text_length": 118,
+      "speaker": "B",
+      "attempts": 1,
+      "success": true,
+      "error": null,
+      "duration_sec": 11.42720365524292
+    },
+    {
+      "chunk_id": 4,
+      "text_length": 118,
+      "speaker": "A",
+      "attempts": 1,
+      "success": true,
+      "error": null,
+      "duration_sec": 10.436616897583008
+    },
+    {
+      "chunk_id": 5,
+      "text_length": 114,
+      "speaker": "B",
+      "attempts": 1,
+      "success": true,
+      "error": null,
+      "duration_sec": 10.119282007217407
+    },
+    {
+      "chunk_id": 6,
+      "text_length": 118,
+      "speaker": "A",
+      "attempts": 1,
+      "success": true,
+      "error": null,
+      "duration_sec": 10.803517580032349
+    },
+    {
+      "chunk_id": 7,
+      "text_length": 121,
+      "speaker": "B",
+      "attempts": 1,
+      "success": true,
+      "error": null,
+      "duration_sec": 11.006619453430176
+    },
+    {
+      "chunk_id": 8,
+      "text_length": 136,
+      "speaker": "A",
+      "attempts": 1,
+      "success": true,
+      "error": null,
+      "duration_sec": 6.900952100753784
+    },
+    {
+      "chunk_id": 9,
+      "text_length": 112,
+      "speaker": "B",
+      "attempts": 1,
+      "success": true,
+      "error": null,
+      "duration_sec": 6.4216437339782715
+    }
+  ]
+}
