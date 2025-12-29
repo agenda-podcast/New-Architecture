@@ -544,7 +544,8 @@ def _tts_with_chunking(dialogue_chunks: List[Dict[str, str]], audio_path: Path,
     # Use tts_chunker module
     success = generate_tts_with_chunking(
         dialogue=dialogue_chunks,
-        voice=primary_voice,
+        voice_a=voice_a,
+        voice_b=voice_b,
         output_file=temp_wav,
         speed=1.0
     )

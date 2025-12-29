@@ -171,7 +171,8 @@ def synthesize_chunk(chunk: TTSChunk, voice: str, speed: float, output_dir: Path
     
     Args:
         chunk: TTSChunk object to synthesize
-        voice: Voice model name
+        voice_a: Voice model name for speaker A
+        voice_b: Voice model name for speaker B
         speed: Speech speed multiplier
         output_dir: Directory for output files
         piper_bin: Path to piper binary (defaults to system piper)
@@ -282,14 +283,15 @@ def synthesize_chunk(chunk: TTSChunk, voice: str, speed: float, output_dir: Path
     return False
 
 
-def synthesize_chunks_parallel(chunks: List[TTSChunk], voice: str, speed: float,
+def synthesize_chunks_parallel(chunks: List[TTSChunk], voice_a: str, voice_b: str, speed: float,
                               output_dir: Path, concurrency: int = None) -> Tuple[int, int]:
     """
     Synthesize multiple chunks in parallel.
     
     Args:
         chunks: List of TTSChunk objects
-        voice: Voice model name
+        voice_a: Voice model name for speaker A
+        voice_b: Voice model name for speaker B
         speed: Speech speed multiplier
         output_dir: Directory for output files
         concurrency: Number of parallel processes (default from config)
@@ -307,10 +309,16 @@ def synthesize_chunks_parallel(chunks: List[TTSChunk], voice: str, speed: float,
     
     with ThreadPoolExecutor(max_workers=concurrency) as executor:
         # Submit all chunks
-        future_to_chunk = {
-            executor.submit(synthesize_chunk, chunk, voice, speed, output_dir): chunk
-            for chunk in chunks
-        }
+        future_to_chunk = {}
+        for chunk in chunks:
+            # Select voice per speaker for this chunk
+            s = (getattr(chunk, 'speaker', '') or '').strip().upper()
+            if s in ('B','HOST_B','SPEAKER_B','MARGARET','FEMALE'):
+                v = voice_b
+            else:
+                v = voice_a
+            future = executor.submit(synthesize_chunk, chunk, v, speed, output_dir)
+            future_to_chunk[future] = chunk
         
         # Process as they complete
         for future in as_completed(future_to_chunk):
@@ -402,7 +410,7 @@ def stitch_wavs(wav_files: List[Path], output_wav: Path, gap_ms: int = None) -> 
         return False
 
 
-def generate_tts_with_chunking(dialogue: List[Dict], voice: str, output_file: Path,
+def generate_tts_with_chunking(dialogue: List[Dict], voice_a: str, voice_b: str, output_file: Path,
                                speed: float = 1.0) -> bool:
     """
     Generate TTS for dialogue using chunking strategy for reliability.
@@ -412,7 +420,8 @@ def generate_tts_with_chunking(dialogue: List[Dict], voice: str, output_file: Pa
     
     Args:
         dialogue: List of dialogue entries with 'speaker' and 'text' keys
-        voice: Voice model name
+        voice_a: Voice model name for speaker A
+        voice_b: Voice model name for speaker B
         output_file: Final output WAV file
         speed: Speech speed multiplier
         
@@ -436,7 +445,7 @@ def generate_tts_with_chunking(dialogue: List[Dict], voice: str, output_file: Pa
         
         # Step 2: Synthesize chunks in parallel
         logger.info("Step 2: Synthesizing chunks...")
-        successful, failed = synthesize_chunks_parallel(chunks, voice, speed, work_dir)
+        successful, failed = synthesize_chunks_parallel(chunks, voice_a, voice_b, speed, work_dir)
         
         if failed > 0:
             logger.warning(f"{failed} chunks failed synthesis")
