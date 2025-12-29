@@ -19,7 +19,9 @@ Notes:
 from __future__ import annotations
 
 import logging
+import httpx
 import os
+import json
 import re
 from typing import List, Optional, Tuple
 
@@ -81,6 +83,17 @@ def _get_client():
     return genai.Client(api_key=api_key)
 
 
+def gemini_model_max_output_tokens(model: str) -> int:
+    """Best-effort maximum output tokens per model id (Gemini Developer API / v1beta)."""
+    m = _normalize_model(model)
+    # Known limits (as of Dec 2025): Gemini 3 Flash/Pro preview support up to 65,536 output tokens.
+    # If the model is unknown, choose a conservative high value; the API will enforce its own cap.
+    if m.startswith("gemini-3-"):
+        return 65536
+    # Older generations often cap lower; still allow a large value and let API clamp.
+    return 8192
+
+
 def gemini_generate_once(
     *,
     model: str,
@@ -89,59 +102,55 @@ def gemini_generate_once(
     temperature: float = 0.2,
     json_mode: bool = False,
 ) -> str:
-    """Single request to Gemini Developer API."""
+    """
+    Single request to Gemini Developer API (v1beta) via raw HTTP.
+    This intentionally avoids the python-genai AFC/agentic loop behavior to guarantee:
+      - exactly ONE HTTP request per call
+      - no automatic tool calls / remote call chains
+    """
     if not _is_gemini_model(model):
         raise ValueError(f"Not a Gemini model: {model}")
 
     model = _normalize_model(model)
+    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_GENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("Missing GOOGLE_API_KEY (Gemini Developer API key).")
 
-    client = _get_client()
+    # If caller did not specify, default to the model maximum.
+    mot = int(max_output_tokens) if int(max_output_tokens or 0) > 0 else gemini_model_max_output_tokens(model)
 
-    try:
-        # Build config; omit max_output_tokens when caller requests "no limit".
-        cfg: dict = {
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    headers = {"Content-Type": "application/json"}
+
+    payload = {
+        "contents": [{"role": "user", "parts": [{"text": str(prompt)}]}],
+        "generationConfig": {
+            "maxOutputTokens": mot,
             "temperature": float(temperature),
-            **({"response_mime_type": "application/json"} if json_mode else {}),
-            # Disable Automatic Function Calling (AFC) to guarantee a single request.
-            "tool_config": {"function_calling_config": {"mode": "NONE"}},
-            "automatic_function_calling": {"disable": True},
-        }
-        if int(max_output_tokens) > 0:
-            cfg["max_output_tokens"] = int(max_output_tokens)
+            **({"responseMimeType": "application/json"} if json_mode else {}),
+        },
+        # Hard-disable tool usage / AFC style loops.
+        "tools": [],
+        "toolConfig": {"functionCallingConfig": {"mode": "NONE"}},
+        "automaticFunctionCalling": {"disable": True},
+    }
 
-        try:
-            resp = client.models.generate_content(
-                model=model,
-                contents=prompt,
-                config=cfg,
-                tools=[],
-            )
-        except TypeError:
-            cfg.pop("tool_config", None)
-            cfg.pop("automatic_function_calling", None)
-            resp = client.models.generate_content(
-                model=model,
-                contents=prompt,
-                config=cfg,
-            )
-    except Exception as e:
-        msg = str(e)
-        # Most common integration error: using a non-existent model ID.
-        if "NOT_FOUND" in msg or "is not found" in msg or "404" in msg:
-            raise RuntimeError(
-                "Gemini model id was rejected by the API. "
-                f"Requested model='{model}'.\n"
-                "For Gemini 3, the Gemini Developer API currently requires the '-preview' model ids "
-                "(e.g., gemini-3-flash-preview, gemini-3-pro-preview). "
-                "Either update your config to a preview id or keep using the short id (gemini-3-flash) "
-                "and let this repo normalize it.\n\n"
-                "If you still see this error, call ListModels in your environment to see which ids your key has access to."
-            ) from e
-        raise
+    # Single, non-streaming request.
+    with httpx.Client(timeout=120.0) as client:
+        resp = client.post(url, params={"key": api_key}, headers=headers, json=payload)
+    if resp.status_code >= 400:
+        raise RuntimeError(f"Gemini HTTP {resp.status_code}: {resp.text[:500]}")
 
-    # SDK exposes `text` for convenient access.
-    txt = getattr(resp, "text", None)
-    return (txt or "").strip()
+    data = resp.json()
+
+    # Extract text from first candidate.
+    try:
+        parts = data["candidates"][0]["content"]["parts"]
+        text_out = "".join(p.get("text", "") for p in parts if isinstance(p, dict))
+        return text_out
+    except Exception:
+        # Fallback: dump minimal tail for debugging
+        return json.dumps(data)[0:2000]
 
 
 def gemini_generate_chunked(

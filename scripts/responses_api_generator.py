@@ -1390,16 +1390,26 @@ def _run_pass_b_grouped(
 
 def _run_gemini_single_pass_all(client, config: dict, specs: list[dict], sources_text: str) -> dict:
     """
-    Gemini-only: generate ALL requested items (including long/L1) in a SINGLE request.
-    Returns normalized structure: {"content":[...]}.
+    Gemini-only: generate ALL requested items (including long/L1) in a SINGLE model request.
+
+    Output must be a single JSON object:
+      {"content":[{code,type,word_count,script,duration_s,video_title,video_description,video_tags}, ...]}
+
+    No Pass A / Pass B separation for Gemini.
     """
     model = config.get("model") or ""
-    max_out = 0  # omit max_output_tokens for Gemini (use model maximum)
-    prompt = _build_pass_a_prompt(
-        config=config,
-        specs=specs,
-        sources_text=sources_text,
-    )
+
+    # Build a single unified prompt that requests the same schema for every requested item type.
+    prompt = _build_single_pass_b_prompt(config, specs)
+    if sources_text:
+        prompt = prompt + "\n\nSOURCE_TEXT:\n" + str(sources_text)
+
+    # Use maximum available output tokens for the model.
+    try:
+        from gemini_utils import gemini_model_max_output_tokens
+        max_out = int(gemini_model_max_output_tokens(model))
+    except Exception:
+        max_out = 65536
 
     txt = _gemini_generate_text(
         model=model,
@@ -1409,6 +1419,7 @@ def _run_gemini_single_pass_all(client, config: dict, specs: list[dict], sources
         json_mode=True,
     )
 
+    # Parse with robust repair (NO additional model calls).
     data = {}
     if isinstance(txt, str):
         try:
@@ -1424,7 +1435,20 @@ def _run_gemini_single_pass_all(client, config: dict, specs: list[dict], sources
                 else:
                     raise
 
-    out = _normalize_single_pass_payload(data=data, config=config, model=model)
+    # Normalize to canonical shape.
+    out = data if isinstance(data, dict) else {}
+    # common wrappers
+    if "content" not in out and isinstance(out.get("output"), dict):
+        out = out["output"]
+    if "content" not in out and isinstance(out.get("result"), dict):
+        out = out["result"]
+    if "content" not in out and isinstance(out.get("data"), dict):
+        out = out["data"]
+
+    if not isinstance(out, dict) or "content" not in out or not isinstance(out.get("content"), list):
+        raise RuntimeError("Gemini single-pass returned JSON without a 'content' list.")
+
+    # Enforce publish metadata constraints and uniqueness.
     _enforce_unique_video_metadata(out.get("content") or [])
     return out
 
