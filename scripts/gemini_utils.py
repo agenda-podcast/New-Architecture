@@ -87,6 +87,7 @@ def gemini_generate_once(
     prompt: str,
     max_output_tokens: int,
     temperature: float = 0.2,
+    json_mode: bool = False,
 ) -> str:
     """Single request to Gemini Developer API."""
     if not _is_gemini_model(model):
@@ -103,6 +104,7 @@ def gemini_generate_once(
             config={
                 "max_output_tokens": int(max_output_tokens),
                 "temperature": float(temperature),
+                **({"response_mime_type": "application/json"} if json_mode else {}),
             },
         )
     except Exception as e:
@@ -133,6 +135,7 @@ def gemini_generate_chunked(
     max_parts: int = 80,
     tail_chars_for_context: int = 1400,
     temperature: float = 0.2,
+    json_mode: bool = False,
 ) -> Tuple[str, List[str]]:
     """Generate a large output in multiple small parts.
 
@@ -151,6 +154,7 @@ def gemini_generate_chunked(
             prompt=prompt,
             max_output_tokens=max_output_tokens_per_part,
             temperature=temperature,
+            json_mode=json_mode,
         )
         if not chunk:
             break

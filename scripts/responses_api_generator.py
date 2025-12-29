@@ -672,6 +672,20 @@ def _gemini_generate_text(*, model: str, prompt: str, json_mode: bool) -> str:
     max_parts = _safe_int(os.getenv("GEMINI_MAX_PARTS"), 80) or 80
     tail_chars = _safe_int(os.getenv("GEMINI_TAIL_CHARS"), 1400) or 1400
 
+    # Optional hard-cap: force a single Gemini remote call.
+    # This is useful when callers require "one request per pass".
+    single_call = str(os.getenv("GEMINI_SINGLE_CALL", "false")).strip().lower() in ("1", "true", "yes", "y")
+    if single_call:
+        if gemini_generate_once is None:
+            raise ImportError("Gemini support is unavailable: google-genai not installed")
+        return gemini_generate_once(
+            model=model,
+            prompt=prompt,
+            max_output_tokens=int(per_part),
+            temperature=float(os.getenv("GEMINI_TEMPERATURE", "0.2")),
+            json_mode=bool(json_mode),
+        )
+
     full, _parts = gemini_generate_chunked(
         model=model,
         base_prompt=prompt,
@@ -679,6 +693,7 @@ def _gemini_generate_text(*, model: str, prompt: str, json_mode: bool) -> str:
         max_parts=max_parts,
         tail_chars_for_context=tail_chars,
         temperature=float(os.getenv("GEMINI_TEMPERATURE", "0.2")),
+        json_mode=bool(json_mode),
     )
     return full
 
@@ -1111,11 +1126,24 @@ def _run_single_pass_b(
         return {"content": [], "sources": []}
 
     if _is_gemini_model(model):
-        txt = _gemini_generate_text(model=model, prompt=prompt, json_mode=False)
+        txt = _gemini_generate_text(model=model, prompt=prompt, json_mode=True)
         data0 = _extract_first_json_object(txt or "")
         data = _normalize_single_pass_payload(data0)
         if not isinstance(data, dict) or "content" not in data or not isinstance(data.get("content"), list):
-            raise ValueError(f"Single-pass output JSON missing 'content' list (keys={list(data0.keys()) if isinstance(data0, dict) else type(data0)})")
+            raise ValueError(
+                "Single-pass output JSON missing 'content' array "
+                f"(model={model}; extracted_type={type(data0)}; extracted_keys={list(data0.keys()) if isinstance(data0, dict) else type(data0)})"
+            )
+
+        # Fail fast if the model "succeeded" but produced zero items; this is the common
+        # cause of downstream "No content generated" errors.
+        if len(data.get("content") or []) == 0:
+            tail = (txt or "")[-1200:].replace("\n", " ").strip()
+            raise RuntimeError(
+                f"Gemini returned no Pass B items after normalization (model={model}). "
+                "This typically means the model did not return valid JSON. "
+                f"Output tail: {tail}"
+            )
         return data
 
     requested_cfg = config.get("pass_b_max_output_tokens")
