@@ -28,7 +28,7 @@ Configuration
 - CAPTIONS_GLOW_COLOR_MALE (default: #00D1FF)
 - CAPTIONS_GLOW_COLOR_FEMALE (default: #FF4FD8)
 - CAPTIONS_GLOW_COLOR_NEUTRAL (default: #C0C0C0)
-- CAPTIONS_TITLE_GLOW_COLOR (default: #00D1FF)
+- CAPTIONS_TITLE_GLOW_COLOR (default: #C0C0C0)
 - VIDEO_FRAME_PNG or FRAME_PNG: explicit frame path (absolute or repo-relative)
 """
 
@@ -433,8 +433,18 @@ class CaptionBurner:
         hide_speaker_names: bool,
     ) -> Path:
         """Build a temporary ASS file with TikTok-style glow."""
+        # Base caption font size (derived from video height).
         font_size = max(24, int(height * self.config.font_size_fraction))
-        title_font_size = max(16, int(font_size * 0.50))
+
+        # Orientation-aware tuning:
+        # - Vertical: title font size should match caption size.
+        # - Horizontal: increase overall font size and slightly boost title ratio.
+        is_horizontal = width >= height
+        if is_horizontal:
+            font_size = int(font_size * float(os.environ.get("CAPTIONS_HORIZONTAL_FONT_SCALE", "1.25")))
+            title_font_size = max(16, int(font_size * float(os.environ.get("CAPTIONS_HORIZONTAL_TITLE_RATIO", "0.60"))))
+        else:
+            title_font_size = max(16, int(font_size * float(os.environ.get("CAPTIONS_VERTICAL_TITLE_RATIO", "1.00"))))
 
         margin_v_bottom = max(24, int(height * self.config.bottom_margin_fraction))
         margin_v_top = max(24, int(height * 0.10))  # inside top ~20%
@@ -454,7 +464,7 @@ class CaptionBurner:
         white = _ass_color_rgba("#FFFFFF", 0)
         black = _ass_color_rgba("#000000", 0)
 
-        title_glow = os.environ.get("CAPTIONS_TITLE_GLOW_COLOR", "#00D1FF").strip()
+        title_glow = os.environ.get("CAPTIONS_TITLE_GLOW_COLOR", "#C0C0C0").strip()
         glow_primary = _ass_color_rgba("#FFFFFF", glow_aa)
         title_outline = _ass_color_rgba(title_glow, glow_aa)
 
