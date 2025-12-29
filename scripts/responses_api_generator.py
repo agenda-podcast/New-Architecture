@@ -695,6 +695,13 @@ def _make_mock_outputs_from_source_text(config: Dict[str, Any], enabled_specs: L
 
     long_specs, nonlong_specs = _enabled_specs_from_content_specs(enabled_specs)
 
+    # Gemini: modern single request only (no Pass A / Pass B; no chunking; no continuations)
+    if _is_gemini_model(_pick_model_pass_b(config)):
+        all_specs = list(long_specs) + list(nonlong_specs)
+        out_all = _run_gemini_single_pass_all_v2(client, config, all_specs, sources_in)
+        return {"content": out_all.get("content", []), "sources": sources_in, "pass_a_raw_text": ""}
+
+
     # Gemini: single request only. Generate ALL items (including long/L1) in one response.
     if _is_gemini_model(_pick_model_pass_b(config)):
         all_specs = list(long_specs) + list(nonlong_specs)
@@ -824,9 +831,7 @@ def _gemini_generate_text(*, model: str, prompt: str, json_mode: bool) -> str:
     tail_chars = _safe_int(os.getenv("GEMINI_TAIL_CHARS"), 1400) or 1400
 
     full, _parts = gemini_generate_once(
-        model=model,
-        base_prompt=prompt,
-        max_output_tokens_per_part=per_part,
+        model=model,max_output_tokens_per_part=per_part,
         max_parts=max_parts,
         tail_chars_for_context=tail_chars,
         temperature=float(os.getenv("GEMINI_TEMPERATURE", "0.2")),
@@ -1532,6 +1537,13 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
     # Legacy style: (client, config, pass_a_long_script, sources)
     if len(args) >= 4 and not isinstance(args[0], dict):
         client, config, pass_a_long_script, sources = args[0], args[1], args[2], args[3]
+        # Gemini legacy-call compatibility: single request, ignore pass_a_long_script
+        if _is_gemini_model(_pick_model_pass_b(config)):
+            sources_in = sources if isinstance(sources, list) else []
+            out_all = _run_gemini_single_pass_all_v2(client, config, list(_enabled_specs_from_content_specs(config.get("content_specs") or []))[0] + list(_enabled_specs_from_content_specs(config.get("content_specs") or []))[1], sources_in)
+            return {"content": out_all.get("content", []), "sources": sources_in, "pass_a_raw_text": ""}
+
+
         if client is None:
             raise ValueError("OpenAI client is required")
         enabled_specs = kwargs.get("enabled_specs") or []

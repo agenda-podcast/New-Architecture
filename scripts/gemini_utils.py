@@ -101,6 +101,7 @@ def gemini_generate_once(
     max_output_tokens: int,
     temperature: float = 0.2,
     json_mode: bool = False,
+    **kwargs,
 ) -> str:
     """
     Single request to Gemini Developer API (v1beta) via raw HTTP.
