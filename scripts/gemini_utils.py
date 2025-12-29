@@ -144,6 +144,11 @@ def gemini_generate_chunked(
 
     Continuation rule is fixed to the user's requested wording.
     """
+    # Safety: do not attempt multi-part continuation when caller expects JSON.
+    # JSON continuation is brittle and can cause expensive "looping" behavior.
+    if json_mode and max_parts > 1:
+        max_parts = 1
+
     parts: List[str] = []
     full = ""
 

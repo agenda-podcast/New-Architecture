@@ -47,7 +47,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import datetime
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -91,65 +90,6 @@ def _truthy(v: Any) -> bool:
 
 def _normalize_ws(s: str) -> str:
     return re.sub(r"[ \t]+\n", "\n", (s or "").strip())
-
-
-def _sanitize_filename_part(s: str, max_len: int = 60) -> str:
-    s = re.sub(r"[^A-Za-z0-9._-]+", "-", (s or "").strip())
-    s = re.sub(r"-{2,}", "-", s).strip("-")
-    return s[:max_len] if len(s) > max_len else s
-
-
-def _raw_responses_dir(config: Dict[str, Any]) -> str:
-    # Prefer explicit env override; otherwise use config; otherwise default under outputs/
-    return (
-        os.getenv("RAW_RESPONSES_DIR")
-        or str(config.get("raw_responses_dir") or "").strip()
-        or os.path.join("outputs", "_raw_responses")
-    )
-
-
-def _save_raw_response(
-    *,
-    config: Dict[str, Any],
-    pass_name: str,
-    model: str,
-    prompt: str,
-    response_text: str,
-    reason: str,
-) -> str:
-    """Persist the raw model response (and prompt) to disk for debugging."""
-    try:
-        ts = datetime.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-        topic = str(config.get("topic_id") or config.get("topic_key") or config.get("topic") or "").strip()
-        fname = "_".join(
-            p
-            for p in [
-                ts,
-                _sanitize_filename_part(pass_name),
-                _sanitize_filename_part(model),
-                _sanitize_filename_part(topic),
-                _sanitize_filename_part(reason, 30),
-            ]
-            if p
-        )
-        out_dir = _raw_responses_dir(config)
-        os.makedirs(out_dir, exist_ok=True)
-        path = os.path.join(out_dir, f"{fname}.json")
-        payload = {
-            "timestamp_utc": ts,
-            "pass": pass_name,
-            "model": model,
-            "reason": reason,
-            "topic": topic,
-            "prompt": prompt,
-            "response_text": response_text,
-        }
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(payload, f, ensure_ascii=False, indent=2)
-        return path
-    except Exception:
-        # Never break generation because debug saving failed.
-        return ""
 
 
 def _is_gemini_model(model: str) -> bool:
@@ -732,16 +672,35 @@ def _gemini_generate_text(*, model: str, prompt: str, json_mode: bool) -> str:
     max_parts = _safe_int(os.getenv("GEMINI_MAX_PARTS"), 80) or 80
     tail_chars = _safe_int(os.getenv("GEMINI_TAIL_CHARS"), 1400) or 1400
 
-    # Optional hard-cap: force a single Gemini remote call.
-    # This is useful when callers require "one request per pass".
-    single_call = str(os.getenv("GEMINI_SINGLE_CALL", "false")).strip().lower() in ("1", "true", "yes", "y")
-    if single_call:
+    # IMPORTANT COST GUARDRAIL:
+    # If callers request JSON (Pass B in this repo), chunking is dangerous:
+    # - JSON cannot be safely continued without risking syntax breakage.
+    # - Our chunk loop may repeatedly call generateContent trying to "finish" the JSON,
+    #   which is expensive and looks like an infinite loop.
+    # Therefore: when json_mode=True, ALWAYS do a single remote call.
+    if json_mode:
         if gemini_generate_once is None:
             raise ImportError("Gemini support is unavailable: google-genai not installed")
+        json_tokens = _gemini_part_tokens("GEMINI_JSON_MAX_TOKENS", 6000)
         return gemini_generate_once(
             model=model,
             prompt=prompt,
-            max_output_tokens=int(per_part),
+            max_output_tokens=int(json_tokens),
+            temperature=float(os.getenv("GEMINI_TEMPERATURE", "0.2")),
+            json_mode=True,
+        )
+
+    # Optional hard-cap: force a single Gemini remote call.
+    # Default is TRUE to prevent expensive multi-call chunking unless explicitly enabled.
+    single_call = str(os.getenv("GEMINI_SINGLE_CALL", "true")).strip().lower() in ("1", "true", "yes", "y")
+    if single_call:
+        if gemini_generate_once is None:
+            raise ImportError("Gemini support is unavailable: google-genai not installed")
+        one_shot_tokens = _gemini_part_tokens("GEMINI_SINGLE_CALL_MAX_TOKENS", 6000)
+        return gemini_generate_once(
+            model=model,
+            prompt=prompt,
+            max_output_tokens=int(one_shot_tokens),
             temperature=float(os.getenv("GEMINI_TEMPERATURE", "0.2")),
             json_mode=bool(json_mode),
         )
@@ -1187,13 +1146,9 @@ def _run_single_pass_b(
 
     if _is_gemini_model(model):
         txt = _gemini_generate_text(model=model, prompt=prompt, json_mode=True)
-        save_mode = (os.getenv("SAVE_RAW_RESPONSES", "on_error") or "on_error").strip().lower()
-        if save_mode == "always":
-            _save_raw_response(config=config, pass_name="pass_b_single", model=model, prompt=prompt, response_text=txt or "", reason="always")
         data0 = _extract_first_json_object(txt or "")
         data = _normalize_single_pass_payload(data0)
         if not isinstance(data, dict) or "content" not in data or not isinstance(data.get("content"), list):
-            raw_path = _save_raw_response(config=config, pass_name="pass_b_single", model=model, prompt=prompt, response_text=txt or "", reason="missing_content_array")
             raise ValueError(
                 "Single-pass output JSON missing 'content' array "
                 f"(model={model}; extracted_type={type(data0)}; extracted_keys={list(data0.keys()) if isinstance(data0, dict) else type(data0)})"
@@ -1203,11 +1158,10 @@ def _run_single_pass_b(
         # cause of downstream "No content generated" errors.
         if len(data.get("content") or []) == 0:
             tail = (txt or "")[-1200:].replace("\n", " ").strip()
-            raw_path = _save_raw_response(config=config, pass_name="pass_b_single", model=model, prompt=prompt, response_text=txt or "", reason="zero_items")
             raise RuntimeError(
                 f"Gemini returned no Pass B items after normalization (model={model}). "
                 "This typically means the model did not return valid JSON. "
-                f"Output tail: {tail} " + (f"(raw_saved={raw_path})" if raw_path else "")
+                f"Output tail: {tail}"
             )
         return data
 
