@@ -28,7 +28,7 @@ Configuration
 - CAPTIONS_GLOW_COLOR_MALE (default: #00D1FF)
 - CAPTIONS_GLOW_COLOR_FEMALE (default: #FF4FD8)
 - CAPTIONS_GLOW_COLOR_NEUTRAL (default: #C0C0C0)
-- CAPTIONS_TITLE_GLOW_COLOR (default: #C0C0C0)
+- CAPTIONS_TITLE_GLOW_COLOR (default: #00D1FF)
 - VIDEO_FRAME_PNG or FRAME_PNG: explicit frame path (absolute or repo-relative)
 """
 
@@ -120,30 +120,7 @@ def _ass_color_rgba(hex_rgb: str, alpha: int) -> str:
 
 
 def _ass_escape(text: str) -> str:
-    # Models sometimes emit JSON-escaped sequences *literally* (e.g., \" or \\n).
-    # If we pass those through, users will see backslashes in burned subtitles.
-    t = (text or "")
-    # Normalize double-escaped backslashes first.
-    while "\\\\" in t:
-        t = t.replace("\\\\", "\\")
-    # Unescape common sequences.
-    t = t.replace("\\n", "\n").replace("\\r", "\r").replace("\\t", "\t")
-    t = t.replace('\\"', '"').replace("\\'", "'")
-    t = t.replace("\r\n", "\n").replace("\r", "\n")
-    # Decode \uXXXX / \UXXXXXXXX sequences if present (Gemini sometimes outputs them literally).
-    def _decode_unicode_escapes(s: str) -> str:
-        def _u4(m):
-            return chr(int(m.group(1), 16))
-        def _u8(m):
-            return chr(int(m.group(1), 16))
-        s = re.sub(r"\\u([0-9a-fA-F]{4})", _u4, s)
-        s = re.sub(r"\\U([0-9a-fA-F]{8})", _u8, s)
-        return s
-
-    t = _decode_unicode_escapes(t)
-
-    # Remove stray escape backslashes before punctuation/space (e.g., \" -> " already handled, but \: etc may remain).
-    t = re.sub(r"\\(?=[\s,\.\:;\!\?\)\]\}\"\'`])", "", t)
+    t = (text or "").replace("\r\n", "\n").replace("\r", "\n")
     t = t.replace("\\", "\\\\")
     t = t.replace("{", "\\{").replace("}", "\\}")
     t = t.replace("\n", "\\N")
@@ -203,7 +180,7 @@ def _repo_root_from_here() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _discover_frame_png(repo_root: Path, width: int, height: int) -> Optional[Path]:
+def _discover_frame_png(repo_root: Path, width: Optional[int] = None, height: Optional[int] = None) -> Optional[Path]:
     # Explicit override
     for envk in ("VIDEO_FRAME_PNG", "FRAME_PNG"):
         v = (os.environ.get(envk) or "").strip()
@@ -218,18 +195,16 @@ def _discover_frame_png(repo_root: Path, width: int, height: int) -> Optional[Pa
     if not assets.exists():
         return None
 
-    # Orientation-aware frames (preferred):
-    # - Horizontal videos: assets/frame_horizontal.png
-    # - Vertical videos: assets/frame_vertical.png
-    fh = assets / "frame_horizontal.png"
-    fv = assets / "frame_vertical.png"
-    if fh.exists() and fv.exists():
-        return fh if width >= height else fv
-    # If only one is present, use it.
-    if width >= height and fh.exists():
-        return fh
-    if width < height and fv.exists():
-        return fv
+    # Orientation-aware preferred names
+    # Requirement:
+    #  - horizontal videos use assets/frame_horizontal.png
+    #  - vertical videos use assets/frame_vertical.png
+    # If width/height are not provided, fall back to generic discovery logic.
+    if width and height:
+        orient_name = "frame_horizontal.png" if width >= height else "frame_vertical.png"
+        oriented = assets / orient_name
+        if oriented.exists():
+            return oriented
 
     # Preferred name
     preferred = assets / "frame.png"
@@ -460,19 +435,20 @@ class CaptionBurner:
         hide_speaker_names: bool,
     ) -> Path:
         """Build a temporary ASS file with TikTok-style glow."""
-        # Base caption font size (derived from video height).
+        # Base caption font size.
         font_size = max(24, int(height * self.config.font_size_fraction))
 
-                # Orientation-aware tuning:
-        # - Vertical: title font size should match caption size.
-        # - Horizontal: increase overall font size (configurable).
+        # Orientation-aware sizing:
+        # - Horizontal: increase overall font size (requested)
+        # - Vertical: keep base sizing
         is_horizontal = width >= height
         if is_horizontal:
             font_size = int(font_size * float(os.environ.get("CAPTIONS_HORIZONTAL_FONT_SCALE", "1.25")))
-        # Title font size must match caption font size (per requirement).
+
+        # Title font size must match caption font size (requested).
         title_font_size = max(16, int(font_size))
 
-margin_v_bottom = max(24, int(height * self.config.bottom_margin_fraction))
+        margin_v_bottom = max(24, int(height * self.config.bottom_margin_fraction))
         margin_v_top = max(24, int(height * 0.10))  # inside top ~20%
         margin_lr = max(24, int(width * self.config.left_right_margin_fraction))
 
@@ -490,6 +466,7 @@ margin_v_bottom = max(24, int(height * self.config.bottom_margin_fraction))
         white = _ass_color_rgba("#FFFFFF", 0)
         black = _ass_color_rgba("#000000", 0)
 
+        # Default title glow to silver (requested: "silver glow").
         title_glow = os.environ.get("CAPTIONS_TITLE_GLOW_COLOR", "#C0C0C0").strip()
         glow_primary = _ass_color_rgba("#FFFFFF", glow_aa)
         title_outline = _ass_color_rgba(title_glow, glow_aa)
@@ -648,7 +625,7 @@ margin_v_bottom = max(24, int(height * self.config.bottom_margin_fraction))
         )
 
         repo_root = _repo_root_from_here()
-        frame_png = _discover_frame_png(repo_root, width, height)
+        frame_png = _discover_frame_png(repo_root, width=width, height=height)
 
         tmp_out = Path(tempfile.mkstemp(prefix="burn_", suffix=video_path.suffix)[1])
         try:
