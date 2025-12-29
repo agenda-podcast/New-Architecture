@@ -1138,20 +1138,22 @@ def _run_pass_b_from_pass_a(
     if _is_gemini_model(model):
         txt = _gemini_generate_text(model=model, prompt=prompt, json_mode=True)
         if isinstance(txt, str):
-        try:
-            data = json.loads(txt)
-        except Exception:
-            txt_repaired = _json_escape_control_chars_in_strings(txt)
-            try:
-                data = json.loads(txt_repaired)
-            except Exception:
-                extracted = _extract_first_json_object(txt_repaired) or _extract_first_json_object(txt)
-                if isinstance(extracted, dict):
-                    data = extracted
-                else:
-                    raise
-    else:
-        data = {}
+                    try:
+                        data = json.loads(txt)
+                    except Exception:
+                        # repair common model failure: literal newlines/control chars inside JSON strings
+                        txt_repaired = _json_escape_control_chars_in_strings(txt)
+                        try:
+                            data = json.loads(txt_repaired)
+                        except Exception:
+                            # final fallback: extract first JSON object then parse
+                            extracted = _extract_first_json_object(txt_repaired) or _extract_first_json_object(txt)
+                            if isinstance(extracted, dict):
+                                data = extracted
+                            else:
+                                raise
+        else:
+            data = {}
         if not isinstance(data, dict):
             raise ValueError("Pass B output is not a JSON object")
         if "content" not in data or not isinstance(data.get("content"), list):
