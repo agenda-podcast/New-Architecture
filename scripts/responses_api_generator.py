@@ -1394,8 +1394,7 @@ def _run_gemini_single_pass_all(client, config: dict, specs: list[dict], sources
     Returns normalized structure: {"content":[...]}.
     """
     model = config.get("model") or ""
-    max_out = clamp_output_tokens(model, default_max_output_tokens(model))
-
+    max_out = 0  # omit max_output_tokens for Gemini (use model maximum)
     prompt = _build_pass_a_prompt(
         config=config,
         specs=specs,

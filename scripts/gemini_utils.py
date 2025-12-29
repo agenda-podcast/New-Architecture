@@ -98,15 +98,32 @@ def gemini_generate_once(
     client = _get_client()
 
     try:
-        resp = client.models.generate_content(
-            model=model,
-            contents=prompt,
-            config={
-                "max_output_tokens": int(max_output_tokens),
-                "temperature": float(temperature),
-                **({"response_mime_type": "application/json"} if json_mode else {}),
-            },
-        )
+        # Build config; omit max_output_tokens when caller requests "no limit".
+        cfg: dict = {
+            "temperature": float(temperature),
+            **({"response_mime_type": "application/json"} if json_mode else {}),
+            # Disable Automatic Function Calling (AFC) to guarantee a single request.
+            "tool_config": {"function_calling_config": {"mode": "NONE"}},
+            "automatic_function_calling": {"disable": True},
+        }
+        if int(max_output_tokens) > 0:
+            cfg["max_output_tokens"] = int(max_output_tokens)
+
+        try:
+            resp = client.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=cfg,
+                tools=[],
+            )
+        except TypeError:
+            cfg.pop("tool_config", None)
+            cfg.pop("automatic_function_calling", None)
+            resp = client.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=cfg,
+            )
     except Exception as e:
         msg = str(e)
         # Most common integration error: using a non-existent model ID.
