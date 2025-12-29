@@ -97,8 +97,8 @@ def gemini_model_max_output_tokens(model: str) -> int:
 def gemini_generate_once(
     *,
     model: str,
-    prompt: str,
-    max_output_tokens: int,
+    prompt: str = "",
+    max_output_tokens: int = 0,
     temperature: float = 0.2,
     json_mode: bool = False,
     **kwargs,

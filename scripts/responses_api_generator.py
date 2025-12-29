@@ -692,6 +692,15 @@ def _make_mock_outputs_from_source_text(config: Dict[str, Any], enabled_specs: L
         "video_description": _as_str(raw.get("video_description") or raw.get("description") or ""),
         "video_tags": _as_str(raw.get("video_tags") or raw.get("tags") or ""),
         }]
+    # Gemini: enforce ONE request total and bypass Pass A/B entirely.
+    if _is_gemini_config(config):
+        sources_in = sources if isinstance(sources, list) else []
+        a_specs, b_specs = _enabled_specs_from_content_specs(config.get("content_specs") or [])
+        all_specs = list(a_specs) + list(b_specs)
+        out_all = _run_gemini_single_pass_all_v2(client, config, all_specs, sources_in)
+        return {"content": out_all.get("content", []), "sources": sources_in, "pass_a_raw_text": ""}
+
+
 
     long_specs, nonlong_specs = _enabled_specs_from_content_specs(enabled_specs)
 
@@ -830,7 +839,7 @@ def _gemini_generate_text(*, model: str, prompt: str, json_mode: bool) -> str:
     max_parts = _safe_int(os.getenv("GEMINI_MAX_PARTS"), 80) or 80
     tail_chars = _safe_int(os.getenv("GEMINI_TAIL_CHARS"), 1400) or 1400
 
-    full, _parts = gemini_generate_once(
+    full = gemini_generate_once(
         model=model,max_output_tokens_per_part=per_part,
         max_parts=max_parts,
         tail_chars_for_context=tail_chars,
@@ -1524,6 +1533,16 @@ Return STRICT JSON only:
     out = _normalize_single_pass_payload(data=data, config=config, model=model)
     _enforce_unique_video_metadata(out.get("content") or [])
     return out
+
+
+
+def _is_gemini_config(config: dict) -> bool:
+    try:
+        model = (config.get("model") or "").lower()
+        provider = (config.get("provider") or config.get("llm_provider") or config.get("vendor") or "").lower()
+        return ("gemini" in model) or (provider == "gemini")
+    except Exception:
+        return False
 
 
 def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
