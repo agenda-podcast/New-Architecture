@@ -135,7 +135,6 @@ def gemini_generate_chunked(
     max_parts: int = 80,
     tail_chars_for_context: int = 1400,
     temperature: float = 0.2,
-    json_mode: bool = False,
 ) -> Tuple[str, List[str]]:
     """Generate a large output in multiple small parts.
 
@@ -144,11 +143,6 @@ def gemini_generate_chunked(
 
     Continuation rule is fixed to the user's requested wording.
     """
-    # Safety: do not attempt multi-part continuation when caller expects JSON.
-    # JSON continuation is brittle and can cause expensive "looping" behavior.
-    if json_mode and max_parts > 1:
-        max_parts = 1
-
     parts: List[str] = []
     full = ""
 
@@ -159,7 +153,6 @@ def gemini_generate_chunked(
             prompt=prompt,
             max_output_tokens=max_output_tokens_per_part,
             temperature=temperature,
-            json_mode=json_mode,
         )
         if not chunk:
             break

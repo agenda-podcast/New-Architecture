@@ -1387,6 +1387,49 @@ def _run_pass_b_grouped(
     }
 
 
+
+def _run_gemini_single_pass_all(client, config: dict, specs: list[dict], sources_text: str) -> dict:
+    """
+    Gemini-only: generate ALL requested items (including long/L1) in a SINGLE request.
+    Returns normalized structure: {"content":[...]}.
+    """
+    model = config.get("model") or ""
+    max_out = clamp_output_tokens(model, default_max_output_tokens(model))
+
+    prompt = _build_pass_a_prompt(
+        config=config,
+        specs=specs,
+        sources_text=sources_text,
+    )
+
+    txt = _gemini_generate_text(
+        model=model,
+        prompt=prompt,
+        max_output_tokens=max_out,
+        temperature=float(config.get("temperature", 0.2)),
+        json_mode=True,
+    )
+
+    data = {}
+    if isinstance(txt, str):
+        try:
+            data = json.loads(txt)
+        except Exception:
+            txt_repaired = _json_escape_control_chars_in_strings(txt)
+            try:
+                data = json.loads(txt_repaired)
+            except Exception:
+                extracted = _extract_first_json_object(txt_repaired) or _extract_first_json_object(txt)
+                if isinstance(extracted, dict):
+                    data = extracted
+                else:
+                    raise
+
+    out = _normalize_single_pass_payload(data=data, config=config, model=model)
+    _enforce_unique_video_metadata(out.get("content") or [])
+    return out
+
+
 def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
     """
     Generate multi-format scripts.
