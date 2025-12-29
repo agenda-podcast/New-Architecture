@@ -1,7 +1,7 @@
 {
   "id": "topic-01",
   "enabled": true,
-  "title": "most important news today in the world",
+  "title": "selena gomez - fresh news",
   "description": "",
   "language": "en",
   "queries": [
@@ -45,7 +45,7 @@
     }
   ],
   "content_types": {
-    "long": { "enabled": false, "items": 1, "max_words": 20000 },
+    "long": { "enabled": true, "items": 1, "max_words": 2000 },
     "medium": { "enabled": false, "items": 2, "max_words": 3000 },
     "short": { "enabled": false, "items": 4, "max_words": 600 },
     "reels": { "enabled": true, "items": 2, "max_words": 200 }
