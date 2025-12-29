@@ -51,6 +51,14 @@ MODEL_CONTEXT_TOKENS: Dict[str, int] = {
     "gpt-4-turbo": 128_000,
     "gpt-4": 8_192,
     "gpt-3.5-turbo": 16_385,
+
+    # Gemini (Google)
+    # Gemini 3 Flash token limits (Vertex AI docs):
+    # - Maximum input tokens: 1,048,576
+    # - Maximum output tokens: 65,536
+    # We use the same context window value here to support prompt truncation helpers.
+    "gemini-3-flash": 1_048_576,
+    "gemini-3-flash-preview": 1_048_576,
 }
 
 # Max *visible* output tokens the API will allow you to request for the model.
@@ -80,6 +88,11 @@ MODEL_MAX_OUTPUT_TOKENS: Dict[str, int] = {
     "gpt-4-turbo": 4_096,
     "gpt-4": 8_192,
     "gpt-3.5-turbo": 4_096,
+
+    # Gemini (Google)
+    # Gemini 3 Flash token limits (Vertex AI docs): maximum output tokens: 65,536
+    "gemini-3-flash": 65_536,
+    "gemini-3-flash-preview": 65_536,
 }
 
 
