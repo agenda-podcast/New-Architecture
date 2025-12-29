@@ -1,30 +1,23 @@
 #!/usr/bin/env python3
-"""
-Release uploader for publishing podcast outputs to GitHub Releases.
+"""scripts/release_uploader.py
 
-Publishes all outputs for each topic to GitHub Releases under topic-scoped
-folders with the following structure:
+GitHub Releases uploader.
 
-    {topic_id}/
-      scripts/
-        {topic_id}-{date}-{code}.script.txt
-        {topic_id}-{date}-{code}.script.json
-        {topic_id}-{date}-{code}.chapters.json
-      audio/
-        {topic_id}-{date}-{code}.m4a
-      video/
-        {topic_id}-{date}-{code}.mp4
-      manifest.json
+**Policy (as requested):**
+- A release must contain **ONLY** the final burned videos.
+- Assets must be **flat** (GitHub Releases are flat by design).
+- Asset names must be **clean**: no tenant, no date, no folders.
 
-Features:
-- Topic-scoped folder namespaces
-- Idempotent uploads (version-bump or overwrite)
-- Manifest with checksums and metadata
-- Predictable asset paths
+Operational behavior:
+- Deletes ALL existing assets in the target release tag.
+- Uploads only final MP4(s) discovered in the topic output directory.
+
+Naming:
+- topic-01-20251229-R8.mp4            -> R8.mp4
+- topic-01-20251229-R1.blender.mp4    -> R1.mp4
 """
 import argparse
 import hashlib
-import zipfile
 import json
 import os
 import sys
@@ -36,6 +29,70 @@ from typing import Dict, List, Any, Optional
 
 # Try to import subprocess for gh CLI usage
 import subprocess
+
+
+def _run_gh(cmd: list[str]) -> tuple[int, str, str]:
+    """Run a gh CLI command and return (rc, stdout, stderr)."""
+    p = subprocess.run(cmd, capture_output=True, text=True)
+    return p.returncode, (p.stdout or "").strip(), (p.stderr or "").strip()
+
+
+def list_release_assets(tag: str) -> List[str]:
+    """Return a list of asset names for a release tag."""
+    rc, out, err = _run_gh(["gh", "release", "view", tag, "--json", "assets", "--jq", ".assets[].name"])
+    if rc != 0:
+        # If release doesn't exist yet, treat as empty.
+        if "release not found" in (err or "").lower():
+            return []
+        raise RuntimeError(f"Failed to list assets for {tag}: {err or out}")
+    assets = [ln.strip() for ln in out.splitlines() if ln.strip()]
+    return assets
+
+
+def _extract_code_from_filename(name: str) -> Optional[str]:
+    """Extract content code (e.g., R8, M1, S2) from expected output filenames."""
+    base = name
+    if base.endswith(".blender.mp4"):
+        base = base[: -len(".blender.mp4")]
+    elif base.endswith(".mp4"):
+        base = base[: -len(".mp4")]
+    parts = base.split("-")
+    if not parts:
+        return None
+    code = parts[-1].strip()
+    if not code:
+        return None
+    return code
+
+
+def find_final_videos(topic_id: str, output_dir: Path, date_str: str) -> List[Path]:
+    """Find final video files for a topic/date.
+
+    Prefers non-blender .mp4 if both exist for the same code.
+    """
+    cand: List[Path] = []
+    # Collect both types
+    cand += sorted(output_dir.glob(f"{topic_id}-{date_str}-*.mp4"))
+    cand += sorted(output_dir.glob(f"{topic_id}-{date_str}-*.blender.mp4"))
+
+    # De-duplicate per code, prefer plain .mp4
+    by_code: Dict[str, Path] = {}
+    for p in cand:
+        if not p.is_file():
+            continue
+        code = _extract_code_from_filename(p.name)
+        if not code:
+            continue
+        prev = by_code.get(code)
+        if prev is None:
+            by_code[code] = p
+            continue
+        # Prefer non-blender mp4
+        if prev.name.endswith(".blender.mp4") and p.name.endswith(".mp4"):
+            by_code[code] = p
+
+    # Stable order by code
+    return [by_code[k] for k in sorted(by_code.keys())]
 
 
 def compute_file_checksum(file_path: Path) -> str:
@@ -153,9 +210,13 @@ def get_file_category(filename: str) -> str:
         return 'other'
 
 
-def upload_to_release(topic_id: str, output_dir: Path, date_str: str,
-                     release_tag: Optional[str] = None,
-                     dry_run: bool = False) -> bool:
+def upload_to_release(
+    topic_id: str,
+    output_dir: Path,
+    date_str: str,
+    release_tag: Optional[str] = None,
+    dry_run: bool = False,
+) -> bool:
     """
     Upload topic outputs to GitHub Release.
     
@@ -171,104 +232,87 @@ def upload_to_release(topic_id: str, output_dir: Path, date_str: str,
     """
     if release_tag is None:
         release_tag = f"{topic_id}-latest"
+    
+    print(f"Preparing release for {topic_id} (tag: {release_tag})")
 
-    # Requirement: publish ONLY final burned videos, and do not upload folders
-    # or auxiliary artifacts (scripts/json/audio/images/etc.). Release assets
-    # are a flat list in GitHub UI, so we upload the MP4 files directly with
-    # their original filenames.
-    video_files = sorted(output_dir.glob(f"{topic_id}-{date_str}-*.mp4"))
-    # Be defensive: exclude Blender compound extension if present as a separate
-    # artifact (it will still match *.mp4). Keep it only if it's the only option.
-    non_blender = [p for p in video_files if not p.name.endswith('.blender.mp4')]
-    if non_blender:
-        video_files = non_blender
-
-    if not video_files:
-        print(f"No burned video files found for {topic_id} on {date_str}")
+    videos = find_final_videos(topic_id, output_dir, date_str)
+    if not videos:
+        print(f"No final videos found for {topic_id} on {date_str}")
         return False
 
-    print(f"Preparing release for {topic_id} (tag: {release_tag})")
-    print("\nVideos to upload:")
-    for p in video_files:
+    print("\nVideos to upload (final only):")
+    for p in videos:
         size_mb = p.stat().st_size / (1024 * 1024)
-        print(f"  - {p.name} ({size_mb:.2f} MB)")
-
+        code = _extract_code_from_filename(p.name) or p.stem
+        print(f"  - {p.name} -> {code}.mp4 ({size_mb:.2f} MB)")
+    
     if dry_run:
         print("\nDry run - no files uploaded")
         return True
     
-    # Check if gh CLI is available
-    try:
-        result = subprocess.run(['gh', '--version'], capture_output=True, timeout=5)
-        if result.returncode != 0:
-            print("ERROR: gh CLI not available")
-            print("Install with: https://cli.github.com/")
-            return False
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        print("ERROR: gh CLI not found or not responding")
-        return False
-    
-    # Check if release exists
-    print(f"\nChecking if release {release_tag} exists...")
-    result = subprocess.run(
-        ['gh', 'release', 'view', release_tag],
-        capture_output=True,
-        text=True
-    )
-    
-    release_exists = result.returncode == 0
+    # Ensure release exists
+    # Hard reset the release so ONLY the desired video assets are present.
+    # This protects against other jobs that previously uploaded zips/folders.
+    reset = os.getenv("RESET_RELEASE", "1").strip().lower() in ("1", "true", "yes", "y", "on")
+    if reset:
+        rc, _, err = _run_gh(["gh", "release", "delete", release_tag, "-y"])
+        if rc == 0:
+            print(f"  ✓ Deleted existing release tag={release_tag} (reset)")
+        else:
+            # Non-fatal: tag may not exist yet.
+            if "release not found" not in (err or "").lower():
+                print(f"  ⓘ Could not delete release (may not exist): {err}")
 
-    if release_exists:
-        print(f"Release {release_tag} exists")
-        # Delete old release to recreate with ONLY MP4 assets.
-        print(f"Deleting existing release {release_tag}...")
-        result = subprocess.run(
-            ['gh', 'release', 'delete', release_tag, '-y'],
-            capture_output=True,
-            text=True
-        )
-        if result.returncode != 0:
-            print(f"Warning: Failed to delete release: {result.stderr}")
+    ensure_release(release_tag, title=f"{topic_id} videos")
 
-    # Create new release
-    print(f"Creating release {release_tag}...")
-    release_title = f"{topic_id} - {date_str}"
-    release_notes = (
-        f"Automated generation for {topic_id} on {date_str}.\n\n"
-        f"This release contains ONLY final burned MP4 videos (no folders, no scripts, no JSON).\n"
-    )
-    
-    result = subprocess.run(
-        [
-            'gh', 'release', 'create', release_tag,
-            '--title', release_title,
-            '--notes', release_notes
-        ],
-        capture_output=True,
-        text=True
-    )
-    
-    if result.returncode != 0:
-        print(f"ERROR: Failed to create release: {result.stderr}")
-        return False
-    
-    print(f"✓ Release {release_tag} created")
-    
-    # Upload ONLY burned videos
-    print("\nUploading videos...")
-    for p in video_files:
-        print(f"  Uploading {p.name}...")
-        result = subprocess.run(
-            ['gh', 'release', 'upload', release_tag, str(p), '--clobber'],
-            capture_output=True,
-            text=True
-        )
-        if result.returncode != 0:
-            print(f"  ERROR: Failed to upload {p.name}: {result.stderr}")
-            return False
-        print(f"  ✓ Uploaded {p.name}")
+    # Delete ALL existing assets so the release contains ONLY final videos.
+    # (Useful even when reset is off.)
+    existing = list_release_assets(release_tag)
+    if existing:
+        print(f"\nCleaning existing release assets ({len(existing)}):")
+        for a in existing:
+            print(f"  - deleting: {a}")
+            if not dry_run:
+                delete_asset(release_tag, a)
 
-    print(f"\n✓ Successfully uploaded {len(video_files)} burned videos to {release_tag}")
+    # Upload videos with clean names (no tenant/date/topic).
+    tmp_dir = output_dir / "_release_tmp"
+    if not dry_run:
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+
+    uploaded = 0
+    for p in videos:
+        code = _extract_code_from_filename(p.name) or p.stem
+        asset_name = f"{code}.mp4"
+
+        if dry_run:
+            print(f"  (dry) upload: {p.name} as {asset_name}")
+            continue
+
+        staged = tmp_dir / asset_name
+        try:
+            # Copy to enforce the desired asset name.
+            import shutil
+
+            shutil.copy2(p, staged)
+            upload_asset(release_tag, staged, clobber=True)
+            uploaded += 1
+        finally:
+            try:
+                if staged.exists():
+                    staged.unlink()
+            except Exception:
+                pass
+
+    # Cleanup tmp dir (best-effort)
+    if not dry_run:
+        try:
+            if tmp_dir.exists():
+                tmp_dir.rmdir()
+        except Exception:
+            pass
+
+    print(f"\nUploaded {uploaded} video asset(s) to {release_tag}")
     return True
 
 

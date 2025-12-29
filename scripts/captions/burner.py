@@ -120,7 +120,16 @@ def _ass_color_rgba(hex_rgb: str, alpha: int) -> str:
 
 
 def _ass_escape(text: str) -> str:
-    t = (text or "").replace("\r\n", "\n").replace("\r", "\n")
+    # Models sometimes emit JSON-escaped sequences *literally* (e.g., \" or \\n).
+    # If we pass those through, users will see backslashes in burned subtitles.
+    t = (text or "")
+    # Normalize double-escaped backslashes first.
+    while "\\\\" in t:
+        t = t.replace("\\\\", "\\")
+    # Unescape common sequences.
+    t = t.replace("\\n", "\n").replace("\\r", "\r").replace("\\t", "\t")
+    t = t.replace('\\"', '"').replace("\\'", "'")
+    t = t.replace("\r\n", "\n").replace("\r", "\n")
     t = t.replace("\\", "\\\\")
     t = t.replace("{", "\\{").replace("}", "\\}")
     t = t.replace("\n", "\\N")
@@ -180,7 +189,7 @@ def _repo_root_from_here() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _discover_frame_png(repo_root: Path, width: Optional[int] = None, height: Optional[int] = None) -> Optional[Path]:
+def _discover_frame_png(repo_root: Path) -> Optional[Path]:
     # Explicit override
     for envk in ("VIDEO_FRAME_PNG", "FRAME_PNG"):
         v = (os.environ.get(envk) or "").strip()
@@ -194,17 +203,6 @@ def _discover_frame_png(repo_root: Path, width: Optional[int] = None, height: Op
     assets = repo_root / "assets"
     if not assets.exists():
         return None
-
-    # Orientation-aware preferred names
-    # Requirement:
-    #  - horizontal videos use assets/frame_horizontal.png
-    #  - vertical videos use assets/frame_vertical.png
-    # If width/height are not provided, fall back to generic discovery logic.
-    if width and height:
-        orient_name = "frame_horizontal.png" if width >= height else "frame_vertical.png"
-        oriented = assets / orient_name
-        if oriented.exists():
-            return oriented
 
     # Preferred name
     preferred = assets / "frame.png"
@@ -456,8 +454,7 @@ class CaptionBurner:
         white = _ass_color_rgba("#FFFFFF", 0)
         black = _ass_color_rgba("#000000", 0)
 
-        # Default title glow to silver (requested: "silver glow").
-        title_glow = os.environ.get("CAPTIONS_TITLE_GLOW_COLOR", "#C0C0C0").strip()
+        title_glow = os.environ.get("CAPTIONS_TITLE_GLOW_COLOR", "#00D1FF").strip()
         glow_primary = _ass_color_rgba("#FFFFFF", glow_aa)
         title_outline = _ass_color_rgba(title_glow, glow_aa)
 
@@ -615,7 +612,7 @@ class CaptionBurner:
         )
 
         repo_root = _repo_root_from_here()
-        frame_png = _discover_frame_png(repo_root, width=width, height=height)
+        frame_png = _discover_frame_png(repo_root)
 
         tmp_out = Path(tempfile.mkstemp(prefix="burn_", suffix=video_path.suffix)[1])
         try:

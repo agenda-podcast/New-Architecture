@@ -88,7 +88,14 @@ def script_to_text(script: Dict[str, Any], config: Dict[str, Any]) -> str:
             if speaker_code not in ("A", "B"):
                 speaker_code = "A"
             speaker_name = voice_a_name if speaker_code == "A" else voice_b_name
-            text = str(dialogue.get("text", "")).strip()
+            text = str(dialogue.get("text", ""))
+            # Remove visible backslashes from JSON-escaped sequences like \" and \n
+            # that sometimes leak into model outputs.
+            while "\\\\" in text:
+                text = text.replace("\\\\", "\\")
+            text = text.replace("\\n", "\n").replace("\\r", "\r").replace("\\t", "\t")
+            text = text.replace('\\"', '"').replace("\\'", "'")
+            text = text.strip()
             if text:
                 lines.append(f"{speaker_name}: {text}")
         lines.append("")
@@ -274,6 +281,17 @@ def generate_multi_format_for_topic(
                 continue
 
             segments = content_item.get("segments") or []
+
+            # Clean dialogue text to avoid visible backslashes in downstream scripts/subtitles
+            # (e.g., JSON-escaped sequences like \" or \n leaking into content).
+            for seg in segments:
+                for d in (seg.get("dialogue") or []):
+                    t = str(d.get("text", ""))
+                    while "\\\\" in t:
+                        t = t.replace("\\\\", "\\")
+                    t = t.replace("\\n", "\n").replace("\\r", "\r").replace("\\t", "\t")
+                    t = t.replace('\\"', '"').replace("\\'", "'")
+                    d["text"] = t
             if not segments:
                 # Last-resort: create a minimal placeholder script so that downstream
                 # steps have a .script.json to work with. This is preferable to a hard
