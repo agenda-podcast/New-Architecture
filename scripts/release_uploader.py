@@ -171,48 +171,28 @@ def upload_to_release(topic_id: str, output_dir: Path, date_str: str,
     """
     if release_tag is None:
         release_tag = f"{topic_id}-latest"
-    
-    print(f"Preparing release for {topic_id} (tag: {release_tag})")
-    
-    # Create manifest
-    manifest = create_manifest(topic_id, output_dir, date_str)
-    
-    if not manifest['files']:
-        print(f"No files found for {topic_id} on {date_str}")
+
+    # Requirement: publish ONLY final burned videos, and do not upload folders
+    # or auxiliary artifacts (scripts/json/audio/images/etc.). Release assets
+    # are a flat list in GitHub UI, so we upload the MP4 files directly with
+    # their original filenames.
+    video_files = sorted(output_dir.glob(f"{topic_id}-{date_str}-*.mp4"))
+    # Be defensive: exclude Blender compound extension if present as a separate
+    # artifact (it will still match *.mp4). Keep it only if it's the only option.
+    non_blender = [p for p in video_files if not p.name.endswith('.blender.mp4')]
+    if non_blender:
+        video_files = non_blender
+
+    if not video_files:
+        print(f"No burned video files found for {topic_id} on {date_str}")
         return False
-    
-    # Save manifest to output directory
-    manifest_path = output_dir / 'manifest.json'
-    with open(manifest_path, 'w') as f:
-        json.dump(manifest, f, indent=2)
-    
-    manifest['files'].append({
-        'name': 'manifest.json',
-        'size_bytes': manifest_path.stat().st_size,
-        'checksum': compute_file_checksum(manifest_path),
-        'type': 'json'
-    })
-    
-    print(f"Manifest created with {len(manifest['files'])} files")
-    
-    # Group files by category
-    files_by_category = {}
-    for file_info in manifest['files']:
-        filename = file_info['name']
-        category = get_file_category(filename)
-        if category not in files_by_category:
-            files_by_category[category] = []
-        files_by_category[category].append(filename)
-    
-    # Print summary
-    print("\nFiles to upload:")
-    for category, files in sorted(files_by_category.items()):
-        print(f"  {category}/")
-        for filename in files:
-            file_path = output_dir / filename
-            size_mb = file_path.stat().st_size / (1024 * 1024)
-            print(f"    - {filename} ({size_mb:.2f} MB)")
-    
+
+    print(f"Preparing release for {topic_id} (tag: {release_tag})")
+    print("\nVideos to upload:")
+    for p in video_files:
+        size_mb = p.stat().st_size / (1024 * 1024)
+        print(f"  - {p.name} ({size_mb:.2f} MB)")
+
     if dry_run:
         print("\nDry run - no files uploaded")
         return True
@@ -237,10 +217,10 @@ def upload_to_release(topic_id: str, output_dir: Path, date_str: str,
     )
     
     release_exists = result.returncode == 0
-    
+
     if release_exists:
         print(f"Release {release_tag} exists")
-        # Delete old release to recreate with new files
+        # Delete old release to recreate with ONLY MP4 assets.
         print(f"Deleting existing release {release_tag}...")
         result = subprocess.run(
             ['gh', 'release', 'delete', release_tag, '-y'],
@@ -249,17 +229,14 @@ def upload_to_release(topic_id: str, output_dir: Path, date_str: str,
         )
         if result.returncode != 0:
             print(f"Warning: Failed to delete release: {result.stderr}")
-    
+
     # Create new release
     print(f"Creating release {release_tag}...")
     release_title = f"{topic_id} - {date_str}"
-    release_notes = f"Automated podcast generation for {topic_id} on {date_str}\n\n"
-    release_notes += f"## Contents\n\n"
-    for category, files in sorted(files_by_category.items()):
-        release_notes += f"### {category.capitalize()}\n"
-        for filename in files:
-            release_notes += f"- `{filename}`\n"
-        release_notes += "\n"
+    release_notes = (
+        f"Automated generation for {topic_id} on {date_str}.\n\n"
+        f"This release contains ONLY final burned MP4 videos (no folders, no scripts, no JSON).\n"
+    )
     
     result = subprocess.run(
         [
@@ -277,32 +254,21 @@ def upload_to_release(topic_id: str, output_dir: Path, date_str: str,
     
     print(f"✓ Release {release_tag} created")
     
-    # Upload files with topic-scoped paths
-    print("\nUploading files...")
-    for file_info in manifest['files']:
-        filename = file_info['name']
-        file_path = output_dir / filename
-        category = get_file_category(filename)
-        
-        # Note: GitHub doesn't support subdirectories in release assets
-        # Files are uploaded with original names, organized via release notes
-        
-        print(f"  Uploading {filename} ({category})...")
-        
+    # Upload ONLY burned videos
+    print("\nUploading videos...")
+    for p in video_files:
+        print(f"  Uploading {p.name}...")
         result = subprocess.run(
-            ['gh', 'release', 'upload', release_tag, str(file_path),
-             '--clobber'],  # Overwrite if exists
+            ['gh', 'release', 'upload', release_tag, str(p), '--clobber'],
             capture_output=True,
             text=True
         )
-        
         if result.returncode != 0:
-            print(f"  ERROR: Failed to upload {filename}: {result.stderr}")
+            print(f"  ERROR: Failed to upload {p.name}: {result.stderr}")
             return False
-        
-        print(f"  ✓ Uploaded {filename}")
-    
-    print(f"\n✓ Successfully uploaded {len(manifest['files'])} files to {release_tag}")
+        print(f"  ✓ Uploaded {p.name}")
+
+    print(f"\n✓ Successfully uploaded {len(video_files)} burned videos to {release_tag}")
     return True
 
 

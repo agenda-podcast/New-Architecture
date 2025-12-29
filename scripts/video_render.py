@@ -3153,15 +3153,19 @@ def render_multi_format_for_topic(topic_id: str, date_str: str,
             ]
             image_cursor = (image_cursor + needed_images) % len(prepared_pool)
 
-            # Materialize selected images into a dedicated directory to preserve order
+            # Materialize selected images into a dedicated directory.
+            # NOTE: Do NOT rename images during materialization.
+            # Images are already placed into a per-video folder (no cross-video conflicts),
+            # and keeping original filenames preserves downstream lookups (e.g., titles).
             video_images_dir = output_dir / f"{code}_images"
             if video_images_dir.exists():
                 shutil.rmtree(video_images_dir)
             video_images_dir.mkdir(parents=True, exist_ok=True)
 
             materialized_images = []
-            for idx, img in enumerate(selected_images, start=1):
-                target = video_images_dir / f"{idx:05d}{img.suffix.lower()}"
+            for img in selected_images:
+                # Keep the original filename as downloaded/prepared.
+                target = video_images_dir / img.name
                 try:
                     target.symlink_to(img.resolve())
                 except OSError as e:
