@@ -98,7 +98,21 @@ def run_for_topic(
             out_dir = get_output_dir(topic_id)
             images_dir = out_dir / IMAGES_SUBDIR
             images_dir.mkdir(parents=True, exist_ok=True)
-            queries = cfg.get("queries", [cfg.get("title", "")])
+            # Prefer canonical search queries emitted by responses_api_generator (saved by scripts module).
+            queries = None
+            try:
+                qpath = out_dir / f"{topic_id}-{date_str}.search_queries.json"
+                if qpath.exists():
+                    import json
+                    data = json.loads(qpath.read_text(encoding="utf-8"))
+                    qs = data.get("search_queries") or []
+                    if isinstance(qs, list) and any(str(x).strip() for x in qs):
+                        queries = [str(x).strip() for x in qs if str(x).strip()]
+            except Exception:
+                queries = None
+
+            if not queries:
+                queries = cfg.get("queries", [cfg.get("title", "")])
             collect_images_for_topic(
                 topic_title=cfg.get("title", topic_id),
                 topic_queries=queries,

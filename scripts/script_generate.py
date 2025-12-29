@@ -88,14 +88,7 @@ def script_to_text(script: Dict[str, Any], config: Dict[str, Any]) -> str:
             if speaker_code not in ("A", "B"):
                 speaker_code = "A"
             speaker_name = voice_a_name if speaker_code == "A" else voice_b_name
-            text = str(dialogue.get("text", ""))
-            # Remove visible backslashes from JSON-escaped sequences like \" and \n
-            # that sometimes leak into model outputs.
-            while "\\\\" in text:
-                text = text.replace("\\\\", "\\")
-            text = text.replace("\\n", "\n").replace("\\r", "\r").replace("\\t", "\t")
-            text = text.replace('\\"', '"').replace("\\'", "'")
-            text = text.strip()
+            text = str(dialogue.get("text", "")).strip()
             if text:
                 lines.append(f"{speaker_name}: {text}")
         lines.append("")
@@ -249,6 +242,33 @@ def generate_multi_format_for_topic(
             with open(pass_a_path, "w", encoding="utf-8") as f:
                 f.write(pass_a_raw + "\n")
 
+        # Save canonical search queries chosen by responses_api_generator.
+        # Downstream image collection must prefer this over topic config queries.
+        search_queries = multi_data.get("search_queries") or []
+        try:
+            if isinstance(search_queries, (list, tuple)):
+                search_queries = [str(q).strip() for q in search_queries if str(q).strip()]
+            elif isinstance(search_queries, str) and search_queries.strip():
+                search_queries = [search_queries.strip()]
+            else:
+                search_queries = []
+        except Exception:
+            search_queries = []
+
+        queries_path = output_dir / f"{topic_id}-{date_str}.search_queries.json"
+        with open(queries_path, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "topic_id": topic_id,
+                    "date": date_str,
+                    "search_queries": search_queries,
+                    "generated_at": datetime.now().isoformat(),
+                },
+                f,
+                indent=2,
+                ensure_ascii=False,
+            )
+
         print(f"Generated {len(content_list)} content pieces")
 
         # Save each generated script
@@ -281,17 +301,6 @@ def generate_multi_format_for_topic(
                 continue
 
             segments = content_item.get("segments") or []
-
-            # Clean dialogue text to avoid visible backslashes in downstream scripts/subtitles
-            # (e.g., JSON-escaped sequences like \" or \n leaking into content).
-            for seg in segments:
-                for d in (seg.get("dialogue") or []):
-                    t = str(d.get("text", ""))
-                    while "\\\\" in t:
-                        t = t.replace("\\\\", "\\")
-                    t = t.replace("\\n", "\n").replace("\\r", "\r").replace("\\t", "\t")
-                    t = t.replace('\\"', '"').replace("\\'", "'")
-                    d["text"] = t
             if not segments:
                 # Last-resort: create a minimal placeholder script so that downstream
                 # steps have a .script.json to work with. This is preferable to a hard

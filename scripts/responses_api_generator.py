@@ -672,50 +672,6 @@ def _gemini_generate_text(*, model: str, prompt: str, json_mode: bool) -> str:
     max_parts = _safe_int(os.getenv("GEMINI_MAX_PARTS"), 80) or 80
     tail_chars = _safe_int(os.getenv("GEMINI_TAIL_CHARS"), 1400) or 1400
 
-    # IMPORTANT COST GUARDRAIL:
-    # If callers request JSON (Pass B in this repo), chunking is dangerous:
-    # - JSON cannot be safely continued without risking syntax breakage.
-    # - Our chunk loop may repeatedly call generateContent trying to "finish" the JSON,
-    #   which is expensive and looks like an infinite loop.
-    # Therefore: when json_mode=True, ALWAYS do a single remote call.
-    if json_mode:
-        if gemini_generate_once is None:
-            raise ImportError("Gemini support is unavailable: google-genai not installed")
-
-        # IMPORTANT: Pass B requires valid JSON. If Gemini output is truncated,
-        # JSON becomes invalid and normalization returns 0 items.
-        # Therefore, default to the model's maximum output tokens unless the
-        # user explicitly overrides via GEMINI_JSON_MAX_TOKENS.
-        default_json_tokens = default_max_output_tokens(model)
-        json_tokens = _safe_int(os.getenv("GEMINI_JSON_MAX_TOKENS"), default_json_tokens)
-        json_tokens = clamp_output_tokens(model, json_tokens)
-        return gemini_generate_once(
-            model=model,
-            prompt=prompt,
-            max_output_tokens=int(json_tokens),
-            temperature=float(os.getenv("GEMINI_TEMPERATURE", "0.2")),
-            json_mode=True,
-        )
-
-    # Optional hard-cap: force a single Gemini remote call.
-    # Default is TRUE to prevent expensive multi-call chunking unless explicitly enabled.
-    single_call = str(os.getenv("GEMINI_SINGLE_CALL", "true")).strip().lower() in ("1", "true", "yes", "y")
-    if single_call:
-        if gemini_generate_once is None:
-            raise ImportError("Gemini support is unavailable: google-genai not installed")
-
-        # Default to the model's maximum output tokens unless overridden.
-        default_one_shot_tokens = default_max_output_tokens(model)
-        one_shot_tokens = _safe_int(os.getenv("GEMINI_SINGLE_CALL_MAX_TOKENS"), default_one_shot_tokens)
-        one_shot_tokens = clamp_output_tokens(model, one_shot_tokens)
-        return gemini_generate_once(
-            model=model,
-            prompt=prompt,
-            max_output_tokens=int(one_shot_tokens),
-            temperature=float(os.getenv("GEMINI_TEMPERATURE", "0.2")),
-            json_mode=bool(json_mode),
-        )
-
     full, _parts = gemini_generate_chunked(
         model=model,
         base_prompt=prompt,
@@ -723,9 +679,36 @@ def _gemini_generate_text(*, model: str, prompt: str, json_mode: bool) -> str:
         max_parts=max_parts,
         tail_chars_for_context=tail_chars,
         temperature=float(os.getenv("GEMINI_TEMPERATURE", "0.2")),
-        json_mode=bool(json_mode),
     )
     return full
+
+
+def _resolve_search_queries(config: Dict[str, Any]) -> List[str]:
+    """Return the canonical list of search queries used by the generator.
+
+    This is the single source of truth for:
+    - Pass A web_search guidance
+    - Downstream Google image collection queries
+
+    Priority order:
+    1) config["queries"] (list[str])
+    2) config["title"] / config["topic"]
+    """
+    raw = config.get("queries") or []
+    queries: List[str] = []
+    if isinstance(raw, (list, tuple)):
+        for q in raw:
+            qs = str(q or "").strip()
+            if qs:
+                queries.append(qs)
+    elif isinstance(raw, str) and raw.strip():
+        queries.append(raw.strip())
+
+    if not queries:
+        topic = str(config.get("title") or config.get("topic") or "").strip()
+        if topic:
+            queries.append(topic)
+    return queries
 
 
 def _build_pass_a_prompt(config: Dict[str, Any], long_specs: List[Dict[str, Any]]) -> str:
@@ -742,7 +725,7 @@ def _build_pass_a_prompt(config: Dict[str, Any], long_specs: List[Dict[str, Any]
     regions = config.get("search_regions") or []
     region_txt = ", ".join([str(r).upper() for r in regions]) if regions else "GLOBAL"
 
-    queries = config.get("queries") or []
+    queries = _resolve_search_queries(config)
     query_txt = "\n".join([f"- {q}" for q in queries]) if queries else "- (use your judgment)"
 
     target_words = 9000
@@ -752,7 +735,8 @@ def _build_pass_a_prompt(config: Dict[str, Any], long_specs: List[Dict[str, Any]
     return f"""You are a newsroom producer and dialogue scriptwriter for an English-language news podcast.
 You MUST use the web_search tool before writing to verify the latest news and to avoid any "knowledge cutoff" disclaimers.
 
-Topic: Most important news for now in the World
+Topic: {topic}
+Topic description: {desc}
 Freshness window: {freshness_window}
 Region focus: {region_txt}
 
@@ -813,8 +797,6 @@ Your task:
 - Create summarized/derived scripts for each requested item below.
 - Do NOT introduce new facts. Use ONLY what is supported by LONG_SCRIPT and SOURCES.
 - Return ALL items in ONE response as STRICT JSON (no markdown).
-- Create unique video title.
-- Create unique video description 150-200 characters length.
 
 Topic: {topic}
 
@@ -834,9 +816,7 @@ JSON OUTPUT SCHEMA (STRICT):
       "code": "M1",
       "type": "medium",
       "script": "HOST_A: ...\\nHOST_B: ...",
-      "max_words": 1200,
-      "video_title": "Some title",
-      "video_description": "Some description"
+      "max_words": 1200
     }}
   ]
 }}
@@ -1159,24 +1139,11 @@ def _run_single_pass_b(
         return {"content": [], "sources": []}
 
     if _is_gemini_model(model):
-        txt = _gemini_generate_text(model=model, prompt=prompt, json_mode=True)
+        txt = _gemini_generate_text(model=model, prompt=prompt, json_mode=False)
         data0 = _extract_first_json_object(txt or "")
         data = _normalize_single_pass_payload(data0)
         if not isinstance(data, dict) or "content" not in data or not isinstance(data.get("content"), list):
-            raise ValueError(
-                "Single-pass output JSON missing 'content' array "
-                f"(model={model}; extracted_type={type(data0)}; extracted_keys={list(data0.keys()) if isinstance(data0, dict) else type(data0)})"
-            )
-
-        # Fail fast if the model "succeeded" but produced zero items; this is the common
-        # cause of downstream "No content generated" errors.
-        if len(data.get("content") or []) == 0:
-            tail = (txt or "")[-1200:].replace("\n", " ").strip()
-            raise RuntimeError(
-                f"Gemini returned no Pass B items after normalization (model={model}). "
-                "This typically means the model did not return valid JSON. "
-                f"Output tail: {tail}"
-            )
+            raise ValueError(f"Single-pass output JSON missing 'content' list (keys={list(data0.keys()) if isinstance(data0, dict) else type(data0)})")
         return data
 
     requested_cfg = config.get("pass_b_max_output_tokens")
@@ -1300,7 +1267,12 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
         sources_text = ""
         script_text = str(pass_a_long_script or "").strip()
         out = _run_pass_b_from_pass_a(client, config, nonlong_specs, sources_text, script_text)
-        return {"content": out.get("content", []), "sources": sources or [], "pass_a_raw_text": ""}
+        return {
+            "content": out.get("content", []),
+            "sources": sources or [],
+            "pass_a_raw_text": "",
+            "search_queries": _resolve_search_queries(config),
+        }
 
     # New style: (config, ...)
     if not args or not isinstance(args[0], dict):
@@ -1318,6 +1290,8 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
         # If source text file exists -> generate mocks based on it.
         # If missing -> still produce minimal mocks so pipeline can continue.
         mock = _make_mock_outputs_from_source_text(config, enabled_specs)
+        if isinstance(mock, dict):
+            mock.setdefault("search_queries", _resolve_search_queries(config))
         return mock
 
     # Determine whether we actually need an OpenAI client. If both passes use Gemini models,
@@ -1420,6 +1394,8 @@ Return STRICT JSON only:
         "content": content,
         "sources": sources_out,
         "pass_a_raw_text": pass_a_raw_text,
+        # Canonical search queries used by the generator. Downstream image collection must use these.
+        "search_queries": _resolve_search_queries(config),
     }
 
 

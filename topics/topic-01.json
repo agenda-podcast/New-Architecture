@@ -1,16 +1,11 @@
 {
   "id": "topic-01",
   "enabled": true,
-  "title": "Global cost of living and rising prices",
-  "description": "Rising prices worldwide are squeezing households as housing food energy and services outpace wages. We discuss causes inflation policy supply shocks and what working families can realistically expect next and how to cope now",
+  "title": "most important news today in the world",
+  "description": "",
   "language": "en",
   "queries": [
-    "global cost of living",
-    "food prices rising",
-    "rent and housing costs",
-    "energy prices",
-    "wages vs inflation",
-    "inflation affects middle class"
+    "news"
   ],
   "search_languages": [
     "en"
