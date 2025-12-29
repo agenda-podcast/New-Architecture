@@ -847,7 +847,22 @@ Targets to generate (all in ONE JSON object):
 {req_txt}
 
 Output format:
-{{ "items": [ {{ "code": "S1", "text": "..." }}, ... ] }}
+{{
+  "content": [
+    {{
+      "code": "S1",
+      "type": "short",
+      "script": "HOST_A: ...\\nHOST_B: ...",
+      "max_words": 350
+    }}
+  ]
+}}
+
+Rules:
+- Use speaker tags HOST_A and HOST_B (do NOT replace with names).
+- Each 'script' must be standalone.
+- Each script must be exactly max_words words (word_count = max_words).
+- Return ONLY the JSON object.
 """
     return prompt
 
@@ -1022,15 +1037,85 @@ def _run_single_pass_b(
     model = _pick_model_pass_b(config)
     prompt = _build_single_pass_b_prompt(config, nonlong_specs)
 
+    def _normalize_single_pass_payload(obj: Any) -> Dict[str, Any]:
+        """Normalize various single-pass JSON shapes into the canonical Pass B shape.
+
+        Canonical shape:
+          {"content": [{"code":..., "type":..., "script":..., "max_words":...}, ...], "sources": [...] }
+
+        We accept (and normalize) common alternate shapes that some models produce:
+          - {"items": [{"code":..., "text"|"script":...}, ...]}
+          - {"result": {"S1": "...", "M1": "...", ...}}
+          - {"content": [...]} already canonical
+        """
+        if not isinstance(obj, dict):
+            return {"content": [], "sources": []}
+
+        # Already canonical.
+        if isinstance(obj.get("content"), list):
+            out = obj
+            if "sources" in out and not isinstance(out.get("sources"), list):
+                out["sources"] = []
+            return out
+
+        # Build a lookup from specs for type/max_words by code.
+        spec_by_code: Dict[str, Dict[str, Any]] = {}
+        for s in nonlong_specs or []:
+            c = str(s.get("code") or "").strip()
+            if c:
+                spec_by_code[c] = s
+
+        def _mk_item(code: str, script: str) -> Dict[str, Any]:
+            s = spec_by_code.get(code, {})
+            return {
+                "code": code,
+                "type": str(s.get("type") or "").strip() or "",
+                "script": script,
+                "max_words": _safe_int(s.get("target_words") or s.get("max_words"), 0) or 0,
+            }
+
+        # Shape: {"items": [...]}
+        items = obj.get("items")
+        if isinstance(items, list):
+            content: List[Dict[str, Any]] = []
+            for it in items:
+                if not isinstance(it, dict):
+                    continue
+                code = str(it.get("code") or "").strip()
+                if not code:
+                    continue
+                script = str(it.get("script") or it.get("text") or "").strip()
+                content.append(_mk_item(code, script))
+            return {"content": content, "sources": []}
+
+        # Shape: {"result": {"S1": "...", ...}}
+        result = obj.get("result")
+        if isinstance(result, dict):
+            content: List[Dict[str, Any]] = []
+            for code, val in result.items():
+                c = str(code or "").strip()
+                if not c:
+                    continue
+                if isinstance(val, str):
+                    script = val.strip()
+                else:
+                    # If value is an object, store pretty JSON so downstream is not broken.
+                    try:
+                        script = json.dumps(val, ensure_ascii=False)
+                    except Exception:
+                        script = str(val)
+                content.append(_mk_item(c, script))
+            return {"content": content, "sources": []}
+
+        # Fallback: treat any dict as a single result blob.
+        return {"content": [], "sources": []}
+
     if _is_gemini_model(model):
         txt = _gemini_generate_text(model=model, prompt=prompt, json_mode=False)
-        data = _extract_first_json_object(txt or "")
-        if not isinstance(data, dict):
-            raise ValueError("Single-pass output is not a JSON object")
-        if "content" not in data or not isinstance(data.get("content"), list):
-            raise ValueError("Single-pass output JSON missing 'content' list")
-        if "sources" in data and not isinstance(data.get("sources"), list):
-            data["sources"] = []
+        data0 = _extract_first_json_object(txt or "")
+        data = _normalize_single_pass_payload(data0)
+        if not isinstance(data, dict) or "content" not in data or not isinstance(data.get("content"), list):
+            raise ValueError(f"Single-pass output JSON missing 'content' list (keys={list(data0.keys()) if isinstance(data0, dict) else type(data0)})")
         return data
 
     requested_cfg = config.get("pass_b_max_output_tokens")
@@ -1056,11 +1141,12 @@ def _run_single_pass_b(
     )
 
     txt = extract_completion_text(resp, model) or ""
-    data = _extract_first_json_object(txt)
+    data0 = _extract_first_json_object(txt)
+    data = _normalize_single_pass_payload(data0)
     if not isinstance(data, dict):
         raise ValueError("Single-pass output is not a JSON object")
     if "content" not in data or not isinstance(data.get("content"), list):
-        raise ValueError("Single-pass output JSON missing 'content' list")
+        raise ValueError(f"Single-pass output JSON missing 'content' list (keys={list(data0.keys()) if isinstance(data0, dict) else type(data0)})")
     if "sources" in data and not isinstance(data.get("sources"), list):
         data["sources"] = []
     return data

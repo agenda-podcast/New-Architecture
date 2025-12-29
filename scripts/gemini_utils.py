@@ -31,6 +31,28 @@ def _is_gemini_model(model: str) -> bool:
     return str(model or "").strip().lower().startswith("gemini-")
 
 
+def _normalize_model(model: str) -> str:
+    """Normalize friendly model aliases to official Gemini API model codes.
+
+    Gemini 3 models are currently exposed as *preview* model IDs in the
+    Gemini Developer API (v1beta). If callers specify the "clean" ID (e.g.,
+    `gemini-3-flash`), we map it to the documented preview ID
+    (`gemini-3-flash-preview`) to avoid 404 NOT_FOUND.
+    """
+
+    m = str(model or "").strip()
+    ml = m.lower()
+
+    # Common Gemini 3 aliases -> preview IDs
+    aliases = {
+        "gemini-3-flash": "gemini-3-flash-preview",
+        "gemini-3-pro": "gemini-3-pro-preview",
+        "gemini-3-pro-image": "gemini-3-pro-image-preview",
+    }
+
+    return aliases.get(ml, m)
+
+
 def _last_n_words(text: str, n: int = 5) -> str:
     words = re.findall(r"\S+", (text or "").strip())
     if not words:
@@ -70,16 +92,33 @@ def gemini_generate_once(
     if not _is_gemini_model(model):
         raise ValueError(f"Not a Gemini model: {model}")
 
+    model = _normalize_model(model)
+
     client = _get_client()
 
-    resp = client.models.generate_content(
-        model=model,
-        contents=prompt,
-        config={
-            "max_output_tokens": int(max_output_tokens),
-            "temperature": float(temperature),
-        },
-    )
+    try:
+        resp = client.models.generate_content(
+            model=model,
+            contents=prompt,
+            config={
+                "max_output_tokens": int(max_output_tokens),
+                "temperature": float(temperature),
+            },
+        )
+    except Exception as e:
+        msg = str(e)
+        # Most common integration error: using a non-existent model ID.
+        if "NOT_FOUND" in msg or "is not found" in msg or "404" in msg:
+            raise RuntimeError(
+                "Gemini model id was rejected by the API. "
+                f"Requested model='{model}'.\n"
+                "For Gemini 3, the Gemini Developer API currently requires the '-preview' model ids "
+                "(e.g., gemini-3-flash-preview, gemini-3-pro-preview). "
+                "Either update your config to a preview id or keep using the short id (gemini-3-flash) "
+                "and let this repo normalize it.\n\n"
+                "If you still see this error, call ListModels in your environment to see which ids your key has access to."
+            ) from e
+        raise
 
     # SDK exposes `text` for convenient access.
     txt = getattr(resp, "text", None)
