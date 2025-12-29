@@ -752,8 +752,7 @@ def _build_pass_a_prompt(config: Dict[str, Any], long_specs: List[Dict[str, Any]
     return f"""You are a newsroom producer and dialogue scriptwriter for an English-language news podcast.
 You MUST use the web_search tool before writing to verify the latest news and to avoid any "knowledge cutoff" disclaimers.
 
-Topic: {topic}
-Topic description: {desc}
+Topic: Most important news for now in the World
 Freshness window: {freshness_window}
 Region focus: {region_txt}
 
@@ -814,6 +813,8 @@ Your task:
 - Create summarized/derived scripts for each requested item below.
 - Do NOT introduce new facts. Use ONLY what is supported by LONG_SCRIPT and SOURCES.
 - Return ALL items in ONE response as STRICT JSON (no markdown).
+- Create unique video title.
+- Create unique video description 150-200 characters length.
 
 Topic: {topic}
 
@@ -833,7 +834,9 @@ JSON OUTPUT SCHEMA (STRICT):
       "code": "M1",
       "type": "medium",
       "script": "HOST_A: ...\\nHOST_B: ...",
-      "max_words": 1200
+      "max_words": 1200,
+      "video_title": "Some title",
+      "video_description": "Some description"
     }}
   ]
 }}

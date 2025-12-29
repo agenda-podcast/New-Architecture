@@ -786,3 +786,32 @@ def build_overlays_ass_from_segments(
         known_names=known_names,
         hide_speaker_names=burner.config.hide_speaker_names,
     )
+
+def _preprocess_frame_png(frame_png: str, width: int, height: int, cache_dir: Path) -> str:
+    """Resize frame PNG to fit target WxH with transparent padding (no crop)."""
+    try:
+        from PIL import Image
+    except Exception:
+        return frame_png
+    src = Path(frame_png)
+    if not src.exists():
+        return frame_png
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    out = cache_dir / f"frame_pre_{src.stem}_{width}x{height}.png"
+    if out.exists():
+        return str(out)
+    img = Image.open(src).convert("RGBA")
+    sw, sh = img.size
+    if sw == width and sh == height:
+        img.save(out)
+        return str(out)
+    scale = min(width / sw, height / sh)
+    nw = max(1, int(sw * scale))
+    nh = max(1, int(sh * scale))
+    img2 = img.resize((nw, nh), Image.LANCZOS)
+    canvas = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    x = (width - nw) // 2
+    y = (height - nh) // 2
+    canvas.alpha_composite(img2, (x, y))
+    canvas.save(out)
+    return str(out)

@@ -2,6 +2,10 @@
 # -*- coding: utf-8 -*-
 """Release uploader (videos-only).
 
+Workflow requirement:
+- This script MUST run as the final step. If other steps upload ZIPs later, they will reappear.
+
+
 Goal:
 - Releases must contain ONLY final burned MP4 videos as flat assets (no folders, no zips, no archives).
 - Even if other steps/modules uploaded .zip assets earlier, this script deletes ALL existing release assets first,
