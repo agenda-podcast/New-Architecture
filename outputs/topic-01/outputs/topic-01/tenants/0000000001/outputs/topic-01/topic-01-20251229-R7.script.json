@@ -1,0 +1,60 @@
+{
+  "title": "Global cost of living and rising prices - R7",
+  "duration_sec": 80,
+  "segments": [
+    {
+      "chapter": 1,
+      "title": "Short",
+      "start_time": 0,
+      "duration": 0,
+      "dialogue": [
+        {
+          "speaker": "A",
+          "text": "What can working families realistically expect next as the global cost of living continues to climb at this rapid pace?"
+        },
+        {
+          "speaker": "B",
+          "text": "That is the question everyone is asking. Unfortunately, the combination of inflation and supply shocks suggests prices may stay high."
+        },
+        {
+          "speaker": "A",
+          "text": "We are seeing housing, food, and energy costs outpace wages, which creates a long-term challenge for many households around the world."
+        },
+        {
+          "speaker": "B",
+          "text": "Policy decisions will play a crucial role in determining whether we see any relief in the coming months or years ahead."
+        },
+        {
+          "speaker": "A",
+          "text": "While some experts hope for a stabilization, others warn that supply shocks could continue to disrupt the global economy for longer."
+        },
+        {
+          "speaker": "B",
+          "text": "This means families must be prepared for a sustained period of high costs and find ways to cope with them now."
+        },
+        {
+          "speaker": "A",
+          "text": "Coping strategies include careful budgeting, reducing unnecessary expenses, and staying informed about the economic factors that drive these rising prices."
+        },
+        {
+          "speaker": "B",
+          "text": "It is also important to look at how services are being impacted, as these costs can often be overlooked in budgets."
+        },
+        {
+          "speaker": "A",
+          "text": "By understanding the causes, we can better anticipate what comes next and make the best decisions for our financial health."
+        },
+        {
+          "speaker": "B",
+          "text": "Staying proactive and informed is the best way to navigate the uncertain future of living."
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-12-29T05:39:03.589035",
+    "num_sources": 0,
+    "content_type": "short",
+    "content_code": "R7"
+  }
+}
