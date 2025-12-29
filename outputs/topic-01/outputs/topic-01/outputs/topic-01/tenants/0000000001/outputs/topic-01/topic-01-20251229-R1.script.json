@@ -4,7 +4,7 @@
   "segments": [
     {
       "chapter": 1,
-      "title": "Short",
+      "title": "Reels",
       "start_time": 0,
       "duration": 0,
       "dialogue": [
@@ -14,47 +14,47 @@
         },
         {
           "speaker": "B",
-          "text": "It is a tough reality. Prices for housing, food, energy, and services are rising much faster than wages can keep up."
+          "text": "It is a tough reality. Prices for housing, food, energy, and services are all rising much faster than wages."
         },
         {
           "speaker": "A",
-          "text": "Exactly. We see inflation driven by complex policy decisions and major supply shocks affecting every corner of the globe right now."
+          "text": "Exactly. Families are feeling the pressure as their paychecks do not stretch as far as they used to lately."
         },
         {
           "speaker": "B",
-          "text": "Working families are feeling the pressure. When the cost of basic necessities spikes, the monthly budget simply does not stretch far enough."
+          "text": "We have to look at the causes. Inflation is a major factor, driven by complex policy decisions and supply shocks."
         },
         {
           "speaker": "A",
-          "text": "So, what caused this? We are looking at a mix of supply chain disruptions and shifts in global economic policy lately."
+          "text": "These supply shocks have disrupted everything from grocery shelves to fuel pumps, making daily life much more expensive for everyone."
         },
         {
           "speaker": "B",
-          "text": "These supply shocks have made energy and food particularly expensive, which then trickles down into the cost of almost every service."
+          "text": "Policy shifts also play a role in how these costs are managed, but the immediate impact on working families is undeniable."
         },
         {
           "speaker": "A",
-          "text": "What can families realistically expect next? Is there any relief on the horizon or should we prepare for more of this?"
+          "text": "So, what can these families realistically expect next? Is there any relief in sight for the average household budget soon?"
         },
         {
           "speaker": "B",
-          "text": "Experts suggest that while some volatility might settle, the high price floor for housing and energy could remain for a while."
+          "text": "It is hard to say for certain, but staying informed about these economic trends is the first step toward coping."
         },
         {
           "speaker": "A",
-          "text": "To cope now, families are forced to prioritize essential spending and look for any possible ways to reduce their energy consumption."
+          "text": "Coping now requires careful planning and understanding where the money goes as these essential services continue to outpace our earnings."
         },
         {
           "speaker": "B",
-          "text": "It is survival."
+          "text": "We must analyze how these factors intertwine to create the current economic landscape."
         }
       ]
     }
   ],
   "metadata": {
-    "generated_at": "2025-12-29T07:05:36.612396",
+    "generated_at": "2025-12-29T07:42:58.993412",
     "num_sources": 0,
-    "content_type": "short",
+    "content_type": "reels",
     "content_code": "R1"
   }
 }
