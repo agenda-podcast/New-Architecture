@@ -60,9 +60,9 @@ from model_limits import clamp_output_tokens, default_max_output_tokens
 from openai_utils import create_openai_completion, extract_completion_text
 
 try:
-    from gemini_utils import gemini_generate_chunked, gemini_generate_once  # type: ignore
+    from gemini_utils import gemini_generate_once, gemini_generate_once  # type: ignore
 except Exception:  # pragma: no cover
-    gemini_generate_chunked = None  # type: ignore
+    gemini_generate_once = None  # type: ignore
     gemini_generate_once = None  # type: ignore
 
 logger = logging.getLogger(__name__)
@@ -695,6 +695,12 @@ def _make_mock_outputs_from_source_text(config: Dict[str, Any], enabled_specs: L
 
     long_specs, nonlong_specs = _enabled_specs_from_content_specs(enabled_specs)
 
+    # Gemini: single request only. Generate ALL items (including long/L1) in one response.
+    if _is_gemini_model(_pick_model_pass_b(config)):
+        all_specs = list(long_specs) + list(nonlong_specs)
+        out_all = _run_gemini_single_pass_all_v2(client, config, all_specs, sources_in)
+        return {"content": out_all.get("content", []), "sources": sources_in, "pass_a_raw_text": ""}
+
     # Long script (Pass A mock)
     pass_a_raw_text = ""
     long_script_text = ""
@@ -809,7 +815,7 @@ def _gemini_generate_text(*, model: str, prompt: str, json_mode: bool) -> str:
     surfaces have practical size limits). Chunking uses the user-required
     continuation rule: "Provide next part after <last 5 words>".
     """
-    if gemini_generate_chunked is None:
+    if gemini_generate_once is None:
         raise ImportError("Gemini support is unavailable: google-genai not installed")
 
     # Keep each part small enough for CI surfaces. Default conservative values.
@@ -817,7 +823,7 @@ def _gemini_generate_text(*, model: str, prompt: str, json_mode: bool) -> str:
     max_parts = _safe_int(os.getenv("GEMINI_MAX_PARTS"), 80) or 80
     tail_chars = _safe_int(os.getenv("GEMINI_TAIL_CHARS"), 1400) or 1400
 
-    full, _parts = gemini_generate_chunked(
+    full, _parts = gemini_generate_once(
         model=model,
         base_prompt=prompt,
         max_output_tokens_per_part=per_part,
@@ -1449,6 +1455,68 @@ def _run_gemini_single_pass_all(client, config: dict, specs: list[dict], sources
         raise RuntimeError("Gemini single-pass returned JSON without a 'content' list.")
 
     # Enforce publish metadata constraints and uniqueness.
+    _enforce_unique_video_metadata(out.get("content") or [])
+    return out
+
+
+
+def _run_gemini_single_pass_all_v2(client, config: dict, specs: list[dict], sources_in: list[dict]) -> dict:
+    """Gemini: ONE request, returns STRICT JSON with all requested items (including L1 if requested)."""
+    model = _pick_model_pass_b(config)
+    max_out = clamp_output_tokens(model, default_max_output_tokens(model))
+
+    # Build requested items list with required word counts (no Pass A/Pass B special casing).
+    req_lines = []
+    for s in specs:
+        code = str(s.get("code") or "").strip()
+        typ = str(s.get("type") or "").strip()
+        words = s.get("words") or s.get("target_words") or s.get("min_words") or s.get("max_words") or ""
+        if isinstance(words, (int, float)):
+            words = int(words)
+        req_lines.append(f'- {code}: type="{typ}", words={words}')
+
+    req_txt = "\n".join(req_lines)
+
+    prompt = f"""System: Return only valid JSON.
+
+You are generating multiple content items based on SOURCE_ITEMS.
+Do NOT introduce any new facts beyond SOURCE_ITEMS.
+If detail is missing/unclear, omit it.
+
+Requested items:
+{req_txt}
+
+SOURCE_ITEMS (JSON):
+{json.dumps(sources_in, ensure_ascii=False)}
+
+Return STRICT JSON only:
+{{"content":[{{"code":"S1","type":"short","script":"...","video_title":"...","video_description":"...","video_tags":"tag1, tag2"}}]}}
+"""
+
+    txt = _gemini_generate_text(
+        model=model,
+        prompt=prompt,
+        max_output_tokens=max_out,
+        temperature=float(config.get("temperature", 0.2)),
+        json_mode=True,
+    )
+
+    data: dict = {}
+    if isinstance(txt, str):
+        try:
+            data = json.loads(txt)
+        except Exception:
+            txt_repaired = _json_escape_control_chars_in_strings(txt)
+            try:
+                data = json.loads(txt_repaired)
+            except Exception:
+                extracted = _extract_first_json_object(txt_repaired) or _extract_first_json_object(txt)
+                if isinstance(extracted, dict):
+                    data = extracted
+                else:
+                    raise
+
+    out = _normalize_single_pass_payload(data=data, config=config, model=model)
     _enforce_unique_video_metadata(out.get("content") or [])
     return out
 

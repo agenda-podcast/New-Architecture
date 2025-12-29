@@ -129,11 +129,8 @@ def gemini_generate_once(
             "temperature": float(temperature),
             **({"responseMimeType": "application/json"} if json_mode else {}),
         },
-        # Hard-disable tool usage / AFC style loops.
-        "tools": [],
-        "toolConfig": {"functionCallingConfig": {"mode": "NONE"}},
-        "automaticFunctionCalling": {"disable": True},
     }
+
 
     # Single, non-streaming request.
     with httpx.Client(timeout=120.0) as client:
