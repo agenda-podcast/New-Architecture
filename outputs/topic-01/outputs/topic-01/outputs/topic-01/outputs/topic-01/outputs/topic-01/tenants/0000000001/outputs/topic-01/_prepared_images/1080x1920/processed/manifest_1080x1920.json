@@ -1,0 +1,356 @@
+{
+  "target_width": 1080,
+  "target_height": 1920,
+  "entries": [
+    {
+      "source_name": "image_000.jpg",
+      "source_size": 50416,
+      "source_mtime": 1766986745.4657986,
+      "mode": "composite",
+      "out_file": "image_000.jpg"
+    },
+    {
+      "source_name": "image_005.jpg",
+      "source_size": 32154,
+      "source_mtime": 1766986745.8418005,
+      "mode": "composite",
+      "out_file": "image_005.jpg"
+    },
+    {
+      "source_name": "image_006.jpg",
+      "source_size": 66372,
+      "source_mtime": 1766986745.8828008,
+      "mode": "composite",
+      "out_file": "image_006.jpg"
+    },
+    {
+      "source_name": "image_008.jpg",
+      "source_size": 79401,
+      "source_mtime": 1766986746.0688019,
+      "mode": "composite",
+      "out_file": "image_008.jpg"
+    },
+    {
+      "source_name": "image_009.jpg",
+      "source_size": 117721,
+      "source_mtime": 1766986746.1708024,
+      "mode": "composite",
+      "out_file": "image_009.jpg"
+    },
+    {
+      "source_name": "image_010.jpg",
+      "source_size": 132739,
+      "source_mtime": 1766986746.268803,
+      "mode": "composite",
+      "out_file": "image_010.jpg"
+    },
+    {
+      "source_name": "image_012.jpg",
+      "source_size": 68720,
+      "source_mtime": 1766986746.4038036,
+      "mode": "composite",
+      "out_file": "image_012.jpg"
+    },
+    {
+      "source_name": "image_014.jpg",
+      "source_size": 31046,
+      "source_mtime": 1766986746.7828057,
+      "mode": "composite",
+      "out_file": "image_014.jpg"
+    },
+    {
+      "source_name": "image_015.jpg",
+      "source_size": 52514,
+      "source_mtime": 1766986746.882806,
+      "mode": "composite",
+      "out_file": "image_015.jpg"
+    },
+    {
+      "source_name": "image_016.jpg",
+      "source_size": 141118,
+      "source_mtime": 1766986747.3508086,
+      "mode": "composite",
+      "out_file": "image_016.jpg"
+    },
+    {
+      "source_name": "image_018.jpg",
+      "source_size": 51246,
+      "source_mtime": 1766986747.4518092,
+      "mode": "composite",
+      "out_file": "image_018.jpg"
+    },
+    {
+      "source_name": "image_019.jpg",
+      "source_size": 52415,
+      "source_mtime": 1766986747.5528097,
+      "mode": "composite",
+      "out_file": "image_019.jpg"
+    },
+    {
+      "source_name": "image_020.jpg",
+      "source_size": 94198,
+      "source_mtime": 1766986747.9248116,
+      "mode": "composite",
+      "out_file": "image_020.jpg"
+    },
+    {
+      "source_name": "image_021.jpg",
+      "source_size": 111578,
+      "source_mtime": 1766986748.4198143,
+      "mode": "composite",
+      "out_file": "image_021.jpg"
+    },
+    {
+      "source_name": "image_022.jpg",
+      "source_size": 103768,
+      "source_mtime": 1766986748.9338171,
+      "mode": "composite",
+      "out_file": "image_022.jpg"
+    },
+    {
+      "source_name": "image_023.jpg",
+      "source_size": 97085,
+      "source_mtime": 1766986749.0358176,
+      "mode": "composite",
+      "out_file": "image_023.jpg"
+    },
+    {
+      "source_name": "image_024.jpg",
+      "source_size": 32168,
+      "source_mtime": 1766986749.5528204,
+      "mode": "composite",
+      "out_file": "image_024.jpg"
+    },
+    {
+      "source_name": "image_025.jpg",
+      "source_size": 116522,
+      "source_mtime": 1766986749.9808228,
+      "mode": "composite",
+      "out_file": "image_025.jpg"
+    },
+    {
+      "source_name": "image_026.jpg",
+      "source_size": 143148,
+      "source_mtime": 1766986750.5008254,
+      "mode": "composite",
+      "out_file": "image_026.jpg"
+    },
+    {
+      "source_name": "image_027.jpg",
+      "source_size": 122132,
+      "source_mtime": 1766986750.9018276,
+      "mode": "composite",
+      "out_file": "image_027.jpg"
+    },
+    {
+      "source_name": "image_028.jpg",
+      "source_size": 143882,
+      "source_mtime": 1766986751.3698301,
+      "mode": "composite",
+      "out_file": "image_028.jpg"
+    },
+    {
+      "source_name": "image_029.jpg",
+      "source_size": 59175,
+      "source_mtime": 1766986751.4658306,
+      "mode": "composite",
+      "out_file": "image_029.jpg"
+    },
+    {
+      "source_name": "image_030.jpg",
+      "source_size": 96479,
+      "source_mtime": 1766986751.7718322,
+      "mode": "composite",
+      "out_file": "image_030.jpg"
+    },
+    {
+      "source_name": "image_031.jpg",
+      "source_size": 55142,
+      "source_mtime": 1766986751.8658328,
+      "mode": "composite",
+      "out_file": "image_031.jpg"
+    },
+    {
+      "source_name": "image_032.jpg",
+      "source_size": 96895,
+      "source_mtime": 1766986751.9628334,
+      "mode": "composite",
+      "out_file": "image_032.jpg"
+    },
+    {
+      "source_name": "image_033.jpg",
+      "source_size": 83224,
+      "source_mtime": 1766986752.0178335,
+      "mode": "composite",
+      "out_file": "image_033.jpg"
+    },
+    {
+      "source_name": "image_034.jpg",
+      "source_size": 49793,
+      "source_mtime": 1766986752.067834,
+      "mode": "composite",
+      "out_file": "image_034.jpg"
+    },
+    {
+      "source_name": "image_036.jpg",
+      "source_size": 47206,
+      "source_mtime": 1766986752.6078367,
+      "mode": "composite",
+      "out_file": "image_036.jpg"
+    },
+    {
+      "source_name": "image_037.jpg",
+      "source_size": 81126,
+      "source_mtime": 1766986752.7028372,
+      "mode": "composite",
+      "out_file": "image_037.jpg"
+    },
+    {
+      "source_name": "image_038.jpg",
+      "source_size": 39879,
+      "source_mtime": 1766986752.8018377,
+      "mode": "composite",
+      "out_file": "image_038.jpg"
+    },
+    {
+      "source_name": "image_039.jpg",
+      "source_size": 45472,
+      "source_mtime": 1766986752.9018383,
+      "mode": "composite",
+      "out_file": "image_039.jpg"
+    },
+    {
+      "source_name": "image_040.jpg",
+      "source_size": 94646,
+      "source_mtime": 1766986752.9968388,
+      "mode": "composite",
+      "out_file": "image_040.jpg"
+    },
+    {
+      "source_name": "image_041.jpg",
+      "source_size": 50276,
+      "source_mtime": 1766986753.0418391,
+      "mode": "composite",
+      "out_file": "image_041.jpg"
+    },
+    {
+      "source_name": "image_042.jpg",
+      "source_size": 55966,
+      "source_mtime": 1766986753.5198417,
+      "mode": "composite",
+      "out_file": "image_042.jpg"
+    },
+    {
+      "source_name": "image_043.jpg",
+      "source_size": 33822,
+      "source_mtime": 1766986753.9718447,
+      "mode": "composite",
+      "out_file": "image_043.jpg"
+    },
+    {
+      "source_name": "image_044.jpg",
+      "source_size": 66960,
+      "source_mtime": 1766986754.505848,
+      "mode": "composite",
+      "out_file": "image_044.jpg"
+    },
+    {
+      "source_name": "image_045.jpg",
+      "source_size": 83656,
+      "source_mtime": 1766986754.6048486,
+      "mode": "composite",
+      "out_file": "image_045.jpg"
+    },
+    {
+      "source_name": "image_046.jpg",
+      "source_size": 50540,
+      "source_mtime": 1766986755.0588515,
+      "mode": "composite",
+      "out_file": "image_046.jpg"
+    },
+    {
+      "source_name": "image_047.jpg",
+      "source_size": 84529,
+      "source_mtime": 1766986755.1618521,
+      "mode": "composite",
+      "out_file": "image_047.jpg"
+    },
+    {
+      "source_name": "image_048.jpg",
+      "source_size": 33224,
+      "source_mtime": 1766986755.2108524,
+      "mode": "composite",
+      "out_file": "image_048.jpg"
+    },
+    {
+      "source_name": "image_049.jpg",
+      "source_size": 56002,
+      "source_mtime": 1766986755.7168555,
+      "mode": "composite",
+      "out_file": "image_049.jpg"
+    },
+    {
+      "source_name": "image_002.jpeg",
+      "source_size": 12888,
+      "source_mtime": 1766986745.7228,
+      "mode": "composite",
+      "out_file": "image_002.jpeg"
+    },
+    {
+      "source_name": "image_007.jpeg",
+      "source_size": 46036,
+      "source_mtime": 1766986745.938801,
+      "mode": "composite",
+      "out_file": "image_007.jpeg"
+    },
+    {
+      "source_name": "image_001.webp",
+      "source_size": 15036,
+      "source_mtime": 1766986745.6637995,
+      "mode": "composite",
+      "out_file": "image_001.webp"
+    },
+    {
+      "source_name": "image_003.webp",
+      "source_size": 11060,
+      "source_mtime": 1766986745.7538002,
+      "mode": "composite",
+      "out_file": "image_003.webp"
+    },
+    {
+      "source_name": "image_004.webp",
+      "source_size": 12888,
+      "source_mtime": 1766986745.8028004,
+      "mode": "composite",
+      "out_file": "image_004.webp"
+    },
+    {
+      "source_name": "image_011.webp",
+      "source_size": 16750,
+      "source_mtime": 1766986746.306803,
+      "mode": "composite",
+      "out_file": "image_011.webp"
+    },
+    {
+      "source_name": "image_013.webp",
+      "source_size": 21844,
+      "source_mtime": 1766986746.4388037,
+      "mode": "composite",
+      "out_file": "image_013.webp"
+    },
+    {
+      "source_name": "image_017.webp",
+      "source_size": 23722,
+      "source_mtime": 1766986747.3858087,
+      "mode": "composite",
+      "out_file": "image_017.webp"
+    },
+    {
+      "source_name": "image_035.webp",
+      "source_size": 10430,
+      "source_mtime": 1766986752.101834,
+      "mode": "composite",
+      "out_file": "image_035.webp"
+    }
+  ]
+}

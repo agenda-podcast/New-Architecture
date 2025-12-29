@@ -1,0 +1,179 @@
+{
+  "captions": [
+    {
+      "index": 1,
+      "start": 0.0,
+      "end": 4.653824850000001,
+      "text": "What can working families realistically\nexpect next as the global\ncost of living continues to",
+      "speaker": "A"
+    },
+    {
+      "index": 2,
+      "start": 4.653824850000001,
+      "end": 6.205099800000001,
+      "text": "climb at this rapid pace?",
+      "speaker": "A"
+    },
+    {
+      "index": 3,
+      "start": 6.705099800000001,
+      "end": 11.358924650000002,
+      "text": "That is the question everyone\nis asking. Unfortunately, the combination\nof inflation and supply shocks",
+      "speaker": "B"
+    },
+    {
+      "index": 4,
+      "start": 11.358924650000002,
+      "end": 12.910199600000002,
+      "text": "suggests prices may stay high.",
+      "speaker": "B"
+    },
+    {
+      "index": 5,
+      "start": 13.410199600000002,
+      "end": 18.06402445,
+      "text": "We are seeing housing, food,\nand energy costs outpace wages,\nwhich creates a long-term challenge",
+      "speaker": "A"
+    },
+    {
+      "index": 6,
+      "start": 18.06402445,
+      "end": 19.925554390000002,
+      "text": "for many households around the\nworld.",
+      "speaker": "A"
+    },
+    {
+      "index": 7,
+      "start": 20.425554390000002,
+      "end": 25.07937924,
+      "text": "Policy decisions will play a\ncrucial role in determining whether\nwe see any relief in",
+      "speaker": "B"
+    },
+    {
+      "index": 8,
+      "start": 25.07937924,
+      "end": 26.940909180000002,
+      "text": "the coming months or years\nahead.",
+      "speaker": "B"
+    },
+    {
+      "index": 9,
+      "start": 27.440909180000002,
+      "end": 32.094734030000005,
+      "text": "While some experts hope for\na stabilization, others warn that\nsupply shocks could continue to",
+      "speaker": "A"
+    },
+    {
+      "index": 10,
+      "start": 32.094734030000005,
+      "end": 33.95626397,
+      "text": "disrupt the global economy for\nlonger.",
+      "speaker": "A"
+    },
+    {
+      "index": 11,
+      "start": 34.45626397,
+      "end": 39.11008882,
+      "text": "This means families must be\nprepared for a sustained period\nof high costs and find",
+      "speaker": "B"
+    },
+    {
+      "index": 12,
+      "start": 39.11008882,
+      "end": 40.97161876,
+      "text": "ways to cope with them\nnow.",
+      "speaker": "B"
+    },
+    {
+      "index": 13,
+      "start": 41.47161876,
+      "end": 46.12544361,
+      "text": "Coping strategies include careful budgeting,\nreducing unnecessary expenses, and staying\ninformed about the economic factors",
+      "speaker": "A"
+    },
+    {
+      "index": 14,
+      "start": 46.12544361,
+      "end": 47.67671856,
+      "text": "that drive these rising prices.",
+      "speaker": "A"
+    },
+    {
+      "index": 15,
+      "start": 48.17671856,
+      "end": 52.83054341,
+      "text": "It is also important to\nlook at how services are\nbeing impacted, as these costs",
+      "speaker": "B"
+    },
+    {
+      "index": 16,
+      "start": 52.83054341,
+      "end": 54.692073349999994,
+      "text": "can often be overlooked in\nbudgets.",
+      "speaker": "B"
+    },
+    {
+      "index": 17,
+      "start": 55.192073349999994,
+      "end": 59.84589819999999,
+      "text": "By understanding the causes, we\ncan better anticipate what comes\nnext and make the best",
+      "speaker": "A"
+    },
+    {
+      "index": 18,
+      "start": 59.84589819999999,
+      "end": 61.39717314999999,
+      "text": "decisions for our financial health.",
+      "speaker": "A"
+    },
+    {
+      "index": 19,
+      "start": 61.89717314999999,
+      "end": 66.55099799999999,
+      "text": "Staying proactive and informed is\nthe best way to navigate\nthe uncertain future of living.",
+      "speaker": "B"
+    }
+  ],
+  "dialogue_chunks": [
+    {
+      "speaker": "A",
+      "text": "What can working families realistically expect next as the global cost of living continues to climb at this rapid pace?"
+    },
+    {
+      "speaker": "B",
+      "text": "That is the question everyone is asking. Unfortunately, the combination of inflation and supply shocks suggests prices may stay high."
+    },
+    {
+      "speaker": "A",
+      "text": "We are seeing housing, food, and energy costs outpace wages, which creates a long-term challenge for many households around the world."
+    },
+    {
+      "speaker": "B",
+      "text": "Policy decisions will play a crucial role in determining whether we see any relief in the coming months or years ahead."
+    },
+    {
+      "speaker": "A",
+      "text": "While some experts hope for a stabilization, others warn that supply shocks could continue to disrupt the global economy for longer."
+    },
+    {
+      "speaker": "B",
+      "text": "This means families must be prepared for a sustained period of high costs and find ways to cope with them now."
+    },
+    {
+      "speaker": "A",
+      "text": "Coping strategies include careful budgeting, reducing unnecessary expenses, and staying informed about the economic factors that drive these rising prices."
+    },
+    {
+      "speaker": "B",
+      "text": "It is also important to look at how services are being impacted, as these costs can often be overlooked in budgets."
+    },
+    {
+      "speaker": "A",
+      "text": "By understanding the causes, we can better anticipate what comes next and make the best decisions for our financial health."
+    },
+    {
+      "speaker": "B",
+      "text": "Staying proactive and informed is the best way to navigate the uncertain future of living."
+    }
+  ]
+}
