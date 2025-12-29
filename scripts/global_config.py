@@ -590,6 +590,12 @@ def validate_topic_config(config: dict) -> dict:
     # TTS chunking configuration
     if 'tts_use_chunking' in config and not isinstance(config['tts_use_chunking'], bool):
         results['errors'].append("tts_use_chunking field must be a boolean (true/false)")
+
+    # LLM provider hints
+    llm_model = str(config.get('llm_model') or config.get('llm_model_pass_b') or config.get('llm_model_pass_a') or '').strip()
+    if llm_model.lower().startswith('gemini-'):
+        if not os.getenv('GOOGLE_API_KEY'):
+            results['warnings'].append("Topic uses a Gemini model but GOOGLE_API_KEY is not set")
     
     # Content types (for multi-format)
     # Backwards compatible:

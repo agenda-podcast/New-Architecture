@@ -104,6 +104,7 @@ def check_dependencies(result: ValidationResult) -> None:
     optional_packages = {
         'piper': 'Local TTS (Piper)',
         'google.cloud.texttospeech': 'Premium TTS (Google Cloud)',
+        'google.genai': 'Gemini Developer API (google-genai)',
         'bs4': 'HTML parsing (deprecated - not used in v2 architecture)'
     }
     
@@ -129,6 +130,8 @@ def check_dependencies(result: ValidationResult) -> None:
                 import piper
             elif package == 'google.cloud.texttospeech':
                 import google.cloud.texttospeech
+            elif package == 'google.genai':
+                from google import genai  # type: ignore
             elif package == 'bs4':
                 import bs4
             result.add_success(f"Optional: {package} ({description})")

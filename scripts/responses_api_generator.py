@@ -59,6 +59,12 @@ except Exception:  # pragma: no cover
 from model_limits import clamp_output_tokens, default_max_output_tokens
 from openai_utils import create_openai_completion, extract_completion_text
 
+try:
+    from gemini_utils import gemini_generate_chunked, gemini_generate_once  # type: ignore
+except Exception:  # pragma: no cover
+    gemini_generate_chunked = None  # type: ignore
+    gemini_generate_once = None  # type: ignore
+
 logger = logging.getLogger(__name__)
 
 
@@ -84,6 +90,10 @@ def _truthy(v: Any) -> bool:
 
 def _normalize_ws(s: str) -> str:
     return re.sub(r"[ \t]+\n", "\n", (s or "").strip())
+
+
+def _is_gemini_model(model: str) -> bool:
+    return str(model or "").strip().lower().startswith("gemini-")
 
 
 def _count_words(s: str) -> int:
@@ -612,11 +622,65 @@ def _make_mock_outputs_from_source_text(config: Dict[str, Any], enabled_specs: L
 # ---------------------------------------------------------------------------
 
 def _pick_model_pass_a(config: Dict[str, Any]) -> str:
-    return (os.getenv("PASS_A_MODEL") or config.get("gpt_model_pass_a") or "gpt-5.2-pro").strip()
+    # Prefer explicit env override, then any unified LLM model, then OpenAI-specific key.
+    return (
+        os.getenv("PASS_A_MODEL")
+        or config.get("llm_model_pass_a")
+        or config.get("llm_model")
+        or config.get("gpt_model_pass_a")
+        or "gpt-5.2-pro"
+    ).strip()
 
 
 def _pick_model_pass_b(config: Dict[str, Any]) -> str:
-    return (os.getenv("PASS_B_MODEL") or config.get("gpt_model_pass_b") or "gpt-5-nano").strip()
+    # Prefer explicit env override, then any unified LLM model, then OpenAI-specific key.
+    return (
+        os.getenv("PASS_B_MODEL")
+        or config.get("llm_model_pass_b")
+        or config.get("llm_model")
+        or config.get("gpt_model_pass_b")
+        or "gpt-5-nano"
+    ).strip()
+
+
+def _is_gemini_model(model: str) -> bool:
+    return str(model or "").strip().lower().startswith("gemini-")
+
+
+def _gemini_part_tokens(env_key: str, default: int) -> int:
+    v = os.getenv(env_key, "").strip()
+    if not v:
+        return int(default)
+    try:
+        return max(64, int(v))
+    except Exception:
+        return int(default)
+
+
+def _gemini_generate_text(*, model: str, prompt: str, json_mode: bool) -> str:
+    """Gemini generation with chunking.
+
+    We intentionally chunk Gemini outputs for CI stability (GitHub Actions output
+    surfaces have practical size limits). Chunking uses the user-required
+    continuation rule: "Provide next part after <last 5 words>".
+    """
+    if gemini_generate_chunked is None:
+        raise ImportError("Gemini support is unavailable: google-genai not installed")
+
+    # Keep each part small enough for CI surfaces. Default conservative values.
+    per_part = _gemini_part_tokens("GEMINI_PART_MAX_TOKENS", 1200)
+    max_parts = _safe_int(os.getenv("GEMINI_MAX_PARTS"), 80) or 80
+    tail_chars = _safe_int(os.getenv("GEMINI_TAIL_CHARS"), 1400) or 1400
+
+    full, _parts = gemini_generate_chunked(
+        model=model,
+        base_prompt=prompt,
+        max_output_tokens_per_part=per_part,
+        max_parts=max_parts,
+        tail_chars_for_context=tail_chars,
+        temperature=float(os.getenv("GEMINI_TEMPERATURE", "0.2")),
+    )
+    return full
 
 
 def _build_pass_a_prompt(config: Dict[str, Any], long_specs: List[Dict[str, Any]]) -> str:
@@ -853,6 +917,14 @@ def _run_pass_a(
     model = _pick_model_pass_a(config)
     prompt = _build_pass_a_prompt(config, long_specs)
 
+    # Gemini path (chunked to fit CI constraints).
+    if _is_gemini_model(model):
+        raw_text = _gemini_generate_text(model=model, prompt=prompt, json_mode=False)
+        raw_text = raw_text.strip() if isinstance(raw_text, str) else ""
+        sources_text, script_text = _parse_pass_a_text(raw_text)
+        sources_list = _sources_text_to_list(sources_text)
+        return sources_list, sources_text, script_text, raw_text
+
     requested_cfg = config.get("pass_a_max_output_tokens")
     force_max = str(os.getenv("OPENAI_FORCE_MAX_OUTPUT", "false")).strip().lower() in ("1", "true", "yes", "y")
     if requested_cfg is None and not force_max:
@@ -897,6 +969,16 @@ def _run_pass_b_from_pass_a(
     model = _pick_model_pass_b(config)
     prompt = _build_pass_b_prompt_from_pass_a(config, nonlong_specs, sources_text, script_text)
 
+    # Gemini path: always a single logical Result for all non-long types, retrieved in small parts.
+    if _is_gemini_model(model):
+        txt = _gemini_generate_text(model=model, prompt=prompt, json_mode=True)
+        data = json.loads(txt) if isinstance(txt, str) else {}
+        if not isinstance(data, dict):
+            raise ValueError("Pass B output is not a JSON object")
+        if "content" not in data or not isinstance(data.get("content"), list):
+            raise ValueError("Pass B output JSON missing 'content' list")
+        return data
+
     requested_cfg = config.get("pass_b_max_output_tokens")
     force_max = str(os.getenv("OPENAI_FORCE_MAX_OUTPUT", "false")).strip().lower() in ("1", "true", "yes", "y")
     if requested_cfg is None and not force_max:
@@ -939,6 +1021,17 @@ def _run_single_pass_b(
     """
     model = _pick_model_pass_b(config)
     prompt = _build_single_pass_b_prompt(config, nonlong_specs)
+
+    if _is_gemini_model(model):
+        txt = _gemini_generate_text(model=model, prompt=prompt, json_mode=False)
+        data = _extract_first_json_object(txt or "")
+        if not isinstance(data, dict):
+            raise ValueError("Single-pass output is not a JSON object")
+        if "content" not in data or not isinstance(data.get("content"), list):
+            raise ValueError("Single-pass output JSON missing 'content' list")
+        if "sources" in data and not isinstance(data.get("sources"), list):
+            data["sources"] = []
+        return data
 
     requested_cfg = config.get("pass_b_max_output_tokens")
     force_max = str(os.getenv("OPENAI_FORCE_MAX_OUTPUT", "false")).strip().lower() in ("1", "true", "yes", "y")
@@ -994,6 +1087,12 @@ def _run_pass_b_grouped(
     """
     if not nonlong_specs:
         return {"content": [], "sources": []}
+
+    # Gemini: user requested a single logical Result across all content types.
+    # We therefore bypass grouping and rely on Gemini chunking continuation.
+    model = _pick_model_pass_b(config)
+    if _is_gemini_model(model):
+        return _run_single_pass_b(client, config, nonlong_specs)
 
     def _type(s: Dict[str, Any]) -> str:
         return str(s.get("type") or "").strip().lower()
@@ -1074,13 +1173,18 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
         mock = _make_mock_outputs_from_source_text(config, enabled_specs)
         return mock
 
+    # Determine whether we actually need an OpenAI client. If both passes use Gemini models,
+    # we do not require OPENAI_API_KEY at all.
+    model_a = _pick_model_pass_a(config)
+    model_b = _pick_model_pass_b(config)
+    needs_openai = not (_is_gemini_model(model_a) and _is_gemini_model(model_b))
+
     # Real mode: create OpenAI client if needed
-    if client is None:
+    if client is None and needs_openai:
         if OpenAI is None:
             raise ImportError("openai package is required. Install with: pip install openai")
         api_key = os.getenv("OPENAI_API_KEY") or os.getenv("GPT_KEY")
         # Long-form script generation can take minutes for large outputs.
-        # Increase timeouts and retries to reduce transient disconnect failures in CI.
         timeout_s = float(os.getenv("OPENAI_TIMEOUT", "600"))
         max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "0"))  # default 0 to enforce single-request per pass
         client = OpenAI(api_key=api_key, timeout=timeout_s, max_retries=max_retries)
@@ -1142,16 +1246,20 @@ Return STRICT JSON only:
             requested_out = _safe_int(config.get("pass_b_max_output_tokens"), default_max_output_tokens(model))
             max_out = clamp_output_tokens(model, requested_out)
 
-            resp = create_openai_completion(
-                client=client,
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                tools=None,
-                json_mode=True,
-                max_completion_tokens=max_out,
-            )
-            txt = extract_completion_text(resp, model)
-            out_b = json.loads(txt) if isinstance(txt, str) else {}
+            if _is_gemini_model(model):
+                txt = _gemini_generate_text(model=model, prompt=prompt, json_mode=True)
+                out_b = json.loads(txt) if isinstance(txt, str) else {}
+            else:
+                resp = create_openai_completion(
+                    client=client,
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}],
+                    tools=None,
+                    json_mode=True,
+                    max_completion_tokens=max_out,
+                )
+                txt = extract_completion_text(resp, model)
+                out_b = json.loads(txt) if isinstance(txt, str) else {}
             if not isinstance(out_b, dict) or "content" not in out_b or not isinstance(out_b.get("content"), list):
                 raise ValueError("Single-pass (sources provided) output JSON missing 'content' list")
             sources_out = sources_in

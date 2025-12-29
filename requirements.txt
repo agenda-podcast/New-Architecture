@@ -16,6 +16,9 @@ google-api-python-client>=2.100.0
 # OpenAI (for ChatGPT API script generation)
 openai>=1.0.0
 
+# Gemini Developer API (for Gemini models via GOOGLE_API_KEY)
+google-genai>=1.0.0
+
 # Piper TTS (local text-to-speech)
 piper-tts>=1.2.0
 
