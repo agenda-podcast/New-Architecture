@@ -56,5 +56,5 @@
     "reels": { "enabled": true, "items": 8, "max_words": 100 }
   },
   "gpt_model_pass_b": "gpt-5-nano",
-  "llm_model": "gemini-1.5-flash"
+  "llm_model": "gemini-3-flash"
 }
