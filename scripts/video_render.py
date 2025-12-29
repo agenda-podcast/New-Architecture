@@ -565,15 +565,27 @@ def render_slideshow_ffmpeg_effects(
             input_label = f'[{i}:v]'
             input_labels.append(input_label)
             
-            # Normalization: scale to cover, crop to exact size, set fps, format
-            # Use 'increase' to ensure image covers the entire frame (may crop edges)
-            normalize_filter = (
-                f'{input_label}'
-                f'scale={width}:{height}:force_original_aspect_ratio=increase,'
-                f'crop={width}:{height},'
-                f'fps={fps},'
-                f'format=yuv420p'
-            )
+            # Normalization
+            # Default behavior is "contain" (center the image, preserve full content).
+            # If VIDEO_FIT_MODE=cover, we use center-crop to fill the frame.
+            fit_mode = (os.environ.get('VIDEO_FIT_MODE') or 'contain').strip().lower()
+            if fit_mode == 'cover':
+                normalize_filter = (
+                    f'{input_label}'
+                    f'scale={width}:{height}:force_original_aspect_ratio=increase,'
+                    f'crop={width}:{height},'
+                    f'fps={fps},'
+                    f'format=yuv420p'
+                )
+            else:
+                # contain + center pad
+                normalize_filter = (
+                    f'{input_label}'
+                    f'scale={width}:{height}:force_original_aspect_ratio=decrease,'
+                    f'pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,'
+                    f'fps={fps},'
+                    f'format=yuv420p'
+                )
             
             # Ken Burns motion (zoompan)
             if kenburns_enabled:
@@ -1029,9 +1041,28 @@ def _load_image_title_map(images: List[Path]) -> Dict[str, str]:
     """Map filename -> cleaned Google-visible title."""
     if not images:
         return {}
+    def _fallback_title(p: Path) -> str:
+        # Best-effort, readable title from filename.
+        stem = p.stem
+        # Strip common prefixes and ids
+        stem = re.sub(r"^(img|image|photo|pic)[-_ ]*", "", stem, flags=re.IGNORECASE)
+        stem = re.sub(r"[_\-]+", " ", stem).strip()
+        stem = re.sub(r"\s+", " ", stem)
+        # Title case but keep short all-caps tokens.
+        if not stem:
+            return ""
+        parts = []
+        for w in stem.split(" "):
+            if len(w) <= 4 and w.isupper():
+                parts.append(w)
+            else:
+                parts.append(w.capitalize())
+        return " ".join(parts)
+
     meta_path = _find_images_metadata(images[0].parent)
     if not meta_path:
-        return {}
+        # No metadata: fall back to filename-derived titles.
+        return {p.name: _fallback_title(p) for p in images if _fallback_title(p)}
     try:
         with open(meta_path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -1044,9 +1075,32 @@ def _load_image_title_map(images: List[Path]) -> Dict[str, str]:
             title = str(it.get("title_clean") or it.get("title") or "").strip()
             if fn and title:
                 out[fn] = title
+        # Backfill any missing filenames using fallback titles.
+        for p in images:
+            if p.name not in out:
+                fb = _fallback_title(p)
+                if fb:
+                    out[p.name] = fb
         return out
     except Exception:
-        return {}
+        return {p.name: _fallback_title(p) for p in images if _fallback_title(p)}
+
+
+def _build_image_fit_filter(width: int, height: int, fps: int) -> str:
+    """Return a filterchain that centers the source image without cropping.
+
+    User requirement: do not reframe/crop—just center.
+    We therefore *contain* the image inside the target canvas and pad the rest.
+    """
+    width = int(width)
+    height = int(height)
+    fps = int(fps)
+    return (
+        f"fps={fps},"
+        f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+        f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,"
+        f"format=yuv420p"
+    )
 
 
 def _write_image_titles_sidecar(video_out: Path, segments: List[Dict[str, Any]]) -> None:
@@ -1277,7 +1331,7 @@ def _render_slideshow_ffmpeg_concat_single_pass(
     try:
         title_map = _load_image_title_map([Path(seg["image"]) for seg in segments])
         for seg in segments:
-            title = title_map.get(Path(seg["image"]))
+            title = title_map.get(Path(seg["image"]).name)
             if title:
                 title_segments.append({
                     "start": float(seg["start"]),
@@ -1322,7 +1376,11 @@ def _render_slideshow_ffmpeg_concat_single_pass(
 
     # Filtergraph: base -> frame -> subtitles (after frame so text is always visible)
     fc = []
-    fc.append(f"[0:v]fps={fps},scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},format=rgba[base]")
+    fit_mode = (os.environ.get('VIDEO_FIT_MODE') or 'contain').strip().lower()
+    if fit_mode == 'cover':
+        fc.append(f"[0:v]fps={fps},scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},format=rgba[base]")
+    else:
+        fc.append(f"[0:v]fps={fps},scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,format=rgba[base]")
     last = "[base]"
 
     if frame_idx is not None:

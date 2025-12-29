@@ -89,6 +89,31 @@ def parse_script_text_to_segments(script_text: str, default_segment_title: str =
     if not dialogue:
         logger.warning(f"No dialogue extracted from script text with {len(matches)} HOST markers")
         return []
+
+    # If the model returned only HOST_A (or only HOST_B), downstream TTS will sound like
+    # a single voice. For short-form formats this is common when the model collapses into
+    # a monologue. When FORCE_TWO_SPEAKERS is enabled, split into sentences and alternate
+    # A/B so we still get a dialogue experience.
+    try:
+        import os
+        force_two = (os.environ.get("FORCE_TWO_SPEAKERS") or "1").strip().lower() not in {"0","false","no"}
+    except Exception:
+        force_two = True
+    if force_two:
+        speakers_present = {d.get('speaker') for d in dialogue}
+        if speakers_present <= {'A'} or speakers_present <= {'B'}:
+            # Merge all text then split on sentence boundaries.
+            merged = " ".join(d.get('text','').strip() for d in dialogue if d.get('text'))
+            merged = re.sub(r"\s+", " ", merged).strip()
+            # Simple sentence splitter (kept conservative to avoid breaking abbreviations too much).
+            sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", merged) if s.strip()]
+            if len(sentences) >= 2:
+                alt: List[Dict[str, str]] = []
+                spk = 'A'
+                for s in sentences:
+                    alt.append({'speaker': spk, 'text': s})
+                    spk = 'B' if spk == 'A' else 'A'
+                dialogue = alt
     
     logger.info(f"Parsed {len(dialogue)} dialogue items from script text")
     

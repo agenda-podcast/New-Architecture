@@ -445,7 +445,8 @@ class CaptionBurner:
         white = _ass_color_rgba("#FFFFFF", 0)
         black = _ass_color_rgba("#000000", 0)
 
-        title_glow = os.environ.get("CAPTIONS_TITLE_GLOW_COLOR", "#00D1FF").strip()
+        # Default title glow to silver (requested: "silver glow").
+        title_glow = os.environ.get("CAPTIONS_TITLE_GLOW_COLOR", "#C0C0C0").strip()
         glow_primary = _ass_color_rgba("#FFFFFF", glow_aa)
         title_outline = _ass_color_rgba(title_glow, glow_aa)
 
