@@ -400,6 +400,47 @@ def _is_testing_or_gesting_mode(config: Dict[str, Any]) -> bool:
     except Exception:
         pass
 
+
+def _json_escape_control_chars_in_strings(s: str) -> str:
+    """
+    Best-effort repair for model outputs that look like JSON but contain literal newlines/control chars inside strings.
+    We scan character-by-character; when inside a JSON string (between unescaped quotes), we replace \n and \r with \\n.
+    This is intentionally minimal; it does not attempt full JSON repair beyond control chars in strings.
+    """
+    if not isinstance(s, str):
+        return s
+    out_chars: list[str] = []
+    in_str = False
+    esc = False
+    for ch in s:
+        if in_str:
+            if esc:
+                out_chars.append(ch)
+                esc = False
+                continue
+            if ch == "\\":
+
+                out_chars.append(ch)
+                esc = True
+                continue
+            if ch == '"':
+                out_chars.append(ch)
+                in_str = False
+                continue
+            if ch == "\n" or ch == "\r":
+                out_chars.append("\\n")
+                continue
+            if ord(ch) < 32:
+                continue
+            out_chars.append(ch)
+        else:
+            if ch == '"':
+                out_chars.append(ch)
+                in_str = True
+            else:
+                out_chars.append(ch)
+    return "".join(out_chars)
+
     return False
 
 
@@ -1096,7 +1137,21 @@ def _run_pass_b_from_pass_a(
     # Gemini path: always a single logical Result for all non-long types, retrieved in small parts.
     if _is_gemini_model(model):
         txt = _gemini_generate_text(model=model, prompt=prompt, json_mode=True)
-        data = json.loads(txt) if isinstance(txt, str) else {}
+        if isinstance(txt, str):
+        try:
+            data = json.loads(txt)
+        except Exception:
+            txt_repaired = _json_escape_control_chars_in_strings(txt)
+            try:
+                data = json.loads(txt_repaired)
+            except Exception:
+                extracted = _extract_first_json_object(txt_repaired) or _extract_first_json_object(txt)
+                if isinstance(extracted, dict):
+                    data = extracted
+                else:
+                    raise
+    else:
+        data = {}
         if not isinstance(data, dict):
             raise ValueError("Pass B output is not a JSON object")
         if "content" not in data or not isinstance(data.get("content"), list):
