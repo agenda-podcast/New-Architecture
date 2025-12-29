@@ -47,6 +47,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import datetime
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -90,6 +91,65 @@ def _truthy(v: Any) -> bool:
 
 def _normalize_ws(s: str) -> str:
     return re.sub(r"[ \t]+\n", "\n", (s or "").strip())
+
+
+def _sanitize_filename_part(s: str, max_len: int = 60) -> str:
+    s = re.sub(r"[^A-Za-z0-9._-]+", "-", (s or "").strip())
+    s = re.sub(r"-{2,}", "-", s).strip("-")
+    return s[:max_len] if len(s) > max_len else s
+
+
+def _raw_responses_dir(config: Dict[str, Any]) -> str:
+    # Prefer explicit env override; otherwise use config; otherwise default under outputs/
+    return (
+        os.getenv("RAW_RESPONSES_DIR")
+        or str(config.get("raw_responses_dir") or "").strip()
+        or os.path.join("outputs", "_raw_responses")
+    )
+
+
+def _save_raw_response(
+    *,
+    config: Dict[str, Any],
+    pass_name: str,
+    model: str,
+    prompt: str,
+    response_text: str,
+    reason: str,
+) -> str:
+    """Persist the raw model response (and prompt) to disk for debugging."""
+    try:
+        ts = datetime.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+        topic = str(config.get("topic_id") or config.get("topic_key") or config.get("topic") or "").strip()
+        fname = "_".join(
+            p
+            for p in [
+                ts,
+                _sanitize_filename_part(pass_name),
+                _sanitize_filename_part(model),
+                _sanitize_filename_part(topic),
+                _sanitize_filename_part(reason, 30),
+            ]
+            if p
+        )
+        out_dir = _raw_responses_dir(config)
+        os.makedirs(out_dir, exist_ok=True)
+        path = os.path.join(out_dir, f"{fname}.json")
+        payload = {
+            "timestamp_utc": ts,
+            "pass": pass_name,
+            "model": model,
+            "reason": reason,
+            "topic": topic,
+            "prompt": prompt,
+            "response_text": response_text,
+        }
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+        return path
+    except Exception:
+        # Never break generation because debug saving failed.
+        return ""
 
 
 def _is_gemini_model(model: str) -> bool:
@@ -1127,9 +1187,13 @@ def _run_single_pass_b(
 
     if _is_gemini_model(model):
         txt = _gemini_generate_text(model=model, prompt=prompt, json_mode=True)
+        save_mode = (os.getenv("SAVE_RAW_RESPONSES", "on_error") or "on_error").strip().lower()
+        if save_mode == "always":
+            _save_raw_response(config=config, pass_name="pass_b_single", model=model, prompt=prompt, response_text=txt or "", reason="always")
         data0 = _extract_first_json_object(txt or "")
         data = _normalize_single_pass_payload(data0)
         if not isinstance(data, dict) or "content" not in data or not isinstance(data.get("content"), list):
+            raw_path = _save_raw_response(config=config, pass_name="pass_b_single", model=model, prompt=prompt, response_text=txt or "", reason="missing_content_array")
             raise ValueError(
                 "Single-pass output JSON missing 'content' array "
                 f"(model={model}; extracted_type={type(data0)}; extracted_keys={list(data0.keys()) if isinstance(data0, dict) else type(data0)})"
@@ -1139,10 +1203,11 @@ def _run_single_pass_b(
         # cause of downstream "No content generated" errors.
         if len(data.get("content") or []) == 0:
             tail = (txt or "")[-1200:].replace("\n", " ").strip()
+            raw_path = _save_raw_response(config=config, pass_name="pass_b_single", model=model, prompt=prompt, response_text=txt or "", reason="zero_items")
             raise RuntimeError(
                 f"Gemini returned no Pass B items after normalization (model={model}). "
                 "This typically means the model did not return valid JSON. "
-                f"Output tail: {tail}"
+                f"Output tail: {tail} " + (f"(raw_saved={raw_path})" if raw_path else "")
             )
         return data
 
