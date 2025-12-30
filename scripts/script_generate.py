@@ -70,6 +70,58 @@ def _is_testing_or_gesting_mode(config: Dict[str, Any]) -> bool:
     return False
 
 
+def _extract_search_queries_from_pass_a(pass_a_raw: str) -> List[str]:
+    """Extract SEARCH_QUERIES from L1 (Pass A) raw text.
+
+    Supports formats like:
+      SEARCH_QUERIES:
+      - query
+      1) query
+      [1] query
+
+    Stops when it reaches another section header (e.g., SOURCES:, SCRIPT:).
+    """
+    text = (pass_a_raw or "").strip()
+    if not text:
+        return []
+
+    # Find the SEARCH_QUERIES section.
+    m = re.search(r"(?im)^\s*SEARCH[_\s-]*QUERIES\s*:\s*$", text)
+    if not m:
+        return []
+
+    after = text[m.end():]
+    lines = after.splitlines()
+    out: List[str] = []
+
+    for raw in lines:
+        line = raw.rstrip("\n")
+        if re.match(r"(?im)^\s*(SOURCES|SCRIPT|LONG_SCRIPT|JSON\s*OUTPUT\s*SCHEMA)\s*:\s*$", line.strip()):
+            break
+        if not line.strip():
+            # allow blank lines inside the section
+            continue
+
+        # Strip common list prefixes: '-', '*', '1.', '1)', '[1]'
+        cleaned = re.sub(r"^\s*(?:[-*]|\d+[\.)]|\[\d+\])\s+", "", line).strip()
+        if cleaned:
+            out.append(cleaned)
+
+        if len(out) >= 8:
+            break
+
+    # De-dupe while preserving order
+    deduped: List[str] = []
+    seen = set()
+    for q in out:
+        k = q.lower()
+        if k in seen:
+            continue
+        seen.add(k)
+        deduped.append(q)
+    return deduped
+
+
 def _estimate_duration_sec_from_words(words: int, wpm: int = 150) -> int:
     if not words or words <= 0:
         return 0
@@ -254,6 +306,23 @@ def generate_multi_format_for_topic(
                 search_queries = []
         except Exception:
             search_queries = []
+
+        # If generator did not provide structured search queries, attempt to
+        # extract them from Pass A raw text (Gemini often returns them as a
+        # plain-text section).
+        if not search_queries and pass_a_raw:
+            try:
+                search_queries = _extract_search_queries_from_pass_a(pass_a_raw)
+            except Exception:
+                search_queries = []
+
+        # Final fallback: topic config/title.
+        if not search_queries:
+            fallback = config.get("queries") or [config.get("title", "")]  # type: ignore
+            if isinstance(fallback, str):
+                fallback = [fallback]
+            if isinstance(fallback, (list, tuple)):
+                search_queries = [str(q).strip() for q in fallback if str(q).strip()]
 
         queries_path = output_dir / f"{topic_id}-{date_str}.search_queries.json"
         with open(queries_path, "w", encoding="utf-8") as f:
