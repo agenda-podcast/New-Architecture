@@ -1187,6 +1187,65 @@ def _discover_frame_png(repo_root: Path) -> Optional[Path]:
     return None
 
 
+def _discover_frame_layers(repo_root: Path, width: int, height: int) -> List[Path]:
+    """Discover one-or-more PNG overlay layers for the final video.
+
+    New convention (requested):
+      - <repo_root>/Assets/Frames/Vertical/*.png
+      - <repo_root>/Assets/Frames/Horizontal/*.png
+
+    Backwards compatible fallback:
+      - <repo_root>/assets/frame*.png
+      - <repo_root>/Assets/frame*.png
+
+    The returned list is ordered (lexicographic), and will be applied as multiple
+    alpha overlays in the order returned (earlier first, later on top).
+    """
+    root = Path(repo_root) if repo_root else None
+    if root is None or not root.exists():
+        return []
+
+    prefer_horizontal = False
+    try:
+        prefer_horizontal = bool(int(width) >= int(height))
+    except Exception:
+        prefer_horizontal = False
+
+    layers: List[Path] = []
+
+    # Prefer the new Assets/Frames/* folders if present.
+    for assets_name in ("Assets", "assets"):
+        assets_dir = root / assets_name
+        frames_dir = assets_dir / "Frames"
+        if not frames_dir.exists():
+            continue
+        sub = "Horizontal" if prefer_horizontal else "Vertical"
+        target_dir = frames_dir / sub
+        if target_dir.exists():
+            try:
+                found = [p for p in sorted(target_dir.glob("*.png")) if p.is_file() and p.stat().st_size > 0]
+                layers.extend(found)
+            except Exception:
+                pass
+        # If the orientation-specific dir is empty, try the other one.
+        if not layers:
+            other = frames_dir / ("Vertical" if prefer_horizontal else "Horizontal")
+            if other.exists():
+                try:
+                    found = [p for p in sorted(other.glob("*.png")) if p.is_file() and p.stat().st_size > 0]
+                    layers.extend(found)
+                except Exception:
+                    pass
+        if layers:
+            return layers
+
+    # Backwards-compatible single-frame discovery.
+    single = _discover_frame_png(root)
+    if single:
+        return [single]
+    return []
+
+
 def _safe_positive_duration(value: float, default: float = 1.0) -> float:
     try:
         v = float(value)
@@ -1197,26 +1256,62 @@ def _safe_positive_duration(value: float, default: float = 1.0) -> float:
     return v
 
 def _compute_static_image_segments(images: List[Path], total_duration: float) -> List[Dict[str, Any]]:
-    """Compute sequential [start,end,image] segments for a static slideshow."""
+    """Compute sequential [start,end,image] segments for a static slideshow.
+
+    IMPORTANT:
+      - Do NOT allocate one segment per *available* image.
+        When there are many images (e.g., 80+) but the video is short,
+        assigning minimum durations to all images produces near-zero
+        segments that may appear as "no rotation".
+      - Instead, compute a reasonable number of slots based on a target
+        per-image duration range, then cycle images as needed.
+    """
     total_duration = _safe_positive_duration(total_duration, default=1.0)
     imgs = [Path(p) for p in images if p is not None]
     if not imgs:
         return []
-    n = len(imgs)
-    per = max(0.35, total_duration / max(1, n))
-    durations = [per] * n
-    sum_prev = per * (n - 1)
-    durations[-1] = max(0.35, total_duration - sum_prev)
-    if sum(durations) > total_duration + 1e-3:
-        durations[-1] = max(0.35, total_duration - sum(durations[:-1]))
-    segs = []
+
+    # Target per-image duration for the *static* concat mode.
+    # Defaults align with global_config IMAGE_TRANSITION_MIN/MAX but are
+    # overridable for tuning.
+    try:
+        min_per = float(os.environ.get("STATIC_IMAGE_MIN_SEC", str(IMAGE_TRANSITION_MIN_SEC)))
+    except Exception:
+        min_per = float(IMAGE_TRANSITION_MIN_SEC)
+    try:
+        max_per = float(os.environ.get("STATIC_IMAGE_MAX_SEC", str(IMAGE_TRANSITION_MAX_SEC)))
+    except Exception:
+        max_per = float(IMAGE_TRANSITION_MAX_SEC)
+    min_per = max(0.35, min_per)
+    max_per = max(min_per, max_per)
+
+    # Choose a nominal slot duration based on total length.
+    # For short content, keep it snappy; for long, a bit slower.
+    nominal = total_duration / max(1, int(total_duration / max_per) or 1)
+    per = max(min_per, min(max_per, nominal))
+
+    # Compute number of slots and cap it to prevent pathological filtergraphs.
+    slots = max(1, int(math.ceil(total_duration / per)))
+    try:
+        max_slots = int(os.environ.get("STATIC_IMAGE_MAX_SLOTS", "600"))
+    except Exception:
+        max_slots = 600
+    slots = min(slots, max_slots)
+
+    segs: List[Dict[str, Any]] = []
     t = 0.0
-    for img, dur in zip(imgs, durations):
+    for i in range(slots):
+        img = imgs[i % len(imgs)]
         start = t
-        end = min(total_duration, t + dur)
-        segs.append({"image": img, "start": start, "end": end, "duration": max(0.001, end-start)})
+        end = min(total_duration, start + per)
+        if i == slots - 1 or end >= total_duration - 1e-6:
+            end = total_duration
+        dur = max(0.001, end - start)
+        segs.append({"image": img, "start": start, "end": end, "duration": dur})
         t = end
-    # ensure final end == total_duration
+        if t >= total_duration - 1e-6:
+            break
+
     if segs:
         segs[-1]["end"] = total_duration
         segs[-1]["duration"] = max(0.001, segs[-1]["end"] - segs[-1]["start"])
@@ -1277,7 +1372,8 @@ def _render_slideshow_ffmpeg_concat_single_pass(
     try:
         title_map = _load_image_title_map([Path(seg["image"]) for seg in segments])
         for seg in segments:
-            title = title_map.get(Path(seg["image"]))
+            # title_map keys are filenames (Path.name), not Path objects.
+            title = title_map.get(Path(seg["image"]).name)
             if title:
                 title_segments.append({
                     "start": float(seg["start"]),
@@ -1289,7 +1385,7 @@ def _render_slideshow_ffmpeg_concat_single_pass(
 
     # Prepare overlays (ASS) and frame discovery
     ass_path: Optional[Path] = None
-    frame_path: Optional[Path] = None
+    frame_layers: List[Path] = []
     if enable_overlays:
         try:
             caption_segments = _load_caption_segments_for_audio(audio_path) if audio_path else []
@@ -1304,9 +1400,13 @@ def _render_slideshow_ffmpeg_concat_single_pass(
         except Exception:
             ass_path = None
     try:
-        frame_path = _discover_frame_png(repo_root or Path(__file__).resolve().parent.parent)
+        frame_layers = _discover_frame_layers(
+            repo_root or Path(__file__).resolve().parent.parent,
+            width=width,
+            height=height,
+        )
     except Exception:
-        frame_path = None
+        frame_layers = []
 
     ffmpeg_cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(concat_path)]
 
@@ -1315,20 +1415,27 @@ def _render_slideshow_ffmpeg_concat_single_pass(
         audio_idx = 1
         ffmpeg_cmd.extend(["-i", str(audio_path)])
 
-    frame_idx = None
-    if frame_path:
-        frame_idx = 2 if audio_idx is not None else 1
-        ffmpeg_cmd.extend(["-loop", "1", "-t", f"{duration:.3f}", "-i", str(frame_path)])
+    # One-or-more transparent PNG layers.
+    frame_start_idx = None
+    if frame_layers:
+        frame_start_idx = 2 if audio_idx is not None else 1
+        for fp in frame_layers:
+            ffmpeg_cmd.extend(["-loop", "1", "-t", f"{duration:.3f}", "-i", str(fp)])
 
     # Filtergraph: base -> frame -> subtitles (after frame so text is always visible)
     fc = []
     fc.append(f"[0:v]fps={fps},scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},format=rgba[base]")
     last = "[base]"
 
-    if frame_idx is not None:
-        fc.append(f"[{frame_idx}:v]scale={width}:{height},format=rgba[frame]")
-        fc.append(f"{last}[frame]overlay=0:0:format=auto:shortest=1[framed]")
-        last = "[framed]"
+    if frame_start_idx is not None and frame_layers:
+        # Apply multiple overlay layers in sequence.
+        for i in range(len(frame_layers)):
+            idx = frame_start_idx + i
+            tag = f"frame{i}"
+            out_tag = f"framed{i}"
+            fc.append(f"[{idx}:v]scale={width}:{height},format=rgba[{tag}]")
+            fc.append(f"{last}[{tag}]overlay=0:0:format=auto:shortest=1[{out_tag}]")
+            last = f"[{out_tag}]"
 
     if ass_path:
         sp = _escape_subtitles_path_for_filter(ass_path)
