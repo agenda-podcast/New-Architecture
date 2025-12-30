@@ -60,9 +60,9 @@ from model_limits import clamp_output_tokens, default_max_output_tokens
 from openai_utils import create_openai_completion, extract_completion_text
 
 try:
-    from gemini_utils import gemini_generate_once, gemini_generate_once  # type: ignore
+    # Import exactly once (previously duplicated due to a copy/paste bug).
+    from gemini_utils import gemini_generate_once  # type: ignore
 except Exception:  # pragma: no cover
-    gemini_generate_once = None  # type: ignore
     gemini_generate_once = None  # type: ignore
 
 logger = logging.getLogger(__name__)
@@ -825,27 +825,33 @@ def _gemini_part_tokens(env_key: str, default: int) -> int:
 
 
 def _gemini_generate_text(*, model: str, prompt: str, json_mode: bool) -> str:
-    """Gemini generation with chunking.
+    """Gemini generation (single request).
 
-    We intentionally chunk Gemini outputs for CI stability (GitHub Actions output
-    surfaces have practical size limits). Chunking uses the user-required
-    continuation rule: "Provide next part after <last 5 words>".
+    This project intentionally uses a single non-streaming request to Gemini to
+    guarantee:
+      - exactly ONE HTTP request per pass
+      - no agentic loops / implicit tool chains
+
+    NOTE: Do not implement chunking here unless it is explicitly requested, as
+    it changes the billing and request-count semantics.
     """
     if gemini_generate_once is None:
         raise ImportError("Gemini support is unavailable: google-genai not installed")
 
-    # Keep each part small enough for CI surfaces. Default conservative values.
-    per_part = _gemini_part_tokens("GEMINI_PART_MAX_TOKENS", 1200)
-    max_parts = _safe_int(os.getenv("GEMINI_MAX_PARTS"), 80) or 80
-    tail_chars = _safe_int(os.getenv("GEMINI_TAIL_CHARS"), 1400) or 1400
+    if not (prompt or "").strip():
+        # Prevent silent garbage requests like {"text": ""}.
+        raise ValueError("LLM prompt is empty — refusing to call Gemini provider.")
 
-    full = gemini_generate_once(
-        model=model,max_output_tokens_per_part=per_part,
-        max_parts=max_parts,
-        tail_chars_for_context=tail_chars,
-        temperature=float(os.getenv("GEMINI_TEMPERATURE", "0.2")),
+    max_out = _safe_int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS"), 0)
+    temperature = float(os.getenv("GEMINI_TEMPERATURE", "0.2"))
+
+    return gemini_generate_once(
+        model=model,
+        prompt=prompt,
+        max_output_tokens=max_out,
+        temperature=temperature,
+        json_mode=bool(json_mode),
     )
-    return full
 
 
 def _build_pass_a_prompt(config: Dict[str, Any], long_specs: List[Dict[str, Any]]) -> str:
