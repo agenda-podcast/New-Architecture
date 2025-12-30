@@ -1,0 +1,457 @@
+{
+  "version": 1,
+  "images": [
+    {
+      "filename": "image_000.png",
+      "url": "https://d3i6fh83elv35t.cloudfront.net/static/assets/images/podcast-news-hour-600.png",
+      "title": "Podcasts | PBS News",
+      "title_clean": "Podcasts | PBS News",
+      "displayLink": "www.pbs.org",
+      "contextLink": "https://www.pbs.org/newshour/podcasts",
+      "query": "news"
+    },
+    {
+      "filename": "image_001.jpg",
+      "url": "http://newsimg.bbc.co.uk/media/images/39878000/jpg/_39878231_map1.jpg",
+      "title": "BBC NEWS | Country Profiles",
+      "title_clean": "BBC NEWS | Country Profiles",
+      "displayLink": "www.bbc.com",
+      "contextLink": "https://www.bbc.com/2/hi/country_profiles/default.stm",
+      "query": "news"
+    },
+    {
+      "filename": "image_002.webp",
+      "url": "https://ichef.bbci.co.uk/news/480/cpsprodpb/e89a/live/5040abd0-ba6a-11ef-aff0-072ce821b6ab.jpg.webp",
+      "title": "Trump gets $15m in ABC News defamation case",
+      "title_clean": "Trump gets $15m in ABC News defamation case",
+      "displayLink": "www.bbc.com",
+      "contextLink": "https://www.bbc.com/news/articles/cgrw57q4y9do",
+      "query": "news"
+    },
+    {
+      "filename": "image_003.jpg",
+      "url": "https://www.aljazeera.com/wp-content/uploads/2025/06/AFP__20250615__62F699Z__v1__HighRes__IranIsraelConflict-1749984513.jpg?resize=730%2C410&quality=80",
+      "title": "Israel-Iran updates: IRGC intelligence chief, two generals killed ...",
+      "title_clean": "Israel-Iran updates: IRGC intelligence chief, two generals killed ...",
+      "displayLink": "www.aljazeera.com",
+      "contextLink": "https://www.aljazeera.com/news/liveblog/2025/6/15/live-iran-fires-missiles-as-israel-strikes-oil-facility-in-tehran",
+      "query": "news"
+    },
+    {
+      "filename": "image_004.jpg",
+      "url": "https://images.ft.com/v3/image/raw/http%3A%2F%2Fcom.ft.imagepublish.upp-prod-eu.s3.amazonaws.com%2Fd68e2e36-d1ea-11e6-b06b-680c49b4b4c0?source=next-article&fit=scale-down&quality=highest&width=700&dpr=1",
+      "title": "Megyn Kelly to leave Fox News for rival NBC",
+      "title_clean": "Megyn Kelly to leave Fox News for rival NBC",
+      "displayLink": "www.ft.com",
+      "contextLink": "https://www.ft.com/content/c5d8845c-d1e9-11e6-9341-7393bb2e1b51",
+      "query": "news"
+    },
+    {
+      "filename": "image_005.jpg",
+      "url": "https://www.pbs.org/independentlens/wp-content/uploads/2023/09/BREAKINGNEWS_KeyArt_Clean_864x1280-405x600.jpg",
+      "title": "Breaking the News - Independent Lens",
+      "title_clean": "Breaking the News - Independent Lens",
+      "displayLink": "www.pbs.org",
+      "contextLink": "https://www.pbs.org/independentlens/documentaries/breaking-the-news/",
+      "query": "news"
+    },
+    {
+      "filename": "image_006.webp",
+      "url": "https://ichef.bbci.co.uk/news/480/cpsprodpb/9031/live/99d3e010-a1a5-11ef-bd13-219c531a3ae2.jpg.webp",
+      "title": "Pete Hegseth: Trump names Fox News host as defence secretary pick",
+      "title_clean": "Pete Hegseth: Trump names Fox News host as defence secretary pick",
+      "displayLink": "www.bbc.com",
+      "contextLink": "https://www.bbc.com/news/articles/c937ndxvkggo",
+      "query": "news"
+    },
+    {
+      "filename": "image_007.jpg",
+      "url": "https://www.aljazeera.com/wp-content/uploads/2025/10/2025-10-30T175647Z_1982330823_RC2DMHAHXGC4_RTRMADP_3_TANZANIA-ELECTION-1761925770.jpg?resize=770%2C513&quality=80",
+      "title": "Opposition says 'hundreds' killed in Tanzania post-election ...",
+      "title_clean": "Opposition says 'hundreds' killed in Tanzania post-election ...",
+      "displayLink": "www.aljazeera.com",
+      "contextLink": "https://www.aljazeera.com/news/2025/10/31/protests-over-disputed-tanzania-election-enter-3rd-day-military-deployed",
+      "query": "news"
+    },
+    {
+      "filename": "image_008.jpg",
+      "url": "https://www.aljazeera.com/wp-content/uploads/2025/06/reuters_684bb620-1749792288.jpg?resize=770%2C513&quality=80",
+      "title": "Israel attacks Iran: What we know so far | Israel-Iran conflict ...",
+      "title_clean": "Israel attacks Iran: What we know so far",
+      "displayLink": "www.aljazeera.com",
+      "contextLink": "https://www.aljazeera.com/news/2025/6/13/israel-attacksiran-what-we-know-so-far",
+      "query": "news"
+    },
+    {
+      "filename": "image_009.jpg",
+      "url": "https://ichef.bbci.co.uk/images/ic/480xn/p060dh18.jpg",
+      "title": "BBC World Service - BBC News Summary",
+      "title_clean": "BBC World Service - BBC News Summary",
+      "displayLink": "www.bbc.com",
+      "contextLink": "https://www.bbc.com/programmes/p002vsn1",
+      "query": "news"
+    },
+    {
+      "filename": "image_010.jpg",
+      "url": "https://www.aljazeera.com/wp-content/uploads/2024/11/GettyImages-1399603355-1-1731495570.jpg?resize=770%2C513&quality=80",
+      "title": "Who is Pete Hegseth, the pro-Israel Fox News host picked to head ...",
+      "title_clean": "Who is Pete Hegseth, the pro-Israel Fox News host picked to head ...",
+      "displayLink": "www.aljazeera.com",
+      "contextLink": "https://www.aljazeera.com/news/2024/11/13/who-is-pete-hegseth-the-pro-israel-fox-news-host-picked-to-head-pentagon",
+      "query": "news"
+    },
+    {
+      "filename": "image_011.jpg",
+      "url": "https://static.dw.com/image/69419573_603.jpg",
+      "title": "DW News – DW",
+      "title_clean": "DW News – DW",
+      "displayLink": "www.dw.com",
+      "contextLink": "https://www.dw.com/en/dw-news/program-262267",
+      "query": "news"
+    },
+    {
+      "filename": "image_012.jpg",
+      "url": "https://www.aljazeera.com/wp-content/uploads/2025/06/AFP__20250614__62CE7BT__v1__HighRes__IsraelIranConflict-1749885439.jpg?resize=730%2C410&quality=80",
+      "title": "Updates: Iran hits Israel with air strikes after nuclear site ...",
+      "title_clean": "Updates: Iran hits Israel with air strikes after nuclear site ...",
+      "displayLink": "www.aljazeera.com",
+      "contextLink": "https://www.aljazeera.com/news/liveblog/2025/6/13/live-explosions-reported-in-iran-amid-israel-tensions",
+      "query": "news"
+    },
+    {
+      "filename": "image_013.jpg",
+      "url": "https://ichef.bbci.co.uk/images/ic/480xn/p0fk7mhm.jpg",
+      "title": "BBC News - BBC News at One",
+      "title_clean": "BBC News - BBC News at One",
+      "displayLink": "www.bbc.com",
+      "contextLink": "https://www.bbc.com/programmes/b007mpl9",
+      "query": "news"
+    },
+    {
+      "filename": "image_014.jpg",
+      "url": "https://www.aljazeera.com/wp-content/uploads/2023/11/msnbc-mehdi-hasan-1701373450.jpg?resize=770%2C513&quality=80",
+      "title": "Palestine advocates decry MSNBC's cancellation of Mehdi Hasan news ...",
+      "title_clean": "Palestine advocates decry MSNBC's cancellation of Mehdi Hasan news ...",
+      "displayLink": "www.aljazeera.com",
+      "contextLink": "https://www.aljazeera.com/news/2023/11/30/palestine-advocates-decry-msnbcs-cancellation-of-mehdi-hasan-news-show",
+      "query": "news"
+    },
+    {
+      "filename": "image_015.webp",
+      "url": "https://ichef.bbci.co.uk/news/480/cpsprodpb/009b/live/bb5ec0b0-2c6a-11f0-994e-4f02e3f9d417.jpg.webp",
+      "title": "Trump picks Fox News' Jeanine Pirro as Washington DC prosecutor",
+      "title_clean": "Trump picks Fox News' Jeanine Pirro as Washington DC prosecutor",
+      "displayLink": "www.bbc.com",
+      "contextLink": "https://www.bbc.com/news/articles/cx2jnl79mejo",
+      "query": "news"
+    },
+    {
+      "filename": "image_016.jpg",
+      "url": "https://www.aljazeera.com/wp-content/uploads/2025/09/AFP__20250924__76LK2KE__v2__MidRes__TopshotIndiaPoliticsUnrestLadakh-1758736650.jpg?resize=770%2C513&quality=80",
+      "title": "Bloodiest day': How Gen-Z protest wave hit India's Ladakh, killing ...",
+      "title_clean": "Bloodiest day': How Gen-Z protest wave hit India's Ladakh, killing ...",
+      "displayLink": "www.aljazeera.com",
+      "contextLink": "https://www.aljazeera.com/news/2025/9/25/bloodiest-day-how-gen-z-protest-wave-hit-indias-ladakh-killing-four",
+      "query": "news"
+    },
+    {
+      "filename": "image_017.jpg",
+      "url": "https://dims.apnews.com/dims4/default/3085072/2147483647/strip/true/crop/5872x3915+0+0/resize/599x399!/quality/90/?url=https%3A%2F%2Fassets.apnews.com%2F43%2F77%2F9ea4599c2f5d3262606f652401e2%2F28a05077c3f54eb3880fc5c46be1a32c",
+      "title": "White House says it has the right to punish AP reporters | AP News",
+      "title_clean": "White House says it has the right to punish AP reporters | AP News",
+      "displayLink": "apnews.com",
+      "contextLink": "https://apnews.com/article/ap-white-house-gulf-name-dispute-3f43c519a4b4f4661dd0831421943ef7",
+      "query": "news"
+    },
+    {
+      "filename": "image_018.jpg",
+      "url": "https://dims.apnews.com/dims4/default/2bad0ee/2147483647/strip/true/crop/7349x5250+0+0/resize/599x428!/quality/90/?url=https%3A%2F%2Fassets.apnews.com%2F80%2F6b%2F1d2e07967838ca4e16151fcd031c%2F3abb4b522dc9468c8fbed260d6eaad4f",
+      "title": "Why Elon Musk and DOGE are focusing on the GSA | AP News",
+      "title_clean": "Why Elon Musk and DOGE are focusing on the GSA | AP News",
+      "displayLink": "apnews.com",
+      "contextLink": "https://apnews.com/article/doge-musk-trump-ai-starlink-gsa-efficiency-d67a41d1be98db11f05ca8e4472f53bd",
+      "query": "news"
+    },
+    {
+      "filename": "image_019.jpg",
+      "url": "https://i.cbc.ca/ais/860dee91-b9c0-41f6-9afb-751d5e6d2922,1763668517060/full/max/0/default.jpg?im=Crop%2Crect%3D%280%2C0%2C768%2C432%29%3B",
+      "title": "News Live - Video | CBC.ca",
+      "title_clean": "News Live",
+      "displayLink": "www.cbc.ca",
+      "contextLink": "https://www.cbc.ca/player/news/live",
+      "query": "news"
+    },
+    {
+      "filename": "image_020.jpg",
+      "url": "https://www.aljazeera.com/wp-content/uploads/2025/06/2025-06-18T160353Z_1552452314_RC245FAKHORL_RTRMADP_3_IRAN-NUCLEAR-1750265314.jpg?resize=730%2C410&quality=80",
+      "title": "Updates: Israel, Iran continue missile attacks; 144 killed in Gaza ...",
+      "title_clean": "Updates: Israel, Iran continue missile attacks; 144 killed in Gaza ...",
+      "displayLink": "www.aljazeera.com",
+      "contextLink": "https://www.aljazeera.com/news/liveblog/2025/6/18/live-israel-iran-attacks-continue-trump-demands-unconditional-surrender",
+      "query": "news"
+    },
+    {
+      "filename": "image_021.jpg",
+      "url": "https://live-production.wcms.abc-cdn.net.au/df32087e254e953fd75b856197daf1d1?impolicy=wcms_crop_resize&cropH=1440&cropW=2560&xPos=0&yPos=240&width=862&height=485",
+      "title": "Former prince Andrew Mountbatten-Windsor stripped of remaining ...",
+      "title_clean": "Former prince Andrew Mountbatten-Windsor stripped of remaining ...",
+      "displayLink": "www.abc.net.au",
+      "contextLink": "https://www.abc.net.au/news/2025-12-02/former-prince-andrew-stripped-of-remaining-royal-titles/106090242",
+      "query": "news"
+    },
+    {
+      "filename": "image_022.jpg",
+      "url": "https://i.cbc.ca/ais/860dee91-b9c0-41f6-9afb-751d5e6d2922,1763668517060/full/max/0/default.jpg?im=Crop%2Crect%3D%280%2C0%2C768%2C432%29%3BResize%3D620",
+      "title": "Watch CBC News free streaming | CBC News",
+      "title_clean": "Watch CBC News free streaming | CBC News",
+      "displayLink": "www.cbc.ca",
+      "contextLink": "https://www.cbc.ca/news/canada/cbc-news-explore-free-tv-streaming-1.6647884",
+      "query": "news"
+    },
+    {
+      "filename": "image_023.jpg",
+      "url": "https://www.aljazeera.com/wp-content/uploads/2025/09/AP25259385635109-1758063358.jpg?resize=770%2C513&quality=80",
+      "title": "Thousands of Palestinians flee as Israeli bombs rain down on Gaza ...",
+      "title_clean": "Thousands of Palestinians flee as Israeli bombs rain down on Gaza ...",
+      "displayLink": "www.aljazeera.com",
+      "contextLink": "https://www.aljazeera.com/news/2025/9/16/thousands-of-palestinians-flee-as-israeli-bombs-rain-down-on-gaza-city",
+      "query": "news"
+    },
+    {
+      "filename": "image_024.jpg",
+      "url": "https://www.aljazeera.com/wp-content/uploads/2025/05/afp_681dde22ba4a-1746787874.jpg?resize=770%2C513&quality=80",
+      "title": "India-Pakistan tensions: A brief history of conflict | India ...",
+      "title_clean": "India-Pakistan tensions: A brief history of conflict",
+      "displayLink": "www.aljazeera.com",
+      "contextLink": "https://www.aljazeera.com/news/2025/5/9/india-pakistan-tensions-a-brief-history-of-conflict",
+      "query": "news"
+    },
+    {
+      "filename": "image_025.jpg",
+      "url": "https://images.ft.com/v3/image/raw/https%3A%2F%2Fd1e00ek4ebabms.cloudfront.net%2Fproduction%2Fa90a422f-7349-4a0b-ad95-708e376f24a2.jpg?source=next-article&fit=scale-down&quality=highest&width=700&dpr=1",
+      "title": "Trump family media company to broadcast GB News in the US",
+      "title_clean": "Trump family media company to broadcast GB News in the US",
+      "displayLink": "www.ft.com",
+      "contextLink": "https://www.ft.com/content/966aa2a8-30c6-469d-8b40-255108be6c94",
+      "query": "news"
+    },
+    {
+      "filename": "image_026.jpg",
+      "url": "https://www.aljazeera.com/wp-content/uploads/2025/09/AFP__20250905__73J74ZQ__v1__HighRes__UkraineRussiaConflictWar-1757202299.jpg?resize=770%2C513&quality=80",
+      "title": "Russia-Ukraine war: List of key events, day 1,291 | Russia-Ukraine ...",
+      "title_clean": "Russia-Ukraine war: List of key events, day 1,291",
+      "displayLink": "www.aljazeera.com",
+      "contextLink": "https://www.aljazeera.com/news/2025/9/7/russia-ukraine-war-list-of-key-events-day-1291",
+      "query": "news"
+    },
+    {
+      "filename": "image_027.png",
+      "url": "https://live-production.wcms.abc-cdn.net.au/5c3ad7d6db78a802126c2f7bfd0d9de8.png",
+      "title": "Stay in the know - ABC News",
+      "title_clean": "Stay in the know - ABC News",
+      "displayLink": "www.abc.net.au",
+      "contextLink": "https://www.abc.net.au/news/subscribe",
+      "query": "news"
+    },
+    {
+      "filename": "image_028.jpg",
+      "url": "https://www.aljazeera.com/wp-content/uploads/2025/06/AFP__20250626__63UD2TB__v1__HighRes__ChinaFloodClimateWeather-1750917700.jpg?resize=770%2C513&quality=80",
+      "title": "Six dead, thousands displaced as floods hit southwestern China ...",
+      "title_clean": "Six dead, thousands displaced as floods hit southwestern China ...",
+      "displayLink": "www.aljazeera.com",
+      "contextLink": "https://www.aljazeera.com/news/2025/6/26/six-dead-thousands-displaced-as-floods-hit-southwestern-china",
+      "query": "news"
+    },
+    {
+      "filename": "image_029.jpg",
+      "url": "https://live-production.wcms.abc-cdn.net.au/f714515b96abadac1697858d0bb61536?impolicy=wcms_crop_resize&cropH=2700&cropW=4800&xPos=0&yPos=250&width=862&height=485",
+      "title": "Say good morning to the 2025 ABC NEWS BREAKFAST team - About the ABC",
+      "title_clean": "Say good morning to the 2025 ABC NEWS BREAKFAST team - About the ABC",
+      "displayLink": "www.abc.net.au",
+      "contextLink": "https://www.abc.net.au/about/media-centre/publicity-media-room/say-good-morning-to-the-2025-abc-news-breakfast-team/104692624",
+      "query": "news"
+    },
+    {
+      "filename": "image_030.webp",
+      "url": "https://ichef.bbci.co.uk/images/ic/480xn/p0kpw7v8.png.webp",
+      "title": "BBC podcasts and audio are now available on BBC.com",
+      "title_clean": "BBC podcasts and audio are now available on BBC.com",
+      "displayLink": "www.bbc.com",
+      "contextLink": "https://www.bbc.com/future/article/20250207-bbc-podcasts-are-now-available-on-the-bbc-website-and-app",
+      "query": "news"
+    },
+    {
+      "filename": "image_031.jpg",
+      "url": "https://www.aljazeera.com/wp-content/uploads/2024/10/AP24303541565471-1730270421.jpg?resize=770%2C513&quality=80",
+      "title": "At least 95 dead after torrential rain and floods in Spain ...",
+      "title_clean": "At least 95 dead after torrential rain and floods in Spain ...",
+      "displayLink": "www.aljazeera.com",
+      "contextLink": "https://www.aljazeera.com/news/2024/10/30/at-least-51-dead-after-torrential-rain-floods-in-spains-valencia-region",
+      "query": "news"
+    },
+    {
+      "filename": "image_032.jpg",
+      "url": "https://www.aljazeera.com/wp-content/uploads/2025/07/2025-07-16T125425Z_208172985_RC2NNFABW891_RTRMADP_3_SYRIA-SECURITY-DRUZE-DAMASCUS-1752670751.jpg?resize=770%2C513&quality=80",
+      "title": "World reacts to Israeli attacks on Syria's Damascus | News | Al ...",
+      "title_clean": "World reacts to Israeli attacks on Syria's Damascus | News",
+      "displayLink": "www.aljazeera.com",
+      "contextLink": "https://www.aljazeera.com/news/2025/7/16/world-reacts-to-israeli-attacks-on-syrias-damascus",
+      "query": "news"
+    },
+    {
+      "filename": "image_033.jpg",
+      "url": "https://www.aljazeera.com/wp-content/uploads/2025/10/reuters_68de9863-1759418467.jpg?resize=770%2C513&quality=80",
+      "title": "Why has Pakistan-administered Kashmir erupted in protest again ...",
+      "title_clean": "Why has Pakistan-administered Kashmir erupted in protest again ...",
+      "displayLink": "www.aljazeera.com",
+      "contextLink": "https://www.aljazeera.com/news/2025/10/3/why-has-pakistan-administered-kashmir-erupted-in-protest-again",
+      "query": "news"
+    },
+    {
+      "filename": "image_034.jpg",
+      "url": "https://www.aljazeera.com/wp-content/uploads/2025/06/2025-06-26T113137Z_1338798175_RC2BAFABW2LM_RTRMADP_3_IRAN-NUCLEAR-1750940480.jpg?resize=770%2C513&quality=80",
+      "title": "Could Israel be planning a second war on Iran? | Israel-Iran ...",
+      "title_clean": "Could Israel be planning a second war on Iran?",
+      "displayLink": "www.aljazeera.com",
+      "contextLink": "https://www.aljazeera.com/news/2025/7/24/could-israel-be-planning-a-second-war-on-iran",
+      "query": "news"
+    },
+    {
+      "filename": "image_035.jpg",
+      "url": "https://www.aljazeera.com/wp-content/uploads/2025/08/2025-08-24T230356Z_899359006_RC2ODGAY3S64_RTRMADP_3_ISRAEL-PALESTINIANS-HOUTHIS-STRIKES-1756102220.jpg?resize=770%2C513&quality=80",
+      "title": "Yemen's Houthis confirm prime minister killed in Israeli strike on ...",
+      "title_clean": "Yemen's Houthis confirm prime minister killed in Israeli strike on ...",
+      "displayLink": "www.aljazeera.com",
+      "contextLink": "https://www.aljazeera.com/news/2025/8/30/yemens-houthis-confirm-israeli-airstrike-killed-the-groups-prime-minister",
+      "query": "news"
+    },
+    {
+      "filename": "image_036.jpg",
+      "url": "https://dims.apnews.com/dims4/default/5304c7c/2147483647/strip/true/crop/2561x1707+0+0/resize/599x399!/quality/90/?url=https%3A%2F%2Fassets.apnews.com%2F4f%2Fee%2F604b8b33842bebc696d4f0938662%2F1d82e1849e88496f884cea2661d6794c",
+      "title": "NASA unveils close-up pictures of the interstellar comet 3I/Atlas ...",
+      "title_clean": "NASA unveils close-up pictures of the interstellar comet 3I/Atlas ...",
+      "displayLink": "apnews.com",
+      "contextLink": "https://apnews.com/article/interstellar-comet-nasa-3cddd6210ba1177d4d0a80c04053190d",
+      "query": "news"
+    },
+    {
+      "filename": "image_037.jpg",
+      "url": "https://play-lh.googleusercontent.com/we2nE_6CGArLNK1rU8R3dHZOHDyNmYN6tLekl1naLXYFyHXZT2syiUCC7zlFu8cPZHk",
+      "title": "DW - Breaking World News - Apps on Google Play",
+      "title_clean": "DW - Breaking World News - Apps on Google Play",
+      "displayLink": "www.dw.com",
+      "contextLink": "https://www.dw.com/app/android",
+      "query": "news"
+    },
+    {
+      "filename": "image_038.jpg",
+      "url": "https://dims.apnews.com/dims4/default/bac7ead/2147483647/strip/true/crop/6500x4117+0+0/resize/599x379!/quality/90/?url=https%3A%2F%2Fassets.apnews.com%2F3f%2Fec%2F89822c754c099ee1d2af81437d40%2Fap25056812814521.jpg",
+      "title": "White House says it 'will determine' the press pool | AP News",
+      "title_clean": "White House says it 'will determine' the press pool | AP News",
+      "displayLink": "apnews.com",
+      "contextLink": "https://apnews.com/article/trump-ap-news-outlets-ban-gulf-mexico-25c77f617418dd3ca2791af90b263a59",
+      "query": "news"
+    },
+    {
+      "filename": "image_039.png",
+      "url": "https://www.cbc.ca/kidsnews/images/LA_wildfire_AI_sitecard.png",
+      "title": "WATCH — The Hollywood sign didn't burn. How to spot fake L.A. ...",
+      "title_clean": "WATCH",
+      "displayLink": "www.cbc.ca",
+      "contextLink": "https://www.cbc.ca/kidsnews/post/watch-fake-l.a-wildfires-posts-are-tricking-people-how-to-spot-whats-not-real",
+      "query": "news"
+    },
+    {
+      "filename": "image_040.jpg",
+      "url": "https://dims.apnews.com/dims4/default/bc758f2/2147483647/strip/true/crop/8640x5760+0+0/resize/599x399!/quality/90/?url=https%3A%2F%2Fassets.apnews.com%2F16%2Fcb%2F2988c09be041f0663245022025a0%2F12ce2a47c9d543c4bddb170b3c715678",
+      "title": "What ignited the deadly Los Angeles wildfires? | AP News",
+      "title_clean": "What ignited the deadly Los Angeles wildfires? | AP News",
+      "displayLink": "apnews.com",
+      "contextLink": "https://apnews.com/article/california-fires-possible-causes-6112488f835e45f53c67d4d03d7a1e4f",
+      "query": "news"
+    },
+    {
+      "filename": "image_041.jpg",
+      "url": "https://ichef.bbci.co.uk/images/ic/480xn/p0ls0lj6.jpg",
+      "title": "BBC Radio 4 - The News Quiz",
+      "title_clean": "BBC Radio 4 - The News Quiz",
+      "displayLink": "www.bbc.com",
+      "contextLink": "https://www.bbc.com/radio4/comedy/newsquiz.shtml",
+      "query": "news"
+    },
+    {
+      "filename": "image_042.jpg",
+      "url": "https://www.aljazeera.com/wp-content/uploads/2025/11/AP25323661470444-1763583829.jpg?resize=770%2C513&quality=80",
+      "title": "Trump pauses immigration from 'Third World' countries: What that ...",
+      "title_clean": "Trump pauses immigration from 'Third World' countries: What that ...",
+      "displayLink": "www.aljazeera.com",
+      "contextLink": "https://www.aljazeera.com/news/2025/11/28/trump-pauses-immigration-from-third-world-countries-what-that-means",
+      "query": "news"
+    },
+    {
+      "filename": "image_043.jpg",
+      "url": "https://www.aljazeera.com/wp-content/uploads/2025/06/2025-06-12T145958Z_175488012_RC211FA246ZA_RTRMADP_3_INDIA-CRASH-1749748679.jpg?resize=730%2C410&quality=80",
+      "title": "Updates: One man survives Air India plane crash in Ahmedabad that ...",
+      "title_clean": "Updates: One man survives Air India plane crash in Ahmedabad that ...",
+      "displayLink": "www.aljazeera.com",
+      "contextLink": "https://www.aljazeera.com/news/liveblog/2025/6/12/live-air-india-flight-carrying-at-least-244-people-crashes-on-takeoff",
+      "query": "news"
+    },
+    {
+      "filename": "image_044.jpg",
+      "url": "https://www.aljazeera.com/wp-content/uploads/2025/11/reuters_691ee2d7-1763631831.jpg?resize=770%2C513&quality=80",
+      "title": "Barcelona vs Athletic Bilbao: La Liga – team news, start, lineups ...",
+      "title_clean": "Barcelona vs Athletic Bilbao: La Liga – team news, start, lineups ...",
+      "displayLink": "www.aljazeera.com",
+      "contextLink": "https://www.aljazeera.com/sports/2025/11/21/barcelona-vs-athletic-bilbao-la-liga-team-news-start",
+      "query": "news"
+    },
+    {
+      "filename": "image_045.jpg",
+      "url": "https://www.aljazeera.com/wp-content/uploads/2025/10/afp_68ff76a4b091-1761572516.jpg?resize=730%2C410&quality=80",
+      "title": "A true genocide': RSF kills 'at least 1,500 people' in Sudan's el ...",
+      "title_clean": "A true genocide': RSF kills 'at least 1,500 people' in Sudan's el ...",
+      "displayLink": "www.aljazeera.com",
+      "contextLink": "https://www.aljazeera.com/news/2025/10/29/horrific-violations-arab-nations-slam-rsf-killings-in-sudans-el-fasher",
+      "query": "news"
+    },
+    {
+      "filename": "image_046.jpg",
+      "url": "https://live-production.wcms.abc-cdn.net.au/2eca30650db7ea72f766766ee1241870?impolicy=wcms_crop_resize&cropH=1827&cropW=3248&xPos=171&yPos=198&width=862&height=485",
+      "title": "Jeremy Fernandez on becoming the main anchor of ABC NSW 7pm News ...",
+      "title_clean": "Jeremy Fernandez on becoming the main anchor of ABC NSW 7pm News ...",
+      "displayLink": "www.abc.net.au",
+      "contextLink": "https://www.abc.net.au/news/backstory/2023-09-11/-jeremy-fernandez-to-host-nsw-7pm-news/102832458",
+      "query": "news"
+    },
+    {
+      "filename": "image_047.jpg",
+      "url": "https://ichef.bbci.co.uk/images/ic/480xn/p0m7wq30.jpg",
+      "title": "BBC One - Have I Got News for You",
+      "title_clean": "BBC One - Have I Got News for You",
+      "displayLink": "www.bbc.com",
+      "contextLink": "https://www.bbc.com/programmes/b006mkw3",
+      "query": "news"
+    },
+    {
+      "filename": "image_048.jpg",
+      "url": "https://www.aljazeera.com/wp-content/uploads/2024/03/2024-03-23T084450Z_1513283650_RC2KR6AXKEPS_RTRMADP_3_RUSSIA-SHOOTING-1711187945.jpg?resize=770%2C513&quality=80",
+      "title": "Moscow concert hall attack: Why is ISIL targeting Russia? | ISIL ...",
+      "title_clean": "Moscow concert hall attack: Why is ISIL targeting Russia?",
+      "displayLink": "www.aljazeera.com",
+      "contextLink": "https://www.aljazeera.com/news/2024/3/23/moscow-concert-hall-attack-why-is-isil-targeting",
+      "query": "news"
+    },
+    {
+      "filename": "image_049.webp",
+      "url": "https://ichef.bbci.co.uk/news/480/cpsprodpb/e9c9/live/9eddabd0-9818-11f0-afbd-e7b72e5c3f7f.jpg.webp",
+      "title": "ICC charges ex-Philippines leader Rodrigo Duterte with murder",
+      "title_clean": "ICC charges ex-Philippines leader Rodrigo Duterte with murder",
+      "displayLink": "www.bbc.com",
+      "contextLink": "https://www.bbc.com/news/articles/cg5e1v85lrdo",
+      "query": "news"
+    }
+  ],
+  "topic_title": "selena gomez - fresh news",
+  "generated_on": "2025-12-30"
+}
