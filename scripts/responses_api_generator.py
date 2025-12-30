@@ -1616,6 +1616,78 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
     pass_a_raw_text = ""
     sources_out: List[Dict[str, Any]] = []
     content: List[Dict[str, Any]] = []
+    search_queries: List[str] = []
+
+    def _normalize_queries(qs: Any) -> List[str]:
+        try:
+            if isinstance(qs, str):
+                qs = [qs]
+            if isinstance(qs, (list, tuple)):
+                out_q = []
+                for q in qs:
+                    s = str(q).strip()
+                    if s:
+                        out_q.append(s)
+                # de-dupe while preserving order
+                seen = set()
+                deduped = []
+                for q in out_q:
+                    k = q.lower()
+                    if k in seen:
+                        continue
+                    seen.add(k)
+                    deduped.append(q)
+                return deduped
+        except Exception:
+            pass
+        return []
+
+    def _extract_queries_from_pass_a_text(raw: str) -> List[str]:
+        """Best-effort extraction of search queries from Pass A raw text.
+
+        Accepts multiple common shapes, e.g.:
+          SEARCH_QUERIES:
+          - q1
+          - q2
+        or
+          Search queries:
+          1) q1
+          2) q2
+        """
+        if not raw:
+            return []
+        text = str(raw)
+        # Find the section header
+        import re
+        m = re.search(r"(?im)^\s*(search[_\s-]*queries)\s*:\s*$", text)
+        if not m:
+            # also tolerate inline header
+            m = re.search(r"(?im)^\s*(search[_\s-]*queries)\s*:\s*(.+)$", text)
+            if m:
+                tail = m.group(2).strip()
+                # split on semicolon / comma if looks like a list
+                parts = [p.strip() for p in re.split(r"[;\n]", tail) if p.strip()]
+                return _normalize_queries(parts)
+            return []
+
+        start = m.end()
+        after = text[start:]
+        # Stop at next all-caps section header (e.g., SOURCES:, SCRIPT:)
+        stop = re.search(r"(?im)^\s*[A-Z][A-Z_\s-]{2,}\s*:\s*$", after)
+        block = after[: stop.start()] if stop else after
+
+        lines = []
+        for ln in block.splitlines():
+            s = ln.strip()
+            if not s:
+                continue
+            # bullets / numbering
+            s = re.sub(r"^[-*•]\s+", "", s)
+            s = re.sub(r"^\(?\d+\)?[\.)]\s+", "", s)
+            s = s.strip()
+            if s:
+                lines.append(s)
+        return _normalize_queries(lines)
 
     if _should_run_pass_a(config, enabled_specs):
         # Pass A: long script only (plain text). Treat incomplete as completed.
@@ -1635,6 +1707,14 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
         if nonlong_specs:
             out_b = _run_pass_b_from_pass_a(client, config, nonlong_specs, sources_text, script_text)
             content.extend(out_b.get("content", []))
+
+        # Prefer explicit SEARCH_QUERIES section in Pass A output; fallback to config queries/title.
+        search_queries = _extract_queries_from_pass_a_text(pass_a_raw_text)
+        if not search_queries:
+            search_queries = _normalize_queries(config.get("queries") or [])
+        if not search_queries:
+            title = str(config.get("title") or config.get("topic") or "").strip()
+            search_queries = [title] if title else []
 
     else:
         # No Pass A. Generate non-long items directly in a single call.
@@ -1686,15 +1766,25 @@ Return STRICT JSON only:
                 raise ValueError("Single-pass (sources provided) output JSON missing 'content' list")
             sources_out = sources_in
             content.extend(out_b.get("content", []))
+            # In single-pass mode with sources provided, prefer config queries/title.
+            search_queries = _normalize_queries(config.get("queries") or [])
+            if not search_queries:
+                title = str(config.get("title") or config.get("topic") or "").strip()
+                search_queries = [title] if title else []
         else:
             out_b = _run_pass_b_grouped(client, config, nonlong_specs)
             sources_out = out_b.get("sources", []) or []
             content.extend(out_b.get("content", []))
+            search_queries = _normalize_queries(config.get("queries") or [])
+            if not search_queries:
+                title = str(config.get("title") or config.get("topic") or "").strip()
+                search_queries = [title] if title else []
 
     return {
         "content": content,
         "sources": sources_out,
         "pass_a_raw_text": pass_a_raw_text,
+        "search_queries": search_queries,
     }
 
 

@@ -94,7 +94,8 @@ def generate_multi_format_scripts(config: Dict[str, Any], sources: List[Dict[str
       {
         "content": [ {code,type,script,max_words,...}, ... ],
         "sources": [...],
-        "pass_a_raw_text": "..."   # present when Pass A ran
+        "pass_a_raw_text": "...",   # present when Pass A ran
+        "search_queries": ["...", ...]  # optional; used by images module
       }
     """
     global _generation_in_progress
@@ -136,11 +137,13 @@ def generate_multi_format_scripts(config: Dict[str, Any], sources: List[Dict[str
         content_list = out.get("content", []) or []
         sources_out = out.get("sources", []) or []
         pass_a_raw = out.get("pass_a_raw_text", "") or ""
+        search_queries = out.get("search_queries") or []
 
         return {
             "content": content_list,
             "sources": sources_out,
             "pass_a_raw_text": pass_a_raw,
+            "search_queries": search_queries,
         }
 
     finally:
