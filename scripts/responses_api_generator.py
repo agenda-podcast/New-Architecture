@@ -698,40 +698,25 @@ def _make_mock_outputs_from_source_text(config: Dict[str, Any], enabled_specs: L
         a_specs, b_specs = _enabled_specs_from_content_specs(config.get("content_specs") or [])
         all_specs = list(a_specs) + list(b_specs)
         out_all = _run_gemini_single_pass_all_v2(client, config, all_specs, sources_in)
-        return {
-                "content": out_all.get("content", []),
-                "sources": sources_in,
-                # Preserve raw L1 JSON/text so script_generate can extract "search_query" when present.
-                "pass_a_raw_text": (out_all.pop("_raw_text", "") or ""),
-                # Canonicalize search queries for image collection.
-                "search_queries": _coerce_str_list(out_all.get("search_queries") or out_all.get("search_query") or []),
-            }
+        return {"content": out_all.get("content", []), "sources": sources_in, "pass_a_raw_text": "", "search_queries": (out_all.get("search_queries") or out_all.get("search_query") or [])}
+
+
+
     long_specs, nonlong_specs = _enabled_specs_from_content_specs(enabled_specs)
 
     # Gemini: modern single request only (no Pass A / Pass B; no chunking; no continuations)
     if _is_gemini_model(_pick_model_pass_b(config)):
         all_specs = list(long_specs) + list(nonlong_specs)
         out_all = _run_gemini_single_pass_all_v2(client, config, all_specs, sources_in)
-        return {
-                "content": out_all.get("content", []),
-                "sources": sources_in,
-                # Preserve raw L1 JSON/text so script_generate can extract "search_query" when present.
-                "pass_a_raw_text": (out_all.pop("_raw_text", "") or ""),
-                # Canonicalize search queries for image collection.
-                "search_queries": _coerce_str_list(out_all.get("search_queries") or out_all.get("search_query") or []),
-            }
+        return {"content": out_all.get("content", []), "sources": sources_in, "pass_a_raw_text": "", "search_queries": (out_all.get("search_queries") or out_all.get("search_query") or [])}
+
+
     # Gemini: single request only. Generate ALL items (including long/L1) in one response.
     if _is_gemini_model(_pick_model_pass_b(config)):
         all_specs = list(long_specs) + list(nonlong_specs)
         out_all = _run_gemini_single_pass_all_v2(client, config, all_specs, sources_in)
-        return {
-                "content": out_all.get("content", []),
-                "sources": sources_in,
-                # Preserve raw L1 JSON/text so script_generate can extract "search_query" when present.
-                "pass_a_raw_text": (out_all.pop("_raw_text", "") or ""),
-                # Canonicalize search queries for image collection.
-                "search_queries": _coerce_str_list(out_all.get("search_queries") or out_all.get("search_query") or []),
-            }
+        return {"content": out_all.get("content", []), "sources": sources_in, "pass_a_raw_text": "", "search_queries": (out_all.get("search_queries") or out_all.get("search_query") or [])}
+
     # Long script (Pass A mock)
     pass_a_raw_text = ""
     long_script_text = ""
@@ -1545,11 +1530,8 @@ Return STRICT JSON only:
                     data = extracted
                 else:
                     raise
-    # Stash raw provider text so downstream can extract search queries even if content is missing.
-    if isinstance(txt, str) and txt.strip():
-        data["_raw_text"] = txt
 
-    out = _normalize_single_pass_payload(data)
+    out = _normalize_single_pass_payload(data=data, config=config, model=model)
     _enforce_unique_video_metadata(out.get("content") or [])
     return out
 
@@ -1582,14 +1564,10 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
             a_specs, b_specs = _enabled_specs_from_content_specs((config.get("content_specs") if isinstance(config, dict) else []) or [])
             all_specs = list(a_specs) + list(b_specs)
             out_all = _run_gemini_single_pass_all_v2(client, config, all_specs, sources_in)
-            return {
-                "content": out_all.get("content", []),
-                "sources": sources_in,
-                # Preserve raw L1 JSON/text so script_generate can extract "search_query" when present.
-                "pass_a_raw_text": (out_all.pop("_raw_text", "") or ""),
-                # Canonicalize search queries for image collection.
-                "search_queries": _coerce_str_list(out_all.get("search_queries") or out_all.get("search_query") or []),
-            }
+            return {"content": out_all.get("content", []), "sources": sources_in, "pass_a_raw_text": "", "search_queries": (out_all.get("search_queries") or out_all.get("search_query") or [])}
+
+
+
         if client is None:
             raise ValueError("OpenAI client is required")
         enabled_specs = kwargs.get("enabled_specs") or []
