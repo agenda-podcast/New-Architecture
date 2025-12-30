@@ -134,7 +134,7 @@ def gemini_generate_once(
 
     # Single, non-streaming request.
     # Default timeout is intentionally high because long-form generation can take minutes.
-    timeout_s = float(os.getenv("GEMINI_HTTP_TIMEOUT_S", os.getenv("OPENAI_TIMEOUT", "600")))
+    timeout_s = float(os.getenv("GEMINI_HTTP_TIMEOUT_S", os.getenv("OPENAI_TIMEOUT", "1600")))
     connect_s = float(os.getenv("GEMINI_HTTP_CONNECT_TIMEOUT_S", "30"))
     timeout = httpx.Timeout(
         timeout_s,
