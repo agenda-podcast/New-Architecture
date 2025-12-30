@@ -438,6 +438,13 @@ def render_slideshow_ffmpeg_effects(
         DEFAULT_STILL_MAX = 6.0
         still_min = max(0.35, float(still_config.get('min', DEFAULT_STILL_MIN) or DEFAULT_STILL_MIN))
         still_max = max(still_min, float(still_config.get('max', DEFAULT_STILL_MAX) or DEFAULT_STILL_MAX))
+        # Apply hard max to avoid extremely long holds (helps when images are few)
+        try:
+            _min_b, _max_b = _slideshow_duration_bounds()
+            still_max = min(still_max, float(_max_b))
+            still_min = min(still_min, still_max)
+        except Exception:
+            pass
         
         # Build slideshow schedule
         schedule = []
@@ -485,6 +492,8 @@ def render_slideshow_ffmpeg_effects(
             for idx, it in enumerate(schedule):
                 img_p = Path(it['image'])
                 title = title_map.get(img_p.name, "").strip()
+                if not title:
+                    title = _fallback_title_from_filename(img_p)
                 still_dur = float(it.get('still_duration', 0.0) or 0.0)
                 if title and still_dur > 0:
                     title_segments.append(
@@ -1196,32 +1205,121 @@ def _safe_positive_duration(value: float, default: float = 1.0) -> float:
         return float(default)
     return v
 
-def _compute_static_image_segments(images: List[Path], total_duration: float) -> List[Dict[str, Any]]:
-    """Compute sequential [start,end,image] segments for a static slideshow."""
+
+def _slideshow_duration_bounds() -> tuple[float, float]:
+    """Return (min_sec, max_sec) for static image slots.
+
+    Uses STATIC_IMAGE_MIN_SEC/STATIC_IMAGE_MAX_SEC if set, otherwise falls back to
+    IMAGE_TRANSITION_MIN_SEC/IMAGE_TRANSITION_MAX_SEC. Also applies a hard max
+    (STATIC_IMAGE_HARD_MAX_SEC) to prevent extremely long single-image videos.
+    """
+    def _f(env_key: str, default: float) -> float:
+        try:
+            return float(os.environ.get(env_key, str(default)).strip())
+        except Exception:
+            return float(default)
+
+    # Prefer dedicated env vars; fall back to legacy names.
+    min_sec = _f("STATIC_IMAGE_MIN_SEC", _f("IMAGE_TRANSITION_MIN_SEC", 3.0))
+    max_sec = _f("STATIC_IMAGE_MAX_SEC", _f("IMAGE_TRANSITION_MAX_SEC", 6.0))
+
+    # Hard cap to avoid one-image-for-entire-video path when config is accidental.
+    hard_max = _f("STATIC_IMAGE_HARD_MAX_SEC", 8.0)
+    if hard_max > 0:
+        max_sec = min(max_sec, hard_max)
+
+    min_sec = max(0.35, float(min_sec))
+    max_sec = max(min_sec, float(max_sec))
+    return min_sec, max_sec
+
+
+def _build_looped_image_slots(images: list[Path], total_duration: float) -> list[tuple[Path, float]]:
+    """Build (image, duration) slots that cover total_duration.
+
+    - Chooses a slot count so per-slot duration is reasonably bounded.
+    - Cycles images in order if slots > len(images).
+    - Ensures total duration matches exactly (last slot adjusted).
+    """
     total_duration = _safe_positive_duration(total_duration, default=1.0)
     imgs = [Path(p) for p in images if p is not None]
     if not imgs:
         return []
-    n = len(imgs)
-    per = max(0.35, total_duration / max(1, n))
-    durations = [per] * n
-    sum_prev = per * (n - 1)
-    durations[-1] = max(0.35, total_duration - sum_prev)
-    if sum(durations) > total_duration + 1e-3:
-        durations[-1] = max(0.35, total_duration - sum(durations[:-1]))
-    segs = []
+
+    min_sec, max_sec = _slideshow_duration_bounds()
+
+    # If the clip is short, keep a single slot.
+    if total_duration <= max_sec + 1e-6:
+        return [(imgs[0], total_duration)]
+
+    # Start with enough slots to keep each <= max_sec.
+    slots = int(math.ceil(total_duration / max_sec))
+    # But avoid creating slots so small they become imperceptible; reduce if needed.
+    if min_sec > 0:
+        max_slots_by_min = max(1, int(math.floor(total_duration / min_sec)))
+        slots = min(slots, max_slots_by_min) if max_slots_by_min >= 1 else slots
+
+    # If we have multiple images and meaningful duration, force at least 2 slots.
+    if len(imgs) >= 2 and total_duration >= (min_sec * 2.0):
+        slots = max(2, slots)
+
+    slots = max(1, slots)
+    per = total_duration / slots
+
+    out: list[tuple[Path, float]] = []
     t = 0.0
-    for img, dur in zip(imgs, durations):
+    for i in range(slots):
+        dur = per
+        if i == slots - 1:
+            dur = max(0.001, total_duration - t)
+        out.append((imgs[i % len(imgs)], float(dur)))
+        t += dur
+
+    # Numerical safety: force exact.
+    if out:
+        img_last, _ = out[-1]
+        sum_prev = sum(d for _, d in out[:-1])
+        out[-1] = (img_last, max(0.001, total_duration - sum_prev))
+    return out
+
+
+def _fallback_title_from_filename(p: Path) -> str:
+    """Best-effort title when Google metadata is missing."""
+    try:
+        stem = Path(p).stem
+    except Exception:
+        stem = str(p)
+    s = stem.replace("_", " ").replace("-", " ").strip()
+    s = re.sub(r"\s+", " ", s)
+    # Avoid shouting title-case on all-caps stems; simple capitalization.
+    if len(s) > 0 and not s.isupper():
+        s = s[:1].upper() + s[1:]
+    return s[:90].strip()
+
+
+def _compute_static_image_segments(images: List[Path], total_duration: float) -> List[Dict[str, Any]]:
+    """Compute sequential [start,end,image] segments for a static slideshow.
+
+    Key property: if total_duration is longer than the available images can reasonably
+    cover, we *loop* images to keep rotation happening, rather than assigning one
+    image an extremely long hold.
+    """
+    total_duration = _safe_positive_duration(total_duration, default=1.0)
+    slots = _build_looped_image_slots([Path(p) for p in images if p is not None], total_duration)
+    if not slots:
+        return []
+    segs: List[Dict[str, Any]] = []
+    t = 0.0
+    for img, dur in slots:
         start = t
-        end = min(total_duration, t + dur)
-        segs.append({"image": img, "start": start, "end": end, "duration": max(0.001, end-start)})
+        end = min(total_duration, t + float(dur))
+        segs.append({"image": img, "start": start, "end": end, "duration": max(0.001, end - start)})
         t = end
-    # ensure final end == total_duration
+        if t >= total_duration - 1e-6:
+            break
     if segs:
         segs[-1]["end"] = total_duration
         segs[-1]["duration"] = max(0.001, segs[-1]["end"] - segs[-1]["start"])
     return segs
-
 def _write_concat_demuxer_file(segments: List[Dict[str, Any]], concat_path: Path) -> None:
     """Write an ffmpeg concat-demuxer file from segments."""
     if not segments:
@@ -1277,7 +1375,9 @@ def _render_slideshow_ffmpeg_concat_single_pass(
     try:
         title_map = _load_image_title_map([Path(seg["image"]) for seg in segments])
         for seg in segments:
-            title = title_map.get(Path(seg["image"]))
+            title = title_map.get(Path(seg["image"]).name, "").strip()
+            if not title:
+                title = _fallback_title_from_filename(Path(seg["image"]))
             if title:
                 title_segments.append({
                     "start": float(seg["start"]),
@@ -1757,7 +1857,7 @@ def collect_topic_images(topic_config: Dict[str, Any], output_dir: Path, topic_i
                 if qpath.exists():
                     import json
                     data = json.loads(qpath.read_text(encoding='utf-8'))
-                    qs = data.get('search_queries') or []
+                    qs = (data.get('search_queries') or data.get('search_query') or data.get('queries') or [])
                     if isinstance(qs, list) and any(str(x).strip() for x in qs):
                         topic_queries = [str(x).strip() for x in qs if str(x).strip()]
             except Exception:
@@ -2611,24 +2711,16 @@ def create_video_from_images(background_images: List[Path], audio_path: Optional
         # Legacy concat mode (fallback or default when effects disabled)
         print(f"  Using legacy FFmpeg concat mode (hard cuts)...")
         
-        # Calculate dynamic image durations with random timing (3-8 seconds per image)
-        # Cycle through images if needed to cover full video duration
-        image_durations = []
-        total_time = 0
-        image_index = 0
-        
-        while total_time < audio_duration:
-            # Random duration between 3-8 seconds
-            duration = random.uniform(IMAGE_TRANSITION_MIN_SEC, IMAGE_TRANSITION_MAX_SEC)
-            
-            # Don't exceed audio duration on last image
-            if total_time + duration > audio_duration:
-                duration = audio_duration - total_time
-            
-            image_durations.append((background_images[image_index % len(background_images)], duration))
-            total_time += duration
-            image_index += 1
-        
+        # Calculate image schedule with bounded per-image durations.
+        # Cycle through images if needed to cover full video duration.
+        image_durations = _build_looped_image_slots([Path(p) for p in background_images], audio_duration)
+        if not image_durations:
+            print("    ✗ No images available for slideshow")
+            return False
+
+        # Keep compatibility with older tuple structure used below
+        total_time = sum(d for _, d in image_durations)
+
         # Log slideshow schedule
         images_used = len(image_durations)
         images_looped = images_used > len(background_images)
@@ -2645,6 +2737,8 @@ def create_video_from_images(background_images: List[Path], audio_path: Optional
             t0 = 0.0
             for idx, (img, dur) in enumerate(image_durations):
                 title = title_map.get(Path(img).name, "").strip()
+                if not title:
+                    title = _fallback_title_from_filename(Path(img))
                 d = float(dur or 0.0)
                 if title and d > 0:
                     segs.append(
@@ -2717,6 +2811,8 @@ def create_video_from_images(background_images: List[Path], audio_path: Optional
                 t0 = 0.0
                 for idx, (img, dur) in enumerate(image_durations):
                     title = title_map.get(Path(img).name, '').strip()
+                    if not title:
+                        title = _fallback_title_from_filename(Path(img))
                     d = float(dur or 0.0)
                     if title and d > 0:
                         title_segments.append({

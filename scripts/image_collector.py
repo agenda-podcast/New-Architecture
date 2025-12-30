@@ -526,6 +526,22 @@ def collect_images_for_topic(
         if image_path.exists():
             logger.info(f"  Image {start_index + i + 1}/{original_num_images} already exists: {image_path.name}")
             downloaded_images.append(image_path)
+            # Ensure we have title metadata even for previously-downloaded files.
+            try:
+                if image_path.name not in known_filenames:
+                    meta["images"].append(
+                        {
+                            "filename": image_path.name,
+                            "url": url,
+                            "title": raw_title,
+                            "title_clean": cleaned_title,
+                            "displayLink": display_link,
+                        }
+                    )
+                    known_filenames.add(image_path.name)
+                    _write_images_metadata(output_dir, meta)
+            except Exception:
+                pass
             continue
         
         # Validate URL before downloading
