@@ -14,7 +14,7 @@
     "us",
     "uk"
   ],
-  "min_fresh_sources": 5,
+  "min_fresh_sources": 10,
   "freshness_hours": 24,
   "max_backlog_items": 100,
   "max_fresh_items": 50,
@@ -45,10 +45,10 @@
     }
   ],
   "content_types": {
-    "long": { "enabled": true, "items": 1, "max_words": 2000 },
-    "medium": { "enabled": false, "items": 2, "max_words": 3000 },
-    "short": { "enabled": false, "items": 4, "max_words": 600 },
-    "reels": { "enabled": true, "items": 2, "max_words": 200 }
+    "long": { "enabled": true, "items": 1, "max_words": 20000 },
+    "medium": { "enabled": true, "items": 2, "max_words": 3000 },
+    "short": { "enabled": true, "items": 4, "max_words": 600 },
+    "reels": { "enabled": true, "items": 10, "max_words": 150 }
   },
   "gpt_model_pass_b": "gpt-5-nano",
   "llm_model": "gemini-3-flash"
