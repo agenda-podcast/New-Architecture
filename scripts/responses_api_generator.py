@@ -1556,11 +1556,15 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
     # Legacy style: (client, config, pass_a_long_script, sources)
     if len(args) >= 4 and not isinstance(args[0], dict):
         client, config, pass_a_long_script, sources = args[0], args[1], args[2], args[3]
-        # Gemini legacy-call compatibility: single request, ignore pass_a_long_script
+
+        # Gemini: enforce ONE request total and bypass Pass A/B entirely (legacy call style)
         if _is_gemini_model(_pick_model_pass_b(config)):
             sources_in = sources if isinstance(sources, list) else []
-            out_all = _run_gemini_single_pass_all_v2(client, config, list(_enabled_specs_from_content_specs(config.get("content_specs") or []))[0] + list(_enabled_specs_from_content_specs(config.get("content_specs") or []))[1], sources_in)
+            a_specs, b_specs = _enabled_specs_from_content_specs((config.get("content_specs") if isinstance(config, dict) else []) or [])
+            all_specs = list(a_specs) + list(b_specs)
+            out_all = _run_gemini_single_pass_all_v2(client, config, all_specs, sources_in)
             return {"content": out_all.get("content", []), "sources": sources_in, "pass_a_raw_text": ""}
+
 
 
         if client is None:
