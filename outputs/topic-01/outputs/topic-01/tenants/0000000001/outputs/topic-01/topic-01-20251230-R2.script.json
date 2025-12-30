@@ -1,0 +1,60 @@
+{
+  "title": "selena gomez - fresh news - R2",
+  "duration_sec": 80,
+  "segments": [
+    {
+      "chapter": 1,
+      "title": "Reels",
+      "start_time": 0,
+      "duration": 0,
+      "dialogue": [
+        {
+          "speaker": "A",
+          "text": "Let us dive into the trending topics for Selena Gomez this May. There is a lot of news happening."
+        },
+        {
+          "speaker": "B",
+          "text": "Exactly. The search queries are dominated by her role in the film Emilia Perez at the Cannes Film Festival."
+        },
+        {
+          "speaker": "A",
+          "text": "People are looking for reviews to see how the movie is performing. It is a big moment for her."
+        },
+        {
+          "speaker": "B",
+          "text": "We are also seeing a lot of interest in the business world regarding the Rare Beauty valuation news lately."
+        },
+        {
+          "speaker": "A",
+          "text": "That brand has become massive. Meanwhile, fans of her television work are asking about Only Murders in the Building."
+        },
+        {
+          "speaker": "B",
+          "text": "They specifically want to know the Season 4 release date. It is one of the most anticipated shows right now."
+        },
+        {
+          "speaker": "A",
+          "text": "Her personal life is also making headlines with new reports about her relationship with Benny Blanco being searched for."
+        },
+        {
+          "speaker": "B",
+          "text": "And we cannot forget her mental health advocacy, which remains a core part of her public profile and work."
+        },
+        {
+          "speaker": "A",
+          "text": "It is clear that Selena is staying busy across multiple industries, from beauty to film and even television production."
+        },
+        {
+          "speaker": "B",
+          "text": "We will continue to follow these search trends as more information becomes available about her upcoming projects today."
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-12-30T01:06:51.458824",
+    "num_sources": 0,
+    "content_type": "reels",
+    "content_code": "R2"
+  }
+}
