@@ -10,34 +10,38 @@
       "dialogue": [
         {
           "speaker": "A",
-          "text": "Selena Gomez is dominating headlines today with a mix of personal joy and professional triumphs. Margaret, what is the latest from her social media?"
+          "text": "Selena Gomez is dominating the news cycle today following the Los Angeles premiere of Wizards Beyond Waverly Place."
         },
         {
           "speaker": "B",
-          "text": "Gary, Selena shared a \"life lately\" update June 17th, featuring sweet photos with boyfriend Benny Blanco. It shows a stable chapter for her. But the real news is her career momentum. She recently shared the Best Actress ensemble prize at the Cannes Film Festival for her role in the musical noir Emilia Pérez."
+          "text": "That is right. On October 24, 2024, Gomez hit the red carpet at the El Capitan Theatre in a custom red Rodarte dress. She was joined by her former co-star David Henrie to celebrate this new sequel series."
         },
         {
           "speaker": "A",
-          "text": "That is a significant shift from her pop roots. It seems she is leaning into serious acting and producing now."
+          "text": "Gomez is not just guest-starring; she is an executive producer. She mentioned her goal is to provide a safe environment for the new cast, including lead actress Janice LeAnn Brown."
         },
         {
           "speaker": "B",
-          "text": "Exactly. She mentioned having perhaps one more album left before focusing on acting full-time. Plus, Only Murders in the Building Season 4 premieres August 27th. The production even moved to Los Angeles this time."
+          "text": "It is a significant return to her roots. The show hits Disney Channel on October 29 and Disney Plus the next day. This comes as she balances a massive career shift."
         },
         {
           "speaker": "A",
-          "text": "She is also a powerhouse in business. Rare Beauty is now valued near two billion dollars."
+          "text": "Indeed. While she revisits Disney, she is also gaining serious Oscar buzz for her role in the film Emilia Pérez. Critics are calling her a frontrunner for Best Supporting Actress."
         },
         {
           "speaker": "B",
-          "text": "It is incredible. She is set to produce and star in the Linda Ronstadt biopic, bridging her musical past with her cinematic future. She is building long-term equity while maintaining her mental health advocacy through her platform, Wondermind. She is firing on all cylinders right now, Gary."
+          "text": "It is a busy time. Between her billionaire status from Rare Beauty and her television success with Only Murders in the Building, she is managing a multi-billion dollar empire while staying selective with her acting projects."
+        },
+        {
+          "speaker": "A",
+          "text": "She is certainly proving that a former child star succeeds."
         }
       ]
     }
   ],
   "metadata": {
-    "generated_at": "2025-12-30T03:59:09.255126",
-    "num_sources": 8,
+    "generated_at": "2025-12-30T06:00:57.269013",
+    "num_sources": 10,
     "content_type": "reels",
     "content_code": "R1"
   }

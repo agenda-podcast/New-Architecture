@@ -1,100 +1,82 @@
 {
-  "total_chunks": 10,
-  "successful_chunks": 10,
+  "total_chunks": 8,
+  "successful_chunks": 8,
   "failed_chunks": 0,
-  "total_time_sec": 26.918579578399658,
+  "total_time_sec": 28.283217906951904,
   "output_file": "/home/runner/work/New-Architecture/New-Architecture/tenants/0000000001/outputs/topic-01/topic-01-20251230-R2.wav",
-  "output_size_mb": 4.968954086303711,
+  "output_size_mb": 5.423940658569336,
   "chunks": [
     {
       "chunk_id": 0,
-      "text_length": 97,
+      "text_length": 130,
       "speaker": "A",
       "attempts": 1,
       "success": true,
       "error": null,
-      "duration_sec": 8.369265079498291
+      "duration_sec": 11.389794111251831
     },
     {
       "chunk_id": 1,
-      "text_length": 107,
+      "text_length": 214,
       "speaker": "B",
       "attempts": 1,
       "success": true,
       "error": null,
-      "duration_sec": 10.73243498802185
+      "duration_sec": 19.660232305526733
     },
     {
       "chunk_id": 2,
-      "text_length": 94,
+      "text_length": 142,
       "speaker": "A",
       "attempts": 1,
       "success": true,
       "error": null,
-      "duration_sec": 8.22736144065857
+      "duration_sec": 12.269839525222778
     },
     {
       "chunk_id": 3,
-      "text_length": 107,
+      "text_length": 196,
       "speaker": "B",
       "attempts": 1,
       "success": true,
       "error": null,
-      "duration_sec": 10.092279195785522
+      "duration_sec": 17.773005485534668
     },
     {
       "chunk_id": 4,
-      "text_length": 116,
+      "text_length": 89,
       "speaker": "A",
       "attempts": 1,
       "success": true,
       "error": null,
-      "duration_sec": 11.310498476028442
+      "duration_sec": 9.62220573425293
     },
     {
       "chunk_id": 5,
-      "text_length": 108,
+      "text_length": 231,
       "speaker": "B",
       "attempts": 1,
       "success": true,
       "error": null,
-      "duration_sec": 11.5934419631958
+      "duration_sec": 15.865574359893799
     },
     {
       "chunk_id": 6,
-      "text_length": 120,
+      "text_length": 111,
       "speaker": "A",
       "attempts": 1,
       "success": true,
       "error": null,
-      "duration_sec": 10.54493522644043
+      "duration_sec": 8.93687891960144
     },
     {
       "chunk_id": 7,
-      "text_length": 106,
+      "text_length": 19,
       "speaker": "B",
       "attempts": 1,
       "success": true,
       "error": null,
-      "duration_sec": 10.867975950241089
-    },
-    {
-      "chunk_id": 8,
-      "text_length": 119,
-      "speaker": "A",
-      "attempts": 1,
-      "success": true,
-      "error": null,
-      "duration_sec": 6.884434461593628
-    },
-    {
-      "chunk_id": 9,
-      "text_length": 119,
-      "speaker": "B",
-      "attempts": 1,
-      "success": true,
-      "error": null,
-      "duration_sec": 6.796159744262695
+      "duration_sec": 5.903793573379517
     }
   ]
 }

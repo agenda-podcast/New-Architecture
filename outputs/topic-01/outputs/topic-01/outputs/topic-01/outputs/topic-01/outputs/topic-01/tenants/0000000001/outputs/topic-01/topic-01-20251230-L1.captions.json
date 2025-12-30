@@ -1,0 +1,45 @@
+{
+  "captions": [
+    {
+      "index": 1,
+      "start": 0.0,
+      "end": 13.306476971830987,
+      "text": "{\"candidates\": [{\"content\": {}, \"finishReason\": \"MALFORMED_FUNCTION_CALL\",\n\"index\": 0, \"finishMessage\": \"Malformed function\ncall: call:google_search:search{queries:[\\\"Selena Gomez news May",
+      "speaker": "A"
+    },
+    {
+      "index": 2,
+      "start": 13.306476971830987,
+      "end": 26.612953943661974,
+      "text": "23 2024\\\",\\\"Selena Gomez Cannes Film\nFestival Emilia Perez reviews May\n2024\\\",\\\"Selena Gomez Rare Beauty valuation",
+      "speaker": "A"
+    },
+    {
+      "index": 3,
+      "start": 26.612953943661974,
+      "end": 39.91943091549296,
+      "text": "news May 2024\\\",\\\"Selena Gomez Only\nMurders in the Building Season\n4 release date\\\",\\\"Selena Gomez Benny",
+      "speaker": "A"
+    },
+    {
+      "index": 4,
+      "start": 39.91943091549296,
+      "end": 53.22590788732395,
+      "text": "Blanco relationship news May 2024\\\",\\\"Selena\nGomez mental health advocacy news\nMay 2024\\\"]}\"}], \"usageMetadata\": {\"promptTokenCount\": 409,",
+      "speaker": "A"
+    },
+    {
+      "index": 5,
+      "start": 53.22590788732395,
+      "end": 62.983991,
+      "text": "\"totalTokenCount\": 409, \"promptTokensDetails\": [{\"modality\": \"TEXT\",\n\"tokenCount\": 409}]}, \"modelVersion\": \"gemini-3-flash-preview\", \"responseId\":\n\"TyVTadWwDriX-8YPjr2ysQs\"}",
+      "speaker": "A"
+    }
+  ],
+  "dialogue_chunks": [
+    {
+      "speaker": "A",
+      "text": "{\"candidates\": [{\"content\": {}, \"finishReason\": \"MALFORMED_FUNCTION_CALL\", \"index\": 0, \"finishMessage\": \"Malformed function call: call:google_search:search{queries:[\\\"Selena Gomez news May 23 2024\\\",\\\"Selena Gomez Cannes Film Festival Emilia Perez reviews May 2024\\\",\\\"Selena Gomez Rare Beauty valuation news May 2024\\\",\\\"Selena Gomez Only Murders in the Building Season 4 release date\\\",\\\"Selena Gomez Benny Blanco relationship news May 2024\\\",\\\"Selena Gomez mental health advocacy news May 2024\\\"]}\"}], \"usageMetadata\": {\"promptTokenCount\": 409, \"totalTokenCount\": 409, \"promptTokensDetails\": [{\"modality\": \"TEXT\", \"tokenCount\": 409}]}, \"modelVersion\": \"gemini-3-flash-preview\", \"responseId\": \"TyVTadWwDriX-8YPjr2ysQs\"}"
+    }
+  ]
+}
