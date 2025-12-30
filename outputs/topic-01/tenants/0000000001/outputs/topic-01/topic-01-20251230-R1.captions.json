@@ -1,0 +1,146 @@
+{
+  "captions": [
+    {
+      "index": 1,
+      "start": 0.0,
+      "end": 5.075051968911917,
+      "text": "Selena Gomez is hitting a\nserious new stride this October.\nBeyond the headlines, she’s navigating",
+      "speaker": "A"
+    },
+    {
+      "index": 2,
+      "start": 5.075051968911917,
+      "end": 6.428399160621762,
+      "text": "a massive career evolution.",
+      "speaker": "A"
+    },
+    {
+      "index": 3,
+      "start": 6.928399160621762,
+      "end": 12.00345112953368,
+      "text": "That’s right. Bloomberg recently labeled\nher a billionaire, primarily due\nto the success of Rare",
+      "speaker": "B"
+    },
+    {
+      "index": 4,
+      "start": 12.00345112953368,
+      "end": 17.078503098445598,
+      "text": "Beauty, now valued at over\ntwo billion dollars. Interestingly, she\ntold reporters she finds that",
+      "speaker": "B"
+    },
+    {
+      "index": 5,
+      "start": 17.078503098445598,
+      "end": 20.46187107772021,
+      "text": "specific title distasteful and prefers\nfocusing on her brand’s impact.",
+      "speaker": "B"
+    },
+    {
+      "index": 6,
+      "start": 20.96187107772021,
+      "end": 26.03692304663213,
+      "text": "She’s also pivoting toward serious\nacting. Her role in the\nnew musical Emilia Pérez is",
+      "speaker": "A"
+    },
+    {
+      "index": 7,
+      "start": 26.03692304663213,
+      "end": 31.111975015544047,
+      "text": "generating genuine Oscar buzz. Critics\nare calling her performance revelatory\nas she plays a character",
+      "speaker": "A"
+    },
+    {
+      "index": 8,
+      "start": 31.111975015544047,
+      "end": 33.480332601036274,
+      "text": "far removed from her pop\nstar persona.",
+      "speaker": "A"
+    },
+    {
+      "index": 9,
+      "start": 33.980332601036274,
+      "end": 39.05538456994819,
+      "text": "She even mentioned to Variety\nthat she might only have\none more album left in",
+      "speaker": "B"
+    },
+    {
+      "index": 10,
+      "start": 39.05538456994819,
+      "end": 44.1304365388601,
+      "text": "her. She wants to be\ntaken seriously as an actress,\nmoving away from the safe",
+      "speaker": "B"
+    },
+    {
+      "index": 11,
+      "start": 44.1304365388601,
+      "end": 49.20548850777202,
+      "text": "lanes like Only Murders in\nthe Building, which was just\nrenewed for a fifth season.",
+      "speaker": "B"
+    },
+    {
+      "index": 12,
+      "start": 49.70548850777202,
+      "end": 54.78054047668394,
+      "text": "It’s a pragmatic shift. She’s\nbalancing a massive empire with\npassion projects while managing her",
+      "speaker": "A"
+    },
+    {
+      "index": 13,
+      "start": 54.78054047668394,
+      "end": 55.1188772746114,
+      "text": "health.",
+      "speaker": "A"
+    },
+    {
+      "index": 14,
+      "start": 55.6188772746114,
+      "end": 60.693929243523314,
+      "text": "Speaking of health, she’s been\nincredibly candid lately about her\nstruggles with lupus and her",
+      "speaker": "B"
+    },
+    {
+      "index": 15,
+      "start": 60.693929243523314,
+      "end": 64.41563402072539,
+      "text": "kidney transplant, even sharing that\nshe cannot carry her own\nchildren.",
+      "speaker": "B"
+    },
+    {
+      "index": 16,
+      "start": 64.91563402072539,
+      "end": 68.299002,
+      "text": "Her honesty de-stigmatizes these issues\nfor many families. She’s evolving.",
+      "speaker": "A"
+    }
+  ],
+  "dialogue_chunks": [
+    {
+      "speaker": "A",
+      "text": "Selena Gomez is hitting a serious new stride this October. Beyond the headlines, she’s navigating a massive career evolution."
+    },
+    {
+      "speaker": "B",
+      "text": "That’s right. Bloomberg recently labeled her a billionaire, primarily due to the success of Rare Beauty, now valued at over two billion dollars. Interestingly, she told reporters she finds that specific title distasteful and prefers focusing on her brand’s impact."
+    },
+    {
+      "speaker": "A",
+      "text": "She’s also pivoting toward serious acting. Her role in the new musical Emilia Pérez is generating genuine Oscar buzz. Critics are calling her performance revelatory as she plays a character far removed from her pop star persona."
+    },
+    {
+      "speaker": "B",
+      "text": "She even mentioned to Variety that she might only have one more album left in her. She wants to be taken seriously as an actress, moving away from the safe lanes like Only Murders in the Building, which was just renewed for a fifth season."
+    },
+    {
+      "speaker": "A",
+      "text": "It’s a pragmatic shift. She’s balancing a massive empire with passion projects while managing her health."
+    },
+    {
+      "speaker": "B",
+      "text": "Speaking of health, she’s been incredibly candid lately about her struggles with lupus and her kidney transplant, even sharing that she cannot carry her own children."
+    },
+    {
+      "speaker": "A",
+      "text": "Her honesty de-stigmatizes these issues for many families. She’s evolving."
+    }
+  ]
+}

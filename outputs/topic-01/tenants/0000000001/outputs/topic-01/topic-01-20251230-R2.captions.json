@@ -1,0 +1,142 @@
+{
+  "captions": [
+    {
+      "index": 1,
+      "start": 0.0,
+      "end": 4.863324896907216,
+      "text": "Selena Gomez is redefining what\nit means to be a\npublic figure in 2024. She",
+      "speaker": "A"
+    },
+    {
+      "index": 2,
+      "start": 4.863324896907216,
+      "end": 7.132876515463916,
+      "text": "is no longer just a\nDisney alumna.",
+      "speaker": "A"
+    },
+    {
+      "index": 3,
+      "start": 7.632876515463916,
+      "end": 12.496201412371132,
+      "text": "Exactly. Between her billionaire status\nand her advocacy, she is\nshowing immense accountability. Her Rare",
+      "speaker": "B"
+    },
+    {
+      "index": 4,
+      "start": 12.496201412371132,
+      "end": 17.359526309278348,
+      "text": "Impact Fund aims to raise\none hundred million dollars for\nmental health services, funded partly",
+      "speaker": "B"
+    },
+    {
+      "index": 5,
+      "start": 17.359526309278348,
+      "end": 19.62907792783505,
+      "text": "by one percent of Rare\nBeauty sales.",
+      "speaker": "B"
+    },
+    {
+      "index": 6,
+      "start": 20.12907792783505,
+      "end": 24.992402824742264,
+      "text": "That commitment to mental health\nis personal. She has been\nopen about her bipolar diagnosis",
+      "speaker": "A"
+    },
+    {
+      "index": 7,
+      "start": 24.992402824742264,
+      "end": 29.85572772164948,
+      "text": "and the physical toll of\nlupus. In a recent Hollywood\nReporter interview, she discussed the",
+      "speaker": "A"
+    },
+    {
+      "index": 8,
+      "start": 29.85572772164948,
+      "end": 33.097944319587626,
+      "text": "grief of learning she cannot\nsafely carry her own children.",
+      "speaker": "A"
+    },
+    {
+      "index": 9,
+      "start": 33.597944319587626,
+      "end": 38.46126921649484,
+      "text": "It is that vulnerability that\nconnects her to fans. Even\nher relationship with Benny Blanco",
+      "speaker": "B"
+    },
+    {
+      "index": 10,
+      "start": 38.46126921649484,
+      "end": 43.32459411340206,
+      "text": "has faced public scrutiny, but\nshe has set firm boundaries,\ndefending her personal choices as",
+      "speaker": "B"
+    },
+    {
+      "index": 11,
+      "start": 43.32459411340206,
+      "end": 43.973037432989685,
+      "text": "an adult.",
+      "speaker": "B"
+    },
+    {
+      "index": 12,
+      "start": 44.473037432989685,
+      "end": 49.3363623298969,
+      "text": "She’s also shining professionally. At\nthe Academy Museum Gala, she\nlooked every bit the classic",
+      "speaker": "A"
+    },
+    {
+      "index": 13,
+      "start": 49.3363623298969,
+      "end": 54.199687226804116,
+      "text": "Hollywood star. With Only Murders\nin the Building renewed for\nseason five and her film",
+      "speaker": "A"
+    },
+    {
+      "index": 14,
+      "start": 54.199687226804116,
+      "end": 57.44190382474226,
+      "text": "Emilia Pérez receiving rave reviews,\nher career is incredibly stable.",
+      "speaker": "A"
+    },
+    {
+      "index": 15,
+      "start": 57.94190382474226,
+      "end": 62.80522872164948,
+      "text": "She is proving you can\nmanage a massive business while\npursuing challenging art. She is",
+      "speaker": "B"
+    },
+    {
+      "index": 16,
+      "start": 62.80522872164948,
+      "end": 65.399002,
+      "text": "choosing her own path and\nher own future.",
+      "speaker": "B"
+    }
+  ],
+  "dialogue_chunks": [
+    {
+      "speaker": "A",
+      "text": "Selena Gomez is redefining what it means to be a public figure in 2024. She is no longer just a Disney alumna."
+    },
+    {
+      "speaker": "B",
+      "text": "Exactly. Between her billionaire status and her advocacy, she is showing immense accountability. Her Rare Impact Fund aims to raise one hundred million dollars for mental health services, funded partly by one percent of Rare Beauty sales."
+    },
+    {
+      "speaker": "A",
+      "text": "That commitment to mental health is personal. She has been open about her bipolar diagnosis and the physical toll of lupus. In a recent Hollywood Reporter interview, she discussed the grief of learning she cannot safely carry her own children."
+    },
+    {
+      "speaker": "B",
+      "text": "It is that vulnerability that connects her to fans. Even her relationship with Benny Blanco has faced public scrutiny, but she has set firm boundaries, defending her personal choices as an adult."
+    },
+    {
+      "speaker": "A",
+      "text": "She’s also shining professionally. At the Academy Museum Gala, she looked every bit the classic Hollywood star. With Only Murders in the Building renewed for season five and her film Emilia Pérez receiving rave reviews, her career is incredibly stable."
+    },
+    {
+      "speaker": "B",
+      "text": "She is proving you can manage a massive business while pursuing challenging art. She is choosing her own path and her own future."
+    }
+  ]
+}
