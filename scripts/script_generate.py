@@ -398,11 +398,13 @@ def generate_multi_format_for_topic(
         # If generator returned queries only inside Pass A text, extract them.
         # Prefer structured JSON (top-level "search_query" key) if present,
         # otherwise fall back to a SEARCH_QUERIES text section.
-        if not search_queries and pass_a_raw:
+        # If Pass A contains queries, prefer them even if generator returned fallback queries
+        # (e.g., topic default like "news").
+        if pass_a_raw:
             extracted = _parse_search_queries_from_l1_json(pass_a_raw)
             if not extracted:
                 extracted = _parse_search_queries_from_pass_a(pass_a_raw)
-            if extracted:
+            if extracted and extracted != search_queries:
                 search_queries = extracted
 
         # Final fallback: use topic-config queries/title so downstream always has something.

@@ -698,7 +698,7 @@ def _make_mock_outputs_from_source_text(config: Dict[str, Any], enabled_specs: L
         a_specs, b_specs = _enabled_specs_from_content_specs(config.get("content_specs") or [])
         all_specs = list(a_specs) + list(b_specs)
         out_all = _run_gemini_single_pass_all_v2(client, config, all_specs, sources_in)
-        return {"content": out_all.get("content", []), "sources": sources_in, "pass_a_raw_text": "", "search_queries": (out_all.get("search_queries") or out_all.get("search_query") or [])}
+        return {"content": out_all.get("content", []), "sources": sources_in, "pass_a_raw_text": ""}
 
 
 
@@ -708,14 +708,14 @@ def _make_mock_outputs_from_source_text(config: Dict[str, Any], enabled_specs: L
     if _is_gemini_model(_pick_model_pass_b(config)):
         all_specs = list(long_specs) + list(nonlong_specs)
         out_all = _run_gemini_single_pass_all_v2(client, config, all_specs, sources_in)
-        return {"content": out_all.get("content", []), "sources": sources_in, "pass_a_raw_text": "", "search_queries": (out_all.get("search_queries") or out_all.get("search_query") or [])}
+        return {"content": out_all.get("content", []), "sources": sources_in, "pass_a_raw_text": ""}
 
 
     # Gemini: single request only. Generate ALL items (including long/L1) in one response.
     if _is_gemini_model(_pick_model_pass_b(config)):
         all_specs = list(long_specs) + list(nonlong_specs)
         out_all = _run_gemini_single_pass_all_v2(client, config, all_specs, sources_in)
-        return {"content": out_all.get("content", []), "sources": sources_in, "pass_a_raw_text": "", "search_queries": (out_all.get("search_queries") or out_all.get("search_query") or [])}
+        return {"content": out_all.get("content", []), "sources": sources_in, "pass_a_raw_text": ""}
 
     # Long script (Pass A mock)
     pass_a_raw_text = ""
@@ -1564,7 +1564,7 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
             a_specs, b_specs = _enabled_specs_from_content_specs((config.get("content_specs") if isinstance(config, dict) else []) or [])
             all_specs = list(a_specs) + list(b_specs)
             out_all = _run_gemini_single_pass_all_v2(client, config, all_specs, sources_in)
-            return {"content": out_all.get("content", []), "sources": sources_in, "pass_a_raw_text": "", "search_queries": (out_all.get("search_queries") or out_all.get("search_query") or [])}
+            return {"content": out_all.get("content", []), "sources": sources_in, "pass_a_raw_text": ""}
 
 
 
@@ -1657,6 +1657,21 @@ def generate_all_content_two_pass(*args, **kwargs) -> Dict[str, Any]:
         if not raw:
             return []
         text = str(raw)
+        # First, if Pass A returned JSON, prefer top-level search_query/search_queries.
+        try:
+            import json as _json
+            obj = _extract_first_json_object(text)
+            if obj is None and text.lstrip().startswith("{"):
+                obj = _json.loads(text)
+            if isinstance(obj, dict):
+                qs = obj.get("search_queries") or obj.get("search_query") or []
+                if isinstance(qs, str):
+                    qs = [qs]
+                if isinstance(qs, (list, tuple)):
+                    return _normalize_queries(qs)
+        except Exception:
+            pass
+
         # Find the section header
         import re
         m = re.search(r"(?im)^\s*(search[_\s-]*queries)\s*:\s*$", text)
