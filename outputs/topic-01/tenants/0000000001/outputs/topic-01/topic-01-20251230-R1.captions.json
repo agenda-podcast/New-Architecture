@@ -1,0 +1,131 @@
+{
+  "captions": [
+    {
+      "index": 1,
+      "start": 0.0,
+      "end": 5.202614692307693,
+      "text": "Selena Gomez is making major\nwaves in Georgia this week.\nOn October 23, 2024, she",
+      "speaker": "A"
+    },
+    {
+      "index": 2,
+      "start": 5.202614692307693,
+      "end": 10.405229384615385,
+      "text": "attended the SCAD Savannah Film\nFestival to receive the prestigious\nVirtuoso Award. This honor recognizes",
+      "speaker": "A"
+    },
+    {
+      "index": 3,
+      "start": 10.405229384615385,
+      "end": 13.526798200000002,
+      "text": "her standout performance in the\nnew film Emilia Pérez.",
+      "speaker": "A"
+    },
+    {
+      "index": 4,
+      "start": 14.026798200000002,
+      "end": 19.229412892307693,
+      "text": "That is right. Directed by\nJacques Audiard, this Spanish language\nmusical features Selena as Jessi,",
+      "speaker": "B"
+    },
+    {
+      "index": 5,
+      "start": 19.229412892307693,
+      "end": 24.432027584615383,
+      "text": "the wife of a cartel\nleader. It is a bold\ncareer pivot that has critics",
+      "speaker": "B"
+    },
+    {
+      "index": 6,
+      "start": 24.432027584615383,
+      "end": 29.634642276923074,
+      "text": "buzzing about a potential Supporting\nActress Oscar nomination. During her\ntime in Savannah, Selena wore",
+      "speaker": "B"
+    },
+    {
+      "index": 7,
+      "start": 29.634642276923074,
+      "end": 34.837256969230765,
+      "text": "an elegant black gown and\nspent time mentoring students, emphasizing\nthat vulnerability is a strength.",
+      "speaker": "B"
+    },
+    {
+      "index": 8,
+      "start": 35.337256969230765,
+      "end": 40.539871661538456,
+      "text": "She also spoke candidly with\nVariety and The Hollywood Reporter\nabout the challenges of this",
+      "speaker": "A"
+    },
+    {
+      "index": 9,
+      "start": 40.539871661538456,
+      "end": 45.74248635384615,
+      "text": "role. She admitted to being\nterrified because she had to\nsing in Spanish, a process",
+      "speaker": "A"
+    },
+    {
+      "index": 10,
+      "start": 45.74248635384615,
+      "end": 47.823532230769224,
+      "text": "she worked incredibly hard to\nreclaim.",
+      "speaker": "A"
+    },
+    {
+      "index": 11,
+      "start": 48.323532230769224,
+      "end": 53.526146923076915,
+      "text": "It is not just about\nthe acting, though. Selena is\nbalancing this awards push with",
+      "speaker": "B"
+    },
+    {
+      "index": 12,
+      "start": 53.526146923076915,
+      "end": 58.728761615384606,
+      "text": "her billion dollar brand, Rare\nBeauty, and her mental health\nadvocacy through the Rare Impact",
+      "speaker": "B"
+    },
+    {
+      "index": 13,
+      "start": 58.728761615384606,
+      "end": 63.9313763076923,
+      "text": "Fund. With the film hitting\nNetflix on November 13, she\nis effectively dominating the film",
+      "speaker": "B"
+    },
+    {
+      "index": 14,
+      "start": 63.9313763076923,
+      "end": 64.97189924615384,
+      "text": "and music cycles.",
+      "speaker": "B"
+    },
+    {
+      "index": 15,
+      "start": 65.47189924615384,
+      "end": 69.633991,
+      "text": "She is proving that consistent\nwork and professional accountability lead\nto success.",
+      "speaker": "A"
+    }
+  ],
+  "dialogue_chunks": [
+    {
+      "speaker": "A",
+      "text": "Selena Gomez is making major waves in Georgia this week. On October 23, 2024, she attended the SCAD Savannah Film Festival to receive the prestigious Virtuoso Award. This honor recognizes her standout performance in the new film Emilia Pérez."
+    },
+    {
+      "speaker": "B",
+      "text": "That is right. Directed by Jacques Audiard, this Spanish language musical features Selena as Jessi, the wife of a cartel leader. It is a bold career pivot that has critics buzzing about a potential Supporting Actress Oscar nomination. During her time in Savannah, Selena wore an elegant black gown and spent time mentoring students, emphasizing that vulnerability is a strength."
+    },
+    {
+      "speaker": "A",
+      "text": "She also spoke candidly with Variety and The Hollywood Reporter about the challenges of this role. She admitted to being terrified because she had to sing in Spanish, a process she worked incredibly hard to reclaim."
+    },
+    {
+      "speaker": "B",
+      "text": "It is not just about the acting, though. Selena is balancing this awards push with her billion dollar brand, Rare Beauty, and her mental health advocacy through the Rare Impact Fund. With the film hitting Netflix on November 13, she is effectively dominating the film and music cycles."
+    },
+    {
+      "speaker": "A",
+      "text": "She is proving that consistent work and professional accountability lead to success."
+    }
+  ]
+}
