@@ -449,6 +449,112 @@ def split_into_chunks(text: str, max_chars: int = 500) -> List[str]:
     return chunks
 
 
+
+def _split_text_near_middle(text: str) -> tuple[str, str]:
+    """Split text into two parts near the middle, preferring whitespace boundaries.
+
+    This is used as a fallback if a TTS request fails for a chunk. The split is
+    deterministic, and preserves left-to-right ordering.
+    """
+    s = (text or "").strip()
+    if not s:
+        return "", ""
+    if len(s) <= 1:
+        return s, ""
+    mid = len(s) // 2
+
+    # Prefer splitting on whitespace near the midpoint to avoid cutting words.
+    # Search outward from mid within a bounded window.
+    window = min(120, max(20, len(s) // 4))
+    best = None
+    for delta in range(0, window + 1):
+        for idx in (mid - delta, mid + delta):
+            if 0 < idx < len(s) and s[idx].isspace():
+                best = idx
+                break
+        if best is not None:
+            break
+
+    split_at = best if best is not None else mid
+    left = s[:split_at].strip()
+    right = s[split_at:].strip()
+
+    # Guard against pathological splits producing empty parts
+    if not left and right:
+        # move a little left
+        split_at = max(1, min(len(s) - 1, mid))
+        left = s[:split_at].strip()
+        right = s[split_at:].strip()
+    if not right and left:
+        split_at = max(1, min(len(s) - 1, mid))
+        left = s[:split_at].strip()
+        right = s[split_at:].strip()
+    return left, right
+
+
+def generate_tts_with_retry(
+    text: str,
+    voice: str,
+    premium: bool,
+    cache_dir: Path,
+    *,
+    max_chars: int = 500,
+    _depth: int = 0,
+) -> List[tuple[str, Path]]:
+    """Generate TTS for text with retry-by-splitting on failure.
+
+    - Enforces max_chars (best-effort) for initial splitting.
+    - If a provider call fails for a chunk, split that chunk into 2 parts and retry.
+    - Returns a list of (text_part, audio_path) in correct playback order.
+    """
+    s = (text or "").strip()
+    if not s:
+        return []
+
+    # Hard safety to avoid runaway recursion.
+    if _depth > 10:
+        raise RuntimeError("TTS retry recursion limit reached")
+
+    # Ensure we don't exceed configured max_chars for initial attempts.
+    if len(s) > max_chars:
+        parts: List[tuple[str, Path]] = []
+        for p in split_into_chunks(s, max_chars=max_chars):
+            parts.extend(
+                generate_tts_with_retry(
+                    p, voice, premium, cache_dir, max_chars=max_chars, _depth=_depth + 1
+                )
+            )
+        return parts
+
+    try:
+        audio_path = generate_tts_chunk(s, voice, premium, cache_dir)
+        return [(s, audio_path)]
+    except Exception:
+        # Split and retry
+        if len(s) <= 20:
+            # Too small to split further meaningfully.
+            raise
+
+        left, right = _split_text_near_middle(s)
+        if not left and not right:
+            raise
+        out: List[tuple[str, Path]] = []
+        if left:
+            out.extend(
+                generate_tts_with_retry(
+                    left, voice, premium, cache_dir, max_chars=max_chars, _depth=_depth + 1
+                )
+            )
+        if right:
+            out.extend(
+                generate_tts_with_retry(
+                    right, voice, premium, cache_dir, max_chars=max_chars, _depth=_depth + 1
+                )
+            )
+        return out
+
+
+
 def tts_chunks_to_audio(dialogue_chunks: List[Dict[str, str]], audio_path: Path, 
                         config: Dict[str, Any]) -> bool:
     """
@@ -710,14 +816,16 @@ def _tts_traditional(dialogue_chunks: List[Dict[str, str]], audio_path: Path,
         text_chunks = split_into_chunks(text, max_chars=500)
         
         for text_chunk in text_chunks:
-            # generate_tts_chunk will now raise an exception on failure
-            audio_file = generate_tts_chunk(text_chunk, voice, premium, cache_dir)
-            audio_files.append(audio_file)
-            utterances.append({
-                'speaker': speaker,
-                'text': text_chunk,
-                'audio_path': str(audio_file)
-            })
+            # Generate TTS; if provider fails for this chunk, split by 2 and retry.
+            for part_text, audio_file in generate_tts_with_retry(
+                text_chunk, voice, premium, cache_dir, max_chars=500
+            ):
+                audio_files.append(audio_file)
+                utterances.append({
+                    'speaker': speaker,
+                    'text': part_text,
+                    'audio_path': str(audio_file)
+                })
     
     if not audio_files:
         print("No audio files generated")
