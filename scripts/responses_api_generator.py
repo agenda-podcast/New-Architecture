@@ -60,9 +60,9 @@ from model_limits import clamp_output_tokens, default_max_output_tokens
 from openai_utils import create_openai_completion, extract_completion_text
 
 try:
-    # Gemini support is optional; keep import conservative.
     from gemini_utils import gemini_generate_once  # type: ignore
 except Exception:  # pragma: no cover
+    gemini_generate_once = None  # type: ignore
     gemini_generate_once = None  # type: ignore
 
 logger = logging.getLogger(__name__)
@@ -825,34 +825,28 @@ def _gemini_part_tokens(env_key: str, default: int) -> int:
 
 
 def _gemini_generate_text(*, model: str, prompt: str, json_mode: bool) -> str:
-    """Gemini generation (single request).
+"""Gemini generation (single request).
 
-    Guarantees exactly ONE HTTP request per call (no chunking / no tool loops).
-    """
-    if gemini_generate_once is None:
-        raise ImportError("Gemini support is unavailable: google-genai not installed")
+IMPORTANT: Exactly ONE HTTP request per call (no chunking / continuation).
+"""
+if gemini_generate_once is None:
+    raise ImportError("Gemini support is unavailable: missing gemini_utils / google credentials")
 
-    if not (prompt or "").strip():
-        raise ValueError("LLM prompt is empty — refusing to call Gemini")
+if not (prompt or "").strip():
+    raise ValueError("LLM prompt is empty — refusing to call Gemini provider.")
 
-    max_out = _safe_int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS"), 0)  # 0 => gemini default (model max)
-    temperature = float(os.getenv("GEMINI_TEMPERATURE", "0.2"))
+max_out = _safe_int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS"), 0)  # 0 => gemini_utils default (model max)
+temperature = float(os.getenv("GEMINI_TEMPERATURE", "0.2"))
 
-    return gemini_generate_once(
-        model=model,
-        prompt=prompt,
-        max_output_tokens=max_out,
-        temperature=temperature,
-        json_mode=bool(json_mode),
-    )
+return gemini_generate_once(
+    model=model,
+    prompt=prompt,
+    max_output_tokens=max_out,
+    temperature=temperature,
+    json_mode=bool(json_mode),
+)
 
-
-def _build_pass_a_prompt(
-    config: Dict[str, Any],
-    long_specs: List[Dict[str, Any]],
-    *,
-    allow_web_search_tool: bool = True,
-) -> str:
+def _build_pass_a_prompt(config: Dict[str, Any], long_specs: List[Dict[str, Any]]) -> str:
     """
     Pass A prompt: ONLY "SOURCES" and "SCRIPT" in plain text. No JSON.
     """
@@ -873,20 +867,8 @@ def _build_pass_a_prompt(
     for s in long_specs:
         target_words = max(target_words, _safe_int(s.get("target_words") or s.get("max_words"), 9000))
 
-    tool_line = (
-        'You MUST use the web_search tool before writing to verify the latest news and to avoid any "knowledge cutoff" disclaimers.'
-        if allow_web_search_tool
-        else 'Do NOT call or reference any browsing/search tools. If a detail is uncertain, omit it rather than guessing.'
-    )
-
-    search_guidance_hdr = (
-        'Search guidance (use as web_search queries; adjust as needed):'
-        if allow_web_search_tool
-        else 'Search guidance (treat these as topical anchors only; do NOT claim you searched):'
-    )
-
     return f"""You are a newsroom producer and dialogue scriptwriter for an English-language news podcast.
-{tool_line}
+Do not mention browsing or search tools. Use only the SOURCES provided (or the retrieved SOURCES text) and the existing context in this prompt.
 
 Topic: {topic}
 Topic description: {desc}
@@ -897,7 +879,7 @@ Host personas:
 - HOST_A ({hosts['host_a_name']}): {hosts['host_a_bio']}
 - HOST_B ({hosts['host_b_name']}): {hosts['host_b_bio']}
 
-{search_guidance_hdr}
+Search guidance (use as web_search queries; adjust as needed):
 {query_txt}
 
 OUTPUT FORMAT (STRICT — no markdown, no JSON):
@@ -1116,7 +1098,7 @@ def _run_pass_a(
     Run Pass A. Returns: (sources_list, sources_text, script_text, raw_text)
     """
     model = _pick_model_pass_a(config)
-    prompt = _build_pass_a_prompt(config, long_specs, allow_web_search_tool=not _is_gemini_model(model))
+    prompt = _build_pass_a_prompt(config, long_specs)
 
     # Gemini path (chunked to fit CI constraints).
     if _is_gemini_model(model):
@@ -1706,44 +1688,10 @@ Return STRICT JSON only:
             sources_out = out_b.get("sources", []) or []
             content.extend(out_b.get("content", []))
 
-    # Canonical search queries for downstream image collection.
-    search_queries: List[str] = []
-    try:
-        # Prefer topic config queries.
-        qs = config.get("queries") or []
-        if isinstance(qs, (list, tuple)):
-            search_queries = [str(q).strip() for q in qs if str(q).strip()]
-        elif isinstance(qs, str) and qs.strip():
-            search_queries = [qs.strip()]
-
-        # If none provided, derive a few anchors from sources titles.
-        if not search_queries:
-            for s in (sources_out or [])[:8]:
-                title = str((s or {}).get("title") or "").strip()
-                pub = str((s or {}).get("publisher") or "").strip()
-                if title:
-                    # Keep queries short and search-engine friendly.
-                    q = re.sub(r"\s+", " ", re.sub(r"[^\w\s\-:'\"]", " ", title)).strip()
-                    if pub and pub.lower() not in q.lower():
-                        q = f"{q} {pub}"
-                    if q and q not in search_queries:
-                        search_queries.append(q)
-                if len(search_queries) >= 5:
-                    break
-
-        # Final fallback: topic/title.
-        if not search_queries:
-            t = str(config.get("title") or config.get("topic") or "").strip()
-            if t:
-                search_queries = [t]
-    except Exception:
-        search_queries = [str(config.get("title") or config.get("topic") or "").strip()]
-
     return {
         "content": content,
         "sources": sources_out,
         "pass_a_raw_text": pass_a_raw_text,
-        "search_queries": search_queries,
     }
 
 
