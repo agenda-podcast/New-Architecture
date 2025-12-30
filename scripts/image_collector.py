@@ -31,9 +31,9 @@ except ImportError:
     logger.warning("google-api-python-client not available - image collection disabled")
 
 # Configuration
-DEFAULT_NUM_IMAGES = 50  # Number of images to collect per topic
-MAX_NUM_IMAGES = 50  # Maximum images to collect
-IMAGE_SEARCH_TIMEOUT = 10  # Timeout for image downloads in seconds
+DEFAULT_NUM_IMAGES = 500  # Number of images to collect per topic
+MAX_NUM_IMAGES = 500  # Maximum images to collect
+IMAGE_SEARCH_TIMEOUT = 100  # Timeout for image downloads in seconds
 
 # Metadata sidecar saved next to downloaded images.
 IMAGES_METADATA_FILENAME = "images_metadata.json"
