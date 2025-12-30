@@ -1637,7 +1637,7 @@ def discover_images(images_dir: Path) -> List[Path]:
     return sorted(image_files, key=lambda p: p.name)
 
 
-def collect_topic_images(topic_config: Dict[str, Any], output_dir: Path) -> Path:
+def collect_topic_images(topic_config: Dict[str, Any], output_dir: Path, topic_id: str, date_str: str) -> Path:
     """
     Collect images for a topic using Google Custom Search API.
     
@@ -1647,6 +1647,8 @@ def collect_topic_images(topic_config: Dict[str, Any], output_dir: Path) -> Path
     Args:
         topic_config: Topic configuration dictionary
         output_dir: Output directory for the topic
+        topic_id: Topic identifier (e.g., 'topic-01')
+        date_str: Date string in YYYYMMDD format
         
     Returns:
         Path to images directory with collected images
@@ -1738,7 +1740,7 @@ def collect_topic_images(topic_config: Dict[str, Any], output_dir: Path) -> Path
             
             print("")
             
-            # Get topic queries.
+    # Get topic queries.
             # Prefer canonical search queries emitted by scripts module.
             # 1) In-process cache (most reliable in the sequential pipeline)
             # 2) Exact file for this topic/date (avoid picking the wrong run via mtime)
@@ -2921,7 +2923,7 @@ def render_multi_format_for_topic(topic_id: str, date_str: str,
     
     # Step 1: Collect images using Google Custom Search API
     print(f"\nStep 1: Collecting images using Google Custom Search API...")
-    images_dir = collect_topic_images(config, output_dir)
+    images_dir = collect_topic_images(config, output_dir, topic_id=topic_id, date_str=date_str)
     
     # Get all images for video rendering (auto-discover with supported extensions)
     image_files = discover_images(images_dir)
