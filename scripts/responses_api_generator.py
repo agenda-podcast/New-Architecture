@@ -825,26 +825,29 @@ def _gemini_part_tokens(env_key: str, default: int) -> int:
 
 
 def _gemini_generate_text(*, model: str, prompt: str, json_mode: bool) -> str:
-"""Gemini generation (single request).
+    """Gemini generation (single request).
 
-IMPORTANT: Exactly ONE HTTP request per call (no chunking / continuation).
-"""
-if gemini_generate_once is None:
-    raise ImportError("Gemini support is unavailable: missing gemini_utils / google credentials")
+    IMPORTANT: Exactly ONE HTTP request per call (no chunking / continuation).
+    """
+    if gemini_generate_once is None:
+        raise ImportError(
+            "Gemini support is unavailable: missing gemini_utils / google credentials"
+        )
 
-if not (prompt or "").strip():
-    raise ValueError("LLM prompt is empty — refusing to call Gemini provider.")
+    if not (prompt or "").strip():
+        raise ValueError("LLM prompt is empty — refusing to call Gemini provider.")
 
-max_out = _safe_int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS"), 0)  # 0 => gemini_utils default (model max)
-temperature = float(os.getenv("GEMINI_TEMPERATURE", "0.2"))
+    # 0 => gemini_utils default (model max)
+    max_out = _safe_int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS"), 0)
+    temperature = float(os.getenv("GEMINI_TEMPERATURE", "0.2"))
 
-return gemini_generate_once(
-    model=model,
-    prompt=prompt,
-    max_output_tokens=max_out,
-    temperature=temperature,
-    json_mode=bool(json_mode),
-)
+    return gemini_generate_once(
+        model=model,
+        prompt=prompt,
+        max_output_tokens=max_out,
+        temperature=temperature,
+        json_mode=bool(json_mode),
+    )
 
 def _build_pass_a_prompt(config: Dict[str, Any], long_specs: List[Dict[str, Any]]) -> str:
     """
