@@ -894,6 +894,7 @@ SOURCES:
 SCRIPT:
 Write ONE long dialogue script (= {target_words} words) between HOST_A and HOST_B.
 - Use concrete dates.
+- On start read all the news titles. Next read each news with discussions.
 - Clearly distinguish verified facts vs claims.
 - Keep it engaging but grounded.
 - No bullet lists inside the script; write as spoken dialogue with speaker tags.
@@ -932,8 +933,8 @@ You will be given:
 2) LONG_SCRIPT (dialogue)
 
 Your task:
-- Create summarized/derived scripts for each requested item below.
-- Do NOT introduce new facts. Use ONLY what is supported by LONG_SCRIPT and SOURCES.
+- Create scripts for each requested item below without duplication
+- Read all titles of news and if you have time then discuss each.
 - Return ALL items in ONE response as STRICT JSON (no markdown).
 
 Topic: {topic}
