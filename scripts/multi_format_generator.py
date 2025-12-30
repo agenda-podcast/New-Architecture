@@ -136,11 +136,13 @@ def generate_multi_format_scripts(config: Dict[str, Any], sources: List[Dict[str
         content_list = out.get("content", []) or []
         sources_out = out.get("sources", []) or []
         pass_a_raw = out.get("pass_a_raw_text", "") or ""
+        search_queries = out.get("search_queries") or []
 
         return {
             "content": content_list,
             "sources": sources_out,
             "pass_a_raw_text": pass_a_raw,
+            "search_queries": search_queries,
         }
 
     finally:
