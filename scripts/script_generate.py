@@ -37,6 +37,146 @@ except Exception:
 
 
 # ---------------------------------------------------------------------------
+# In-process search query cache
+# ---------------------------------------------------------------------------
+#
+# The pipeline frequently runs modules in-process (run_pipeline.py invokes
+# scripts -> images -> ...). If we rely only on a written JSON file, we can lose
+# queries due to ordering, early exceptions, or later code reading the wrong
+# file. This cache allows the images/video modules to consume the canonical
+# queries produced by Pass A in the same process, even before files are written.
+
+_SEARCH_QUERIES_CACHE: Dict[tuple[str, str], List[str]] = {}
+
+
+def cache_search_queries(topic_id: str, date_str: str, queries: List[str]) -> None:
+    key = (str(topic_id), str(date_str))
+    _SEARCH_QUERIES_CACHE[key] = [str(q).strip() for q in (queries or []) if str(q).strip()]
+
+
+def get_cached_search_queries(topic_id: str, date_str: str) -> List[str]:
+    return list(_SEARCH_QUERIES_CACHE.get((str(topic_id), str(date_str)), []))
+
+
+def _parse_search_queries_from_pass_a(text: str) -> List[str]:
+    """Extract SEARCH_QUERIES section from Pass A raw text.
+
+    Supports formats like:
+      SEARCH_QUERIES:
+      - query
+      1) query
+    Stops at SOURCES/SCRIPT or an empty line.
+    """
+    if not text:
+        return []
+
+    # Normalize newlines
+    t = text.replace("\r\n", "\n").replace("\r", "\n")
+    m = re.search(r"(?im)^\s*SEARCH\s*_?QUERIES\s*:\s*$", t)
+    if not m:
+        return []
+
+    lines = t[m.end():].split("\n")
+    out: List[str] = []
+    for raw in lines:
+        line = raw.strip()
+        if not line:
+            # stop at first blank once we have at least one query
+            if out:
+                break
+            continue
+        # stop when we hit the next section
+        if re.match(r"(?i)^(SOURCES|SCRIPT)\s*:\s*$", line):
+            break
+        # Strip bullets/numbering
+        line = re.sub(r"^[-*•\u2022]\s+", "", line)
+        line = re.sub(r"^\(?\d+\)?[.)]\s+", "", line)
+        line = line.strip()
+        if line:
+            out.append(line)
+    # Deduplicate while preserving order
+    seen = set()
+    deduped: List[str] = []
+    for q in out:
+        k = q.lower()
+        if k in seen:
+            continue
+        seen.add(k)
+        deduped.append(q)
+    return deduped
+
+
+def _parse_search_queries_from_l1_json(text: str) -> List[str]:
+    """Extract search queries from an L1 JSON response.
+
+    Some L1 generators return a strict JSON object with a top-level
+    "search_query" list (singular) rather than an explicit SEARCH_QUERIES
+    text section.
+
+    This function attempts to parse JSON from the provided text and returns a
+    de-duplicated list of queries.
+    """
+    if not text:
+        return []
+
+    t = text.strip()
+    if not t:
+        return []
+
+    # Best-effort JSON extraction: try full text, then the first JSON object.
+    candidates: List[str] = [t]
+    if not t.startswith("{"):
+        i = t.find("{")
+        j = t.rfind("}")
+        if 0 <= i < j:
+            candidates.append(t[i : j + 1])
+
+    obj = None
+    for cand in candidates:
+        try:
+            obj = json.loads(cand)
+            break
+        except Exception:
+            continue
+    if not isinstance(obj, dict):
+        return []
+
+    raw = obj.get("search_query")
+    if raw is None:
+        raw = obj.get("search_queries")
+    if raw is None:
+        # Some providers may nest this under content[0]
+        try:
+            content0 = (obj.get("content") or [None])[0]
+            if isinstance(content0, dict):
+                raw = content0.get("search_query") or content0.get("search_queries")
+        except Exception:
+            raw = None
+
+    if raw is None:
+        return []
+
+    out: List[str] = []
+    if isinstance(raw, str) and raw.strip():
+        out = [raw.strip()]
+    elif isinstance(raw, (list, tuple)):
+        out = [str(x).strip() for x in raw if str(x).strip()]
+    else:
+        return []
+
+    # Deduplicate while preserving order
+    seen = set()
+    deduped: List[str] = []
+    for q in out:
+        k = q.lower()
+        if k in seen:
+            continue
+        seen.add(k)
+        deduped.append(q)
+    return deduped
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -68,58 +208,6 @@ def _is_testing_or_gesting_mode(config: Dict[str, Any]) -> bool:
     except Exception:
         pass
     return False
-
-
-def _extract_search_queries_from_pass_a(pass_a_raw: str) -> List[str]:
-    """Extract SEARCH_QUERIES from L1 (Pass A) raw text.
-
-    Supports formats like:
-      SEARCH_QUERIES:
-      - query
-      1) query
-      [1] query
-
-    Stops when it reaches another section header (e.g., SOURCES:, SCRIPT:).
-    """
-    text = (pass_a_raw or "").strip()
-    if not text:
-        return []
-
-    # Find the SEARCH_QUERIES section.
-    m = re.search(r"(?im)^\s*SEARCH[_\s-]*QUERIES\s*:\s*$", text)
-    if not m:
-        return []
-
-    after = text[m.end():]
-    lines = after.splitlines()
-    out: List[str] = []
-
-    for raw in lines:
-        line = raw.rstrip("\n")
-        if re.match(r"(?im)^\s*(SOURCES|SCRIPT|LONG_SCRIPT|JSON\s*OUTPUT\s*SCHEMA)\s*:\s*$", line.strip()):
-            break
-        if not line.strip():
-            # allow blank lines inside the section
-            continue
-
-        # Strip common list prefixes: '-', '*', '1.', '1)', '[1]'
-        cleaned = re.sub(r"^\s*(?:[-*]|\d+[\.)]|\[\d+\])\s+", "", line).strip()
-        if cleaned:
-            out.append(cleaned)
-
-        if len(out) >= 8:
-            break
-
-    # De-dupe while preserving order
-    deduped: List[str] = []
-    seen = set()
-    for q in out:
-        k = q.lower()
-        if k in seen:
-            continue
-        seen.add(k)
-        deduped.append(q)
-    return deduped
 
 
 def _estimate_duration_sec_from_words(words: int, wpm: int = 150) -> int:
@@ -307,22 +395,29 @@ def generate_multi_format_for_topic(
         except Exception:
             search_queries = []
 
-        # If generator did not provide structured search queries, attempt to
-        # extract them from Pass A raw text (Gemini often returns them as a
-        # plain-text section).
+        # If generator returned queries only inside Pass A text, extract them.
+        # Prefer structured JSON (top-level "search_query" key) if present,
+        # otherwise fall back to a SEARCH_QUERIES text section.
         if not search_queries and pass_a_raw:
-            try:
-                search_queries = _extract_search_queries_from_pass_a(pass_a_raw)
-            except Exception:
-                search_queries = []
+            extracted = _parse_search_queries_from_l1_json(pass_a_raw)
+            if not extracted:
+                extracted = _parse_search_queries_from_pass_a(pass_a_raw)
+            if extracted:
+                search_queries = extracted
 
-        # Final fallback: topic config/title.
+        # Final fallback: use topic-config queries/title so downstream always has something.
         if not search_queries:
-            fallback = config.get("queries") or [config.get("title", "")]  # type: ignore
-            if isinstance(fallback, str):
-                fallback = [fallback]
-            if isinstance(fallback, (list, tuple)):
-                search_queries = [str(q).strip() for q in fallback if str(q).strip()]
+            cfg_qs = config.get("queries") or []
+            if isinstance(cfg_qs, str) and cfg_qs.strip():
+                search_queries = [cfg_qs.strip()]
+            elif isinstance(cfg_qs, list) and any(str(x).strip() for x in cfg_qs):
+                search_queries = [str(x).strip() for x in cfg_qs if str(x).strip()]
+            else:
+                title = (config.get("title") or topic_id)
+                search_queries = [str(title).strip()] if str(title).strip() else []
+
+        # Cache for in-process consumers (images/video) so they can use it immediately.
+        cache_search_queries(topic_id, date_str, search_queries)
 
         queries_path = output_dir / f"{topic_id}-{date_str}.search_queries.json"
         with open(queries_path, "w", encoding="utf-8") as f:

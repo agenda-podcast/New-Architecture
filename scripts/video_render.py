@@ -1739,18 +1739,27 @@ def collect_topic_images(topic_config: Dict[str, Any], output_dir: Path) -> Path
             print("")
             
             # Get topic queries.
-            # Prefer canonical search queries emitted by Pass A and saved by scripts module.
+            # Prefer canonical search queries emitted by scripts module.
+            # 1) In-process cache (most reliable in the sequential pipeline)
+            # 2) Exact file for this topic/date (avoid picking the wrong run via mtime)
             topic_queries = None
             try:
-                import json
+                import script_generate as _sg
+                cached = _sg.get_cached_search_queries(topic_id, date_str)
+                if cached:
+                    topic_queries = cached
+            except Exception:
+                pass
+            try:
                 qpath = output_dir / f"{topic_id}-{date_str}.search_queries.json"
                 if qpath.exists():
-                    data = json.loads(qpath.read_text(encoding="utf-8"))
-                    qs = data.get("search_queries") or []
+                    import json
+                    data = json.loads(qpath.read_text(encoding='utf-8'))
+                    qs = data.get('search_queries') or []
                     if isinstance(qs, list) and any(str(x).strip() for x in qs):
                         topic_queries = [str(x).strip() for x in qs if str(x).strip()]
             except Exception:
-                topic_queries = None
+                pass
 
             if not topic_queries:
                 topic_queries = topic_config.get('queries', [topic_config.get('title', '')])

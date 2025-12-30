@@ -98,8 +98,17 @@ def run_for_topic(
             out_dir = get_output_dir(topic_id)
             images_dir = out_dir / IMAGES_SUBDIR
             images_dir.mkdir(parents=True, exist_ok=True)
-            # Prefer canonical search queries emitted by responses_api_generator (saved by scripts module).
+            # Prefer canonical search queries emitted by scripts module.
+            # 1) In-process cache (most reliable when running modules sequentially in one process)
+            # 2) Written JSON file
             queries = None
+            try:
+                import script_generate as _sg
+                cached = _sg.get_cached_search_queries(topic_id, date_str)
+                if cached:
+                    queries = cached
+            except Exception:
+                pass
             try:
                 qpath = out_dir / f"{topic_id}-{date_str}.search_queries.json"
                 if qpath.exists():
